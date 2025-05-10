@@ -885,7 +885,7 @@ def print_prett(tree):
 
     _collect(tree.node)
 
-def print_pretty(tree):
+def print_pretty(set):
     """
     Prints a B+-tree so:
       • Lines go from highest rank down to 1.
@@ -893,16 +893,32 @@ def print_pretty(tree):
       • All columns have the same width, so initial indent and
         inter-node spacing are uniform.
     """
-    if tree is None:
-        return f"{type(tree).__name__}: None"
+    if set is None:
+        return f"{type(set).__name__}: None"
 
-    if not (isinstance(tree, GPlusTreeBase) or isinstance(tree.node, KListBase)):
-        raise TypeError(f"print_pretty() expects GPlusTreeBase or KListBase, got {type(tree).__name__}")
+    if not (isinstance(set, GPlusTreeBase) or isinstance(set, KListBase)):
+        raise TypeError(f"print_pretty() expects GPlusTreeBase or KListBase, got {type(set).__name__}")
 
-    if tree.is_empty():
-        return f"{type(tree).__name__}: Empty"
+    if set.is_empty():
+        return f"{type(set).__name__}: Empty"
     
     SEP = " | "
+    set_type = type(set).__name__
+
+    if isinstance(set, KListBase):
+        texts = []
+        node = set.head
+        node_idx = 0
+        while node is not None:
+            text = ("[" + SEP.join(str(e.item.key) for e in node.entries)+ "]")
+            texts.append(text)
+            node_idx += 1
+            node = node.next
+        # print(f"Klist Height: {height}")
+        res_text = " ".join(texts)
+        return f"({set_type}): {res_text}"
+
+    tree = set
 
     # 1) First pass: collect each node's text and track max length
     layers_raw  = collections.defaultdict(list)  # rank -> list of node-strings
@@ -961,7 +977,7 @@ def print_pretty(tree):
         # indent to reflect depth
         # prefix = " " * ((rank - 1) * column_width) + "  "
         if i == 0:
-            # first line: no indent
+            # first line: constant indent
             prefix = "  "
         else:
             # print(layers[i+1])
@@ -980,5 +996,6 @@ def print_pretty(tree):
         out_lines.append(f"Rank {rank}:{prefix}{line}")
 
     # join with newlines and return
-    return "\n\n".join(reversed(out_lines)) + "\n\n"
+    res_text = set_type + "\n" + "\n\n".join(reversed(out_lines)) + "\n"
+    return res_text
     

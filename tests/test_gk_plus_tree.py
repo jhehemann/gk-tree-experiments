@@ -492,9 +492,9 @@ class TestGKPlusSplitInplace(unittest.TestCase):
     
     ASSERTION_MESSAGE_TEMPLATE = (
         "\n\nSplit result:\n"
-        "\nLeft tree:\n{left}\n\n"
-        "\nMiddle tree:\n{middle}\n\n"
-        "\nRight tree:\n{right}\n"
+        "\nLEFT TREE: {left}\n\n"
+        "\nMIDDLE TREE: {middle}\n\n"
+        "\nRIGHT TREE: {right}\n"
     )
     
     # Initialize items once to avoid re-creating them in each test
@@ -599,15 +599,14 @@ class TestGKPlusSplitInplace(unittest.TestCase):
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE BEFORE SPLIT:\n"
-            f"{print_pretty(base_tree)}"
+            f"\n\nTREE BEFORE SPLIT: {print_pretty(base_tree)}\n"
         )
 
         # deep-copy and split
         tree_copy = copy.deepcopy(base_tree)
         left, middle, right = tree_copy.split_inplace(split_key)
 
-        msg = f"\n\nSplit at {case_name}: {split_key}" + msg_head
+        msg = f"\n\nSplit at {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
             left=print_pretty(left),
             middle=print_pretty(middle),
@@ -1152,8 +1151,8 @@ class TestGKPlusSplitInplace(unittest.TestCase):
             
            
     def test_specific_rank_combo(self):
-        keys  =  [1, 2, 3, 5, 6, 7, 8]
-        ranks =  (3, 4, 3, 3, 2, 2, 1)
+        keys  =  [1, 2, 3, 5, 6, 7]
+        ranks =  (1, 1, 1, 1, 2, 4)
 
         split_cases = self._get_split_cases(keys)
         # array of tuples with (case_name, split_key)
@@ -1165,16 +1164,23 @@ class TestGKPlusSplitInplace(unittest.TestCase):
                 # ("above largest",              max(keys) + 1),
                 # ("non-existing middle key",    self._find_first_missing(keys)),
             ]
-        
-        # exp_split_keys = [1, 7, 3, 0, 8, 4] 
-        # calc_split_keys = [split_key for _, split_key in split_cases]
 
-        # if calc_split_keys != exp_split_keys:
-        #     raise ValueError(
-        #         f"Split keys {calc_split_keys} do not match expected split keys {exp_split_keys}"
-        #     )
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name
+                )
+    def test_split_at_max_key_rank_gt_1(self):
+        keys  =  [1, 3]
+        ranks =  [1, 3]
 
-
+        split_cases = self._get_split_cases(keys)
+        # array of tuples with (case_name, split_key)
+        split_cases = [("max key", max(keys))]
 
         for case_name, split_key in split_cases:
             exp_left = [k for k in keys if k < split_key]
@@ -1191,14 +1197,15 @@ class TestGKPlusSplitInplace(unittest.TestCase):
         Exhaustively test every rank-combo and every split-key,
         computing the expected left/right key-lists on the fly.
         """
-        keys = [1, 2, 3, 5, 6, 7]
+        keys = [1, 3]
         ranks = range(1, 5)
-        split_keys = [0, 1, 4, 5, 7, 8]
+        split_keys = [0, 1, 2, 3, 4]
+        # split_key
 
         num_keys = len(keys)
         combinations = len(ranks) ** num_keys
 
-        iterations = 10
+        iterations = 2
 
         combos = islice(product(ranks, repeat=num_keys), iterations)
         

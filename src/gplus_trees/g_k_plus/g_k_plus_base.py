@@ -15,7 +15,7 @@ from gplus_trees.base import (
 )
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
-    GPlusTreeBase, GPlusNodeBase, Stats
+    GPlusTreeBase, GPlusNodeBase, Stats, print_pretty
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
@@ -30,7 +30,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
@@ -694,7 +694,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             - key_subtree: If key exists in the tree, its associated left subtree; otherwise, None
             - right_return: A tree containing all entries with keys ≥ key (except the entry with key itself)
         """
-        logger.debug(f"\n\nSplitting tree at key {key}.")
+        logger.debug(f"SPLITTING TREE AT KEY {key}.")
         
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
@@ -705,6 +705,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # Case 1: Empty tree - return None left, right and key's subtree
         if self.is_empty():
+            logger.debug("")
             return self, None, TreeClass()
         
         # Initialize left and right return trees
@@ -720,8 +721,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         key_node_found = False
 
         while True:
-            logger.debug("")
-            logger.debug(f"New iteration with cur: {cur.node.set}")
+            logger.debug(f"New iteration with cur: {print_pretty(cur.node.set)}")
             node = cur.node
             is_leaf = node.rank == 1
 
@@ -733,9 +733,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Split node at key
             left_split, key_subtree, right_split = node.set.split_inplace(key)
 
-            logger.debug(f"Left split: {left_split}")
-            logger.debug(f"Key subtree: {key_subtree}")
-            logger.debug(f"Right split: {right_split}")
+            logger.debug(f"LEFT SPLIT: {print_pretty(left_split)}")
+            logger.debug(f"KEY SUBTREE: {print_pretty(key_subtree)}")
+            logger.debug(f"RIGHT SPLIT: {print_pretty(right_split)}")
 
             l_count = left_split.item_count()
             r_count = right_split.item_count()
@@ -940,7 +940,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 # prepare key entry subtree for return
                 return_subtree = res.found_entry.left_subtree if res.found_entry else None
-
+                logger.debug("")
                 return self, return_subtree, right_return
 
             if key_subtree:
@@ -949,6 +949,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Continue to next iteration with updated current node
             cur = next_cur
+            logger.debug("")
     
     def __iter__(self):
         """Yields each entry of the gk-plus-tree in order."""
