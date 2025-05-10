@@ -1174,7 +1174,27 @@ class TestGKPlusSplitInplace(unittest.TestCase):
                     split_key, exp_left,
                     exp_right, case_name
                 )
-    def test_split_at_max_key_rank_gt_1(self):
+
+    def test_single_abc(self):
+        keys  =  [1, 2, 4, 5]
+        ranks =  [1, 3, 1, 1]
+
+        split_cases = self._get_split_cases(keys)
+        # array of tuples with (case_name, split_key)
+        split_cases = [("non-existing middle key", 3),
+            ]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name
+                )
+
+    def test_split_2_level_tree_at_single_root_key(self):
         keys  =  [1, 3]
         ranks =  [1, 3]
 
@@ -1197,21 +1217,21 @@ class TestGKPlusSplitInplace(unittest.TestCase):
         Exhaustively test every rank-combo and every split-key,
         computing the expected left/right key-lists on the fly.
         """
-        keys = [1, 3]
+        keys = [1, 2, 4, 5]
         ranks = range(1, 5)
-        split_keys = [0, 1, 2, 3, 4]
+        split_keys = [0, 1, 3, 5, 6]
         # split_key
 
         num_keys = len(keys)
         combinations = len(ranks) ** num_keys
 
-        iterations = 2
+        iterations = 10
 
-        combos = islice(product(ranks, repeat=num_keys), iterations)
+        # combos = islice(product(ranks, repeat=num_keys), iterations)
         
         for rank_combo in tqdm(
-            combos,
-            total=iterations,
+            product(ranks, repeat=num_keys),
+            total=combinations,
             desc="Rank combinations",
             unit="combo",
         ):

@@ -30,7 +30,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
@@ -716,12 +716,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_parent = None    # Parent node for right-side updates
         right_entry = None     # Entry in right parent points to current subtree
         left_parent = None     # Parent node for left-side updates
+        seen_key_subtree = None # Cache last seen left_parents left subtree
         
         cur = left_return
         key_node_found = False
 
         while True:
             logger.debug(f"New iteration with cur: {print_pretty(cur.node.set)}")
+            logger.debug(f"Split node at key {key}.")
             node = cur.node
             is_leaf = node.rank == 1
 
@@ -741,7 +743,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             r_count = right_split.item_count()
 
             # Log split information, is empty, and item count
-            logger.debug(f"Split node at key {key}.")
             logger.debug(f"Is leaf: {is_leaf}")  
 
             # --- Handle right side of the split ---
@@ -849,6 +850,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # All entries in its left subtree are less than key and
                     # are part of the left return tree
                     cur.node.right_subtree = key_subtree
+                    seen_key_subtree = key_subtree
                 elif next_entry:
                     cur.node.right_subtree = next_entry.left_subtree
                 
@@ -865,12 +867,20 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 if is_leaf:
                     logger.debug(f"Is leaf: {is_leaf}")
-                    if left_parent:
+                    if left_parent or seen_key_subtree:
                         if l_count == 0:
-                            logger.debug("Left parent exists, so leaf is not collapsed. Update leaf next pointers.")
-                            logger.debug(f"Find the previous leaf node by traversing the left parent to unlink leaf nodes.")
+                            
                             # find the previous leaf node by traversing the left parent
-                            l_last_leaf = left_parent.get_max_leaf()
+                            if left_parent:
+                                logger.debug("Left parent exists, so leaf is not collapsed. Update leaf next pointers.")
+                                logger.debug(f"Find the previous leaf node by traversing the left parent to unlink leaf nodes.")
+                                l_last_leaf = left_parent.get_max_leaf()
+                            else:
+                                logger.debug("Left parent exists, so leaf is not collapsed. Update leaf next pointers.")
+                                logger.debug(f"Find the previous leaf node by traversing the left parent to unlink leaf nodes.")
+                                left_return = self = seen_key_subtree
+                                l_last_leaf = seen_key_subtree.get_max_leaf()
+                                
                         else:
                             logger.debug("Left parent exists, so leaf is not collapsed. Set l_last_leaf to cur and update leaf next pointers.")
                             
@@ -903,6 +913,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         # All entries in its left subtree are less than key and
                         # are part of the left return tree
                         new_subtree = key_subtree
+                        seen_key_subtree = key_subtree
                     elif next_entry:
                         logger.debug("Next entry exists, using its left subtree as new subtree.")
                         new_subtree = next_entry.left_subtree
