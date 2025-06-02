@@ -436,7 +436,22 @@ class KListBase(AbstractSetDataStructure):
         if not self._prefix_counts:
             return RetrievalResult(found_entry=None, next_entry=None)
         node = self.tail
+        # print(print_pretty(self))
+        head = self.head
+        # print(f"head: {head}")
+        h_entries = head.entries
+        # print(h_entries)
+        
+        tail = self.tail
+        # print(f"tail: {tail}")
+        t_entries = tail.entries
+        # print(t_entries)
+
+
+
         entries = node.entries
+        # print(entries)
+        # print(len(entries))
         entry, in_node_succ, _ = node.get_by_offset(len(entries) - 1)
 
         return RetrievalResult(found_entry=entry, next_entry=in_node_succ)

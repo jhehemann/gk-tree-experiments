@@ -771,6 +771,8 @@ def gtree_stats_(t: GPlusTreeBase,
     if right_stats.greatest_item is not None:
         stats.greatest_item = right_stats.greatest_item
     else:
+        # print_pretty(node_set)
+
         stats.greatest_item = node_set.get_max().found_entry.item
 
     # ---------- leaf walk ONCE at the root -----------------------------
@@ -858,32 +860,32 @@ def _find_capacity(set_cls):
     # now cls is a KListBase, so its node class has the capacity
     return cls.KListNodeClass.CAPACITY
 
-def print_prett(tree):
-    """
-    Print the B+-tree so that all nodes on the same layer
-    appear on the same line, correctly indented.
-    """
-    # 1) Determine indent unit from the tree’s capacity
-    capacity    = _find_capacity(tree.SetClass)
-    indent_unit = capacity
-    print(f"Indent unit: {indent_unit}")
+# def print_prett(tree):
+#     """
+#     Print the B+-tree so that all nodes on the same layer
+#     appear on the same line, correctly indented.
+#     """
+#     # 1) Determine indent unit from the tree’s capacity
+#     capacity    = _find_capacity(tree.SetClass)
+#     indent_unit = capacity
+#     print(f"Indent unit: {indent_unit}")
 
-    layers = collections.defaultdict(list)  # rank -> list of (indent, segment)
+#     layers = collections.defaultdict(list)  # rank -> list of (indent, segment)
 
-    def _collect(node):
-        rank       = node.rank
-        indent     = indent_unit ** rank 
-        keys_line  = " | ".join(str(entry.item.key) for entry in node.set)
-        layers[rank-1].append((indent, keys_line))
+#     def _collect(node):
+#         rank       = node.rank
+#         indent     = indent_unit ** rank 
+#         keys_line  = " | ".join(str(entry.item.key) for entry in node.set)
+#         layers[rank-1].append((indent, keys_line))
 
-        # Recurse left‐to‐right
-        for entry in node.set:
-            if entry.left_subtree is not None:
-                _collect(entry.left_subtree.node)
-        if node.right_subtree is not None:
-            _collect(node.right_subtree.node)
+#         # Recurse left‐to‐right
+#         for entry in node.set:
+#             if entry.left_subtree is not None:
+#                 _collect(entry.left_subtree.node)
+#         if node.right_subtree is not None:
+#             _collect(node.right_subtree.node)
 
-    _collect(tree.node)
+#     _collect(tree.node)
 
 def print_pretty(set):
     """
