@@ -708,6 +708,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             logger.debug("")
             return self, None, TreeClass()
         
+        logger.debug("SELF TREE TO SPLIT:")
+        logger.debug(print_pretty(self))
+
         # Initialize left and right return trees
         left_return = self
         right_return = TreeClass()
@@ -784,7 +787,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 next_right_parent = new_tree
 
             else:
-                logger.debug(f"Right split item count is zero: {r_count}")
+                logger.debug(f"Right split item count is {r_count}")
                 if is_leaf and right_parent:
                     logger.debug("We are at a leaf node and have a right parent --> create a new right tree node.")
                     # Create a leaf with a single dummy item
@@ -838,6 +841,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     logger.debug("Left parent is None, set the left tree to cur and update self reference to this node.")
                     # Reuse left split as the root node for the left return tree
                     left_return = self = cur
+                    logger.debug(f"Left tree: {print_pretty(left_return)}")
                 
                 if is_leaf:
                     logger.debug(f"Is leaf: {is_leaf} --> Set l_last_leaf to cur.")
@@ -898,9 +902,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
 
                         left_return = self = TreeClass()
-                        # logger.debug(f"Left split: {left_split}")
-                        # logger.debug(f"self tree: {self.print_structure()}")
-                        # logger.debug(f"cur tree: {cur.print_structure()}")
                         l_last_leaf = None
 
                     next_left_parent = left_parent
@@ -917,16 +918,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     elif next_entry:
                         logger.debug("Next entry exists, using its left subtree as new subtree.")
                         new_subtree = next_entry.left_subtree
+                        logger.debug(f"Next entry's left subtree: {print_pretty(new_subtree)}")
                     else:
                         logger.debug("SHOULD NOT HAPPEN: No next entry in current node --> using current node's right subtree to proceed with left tree.")
                         new_subtree = cur.node.right_subtree # Should not happen
 
                     if left_parent:
-                        logger.debug("Left parent exists. Update only if it is not fixed yet.")
+                        logger.debug("Left parent exists. Update right subtree only if it is not fixed yet.")
                         if not key_node_found:
-                            logger.debug("Not fixed: Update left parent with new subtree.")
+                            logger.debug(f"Not fixed: Update left parent's right subtree with new subtree: {print_pretty(new_subtree)}")
+                            
                             left_parent.node.right_subtree = new_subtree
-                            next_left_parent = new_subtree
+                            logger.debug(f"Left parent tree: {print_pretty(left_parent)}")
+                            next_left_parent = left_parent
                         else:
                             logger.debug("Fixed: Keep left parent reference.")
                             next_left_parent = left_parent
@@ -936,22 +940,23 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             left_parent = next_left_parent
 
-            # logger.debug(f"Left split: {left_split}")
-            # logger.debug(f"Left return: {left_return.print_structure()}")
-            # logger.debug(f"self tree: {self.print_structure()}")
-            # logger.debug(f"cur tree: {cur.print_structure()}")
-
             # Update leaf node 'next' pointers if at leaf level
             if is_leaf:
                 # Unlink leaf nodes
                 if l_last_leaf:
-                    # logger.debug("Left leaf node exists.")
-                    # logger.debug("Setting its next pointer to None.")
+                    logger.debug("Left leaf node exists.")
+                    logger.debug("Setting its next pointer to None.")
                     l_last_leaf.next = None
 
                 # prepare key entry subtree for return
                 return_subtree = res.found_entry.left_subtree if res.found_entry else None
                 logger.debug("")
+                logger.debug("LEFT (SELF) RETURN:")
+                logger.debug(print_pretty(self))
+                logger.debug("MIDDLE RETURN:")
+                logger.debug(print_pretty(return_subtree))
+                logger.debug("RIGHT RETURN:")
+                logger.debug(print_pretty(right_return))
                 return self, return_subtree, right_return
 
             if key_subtree:
