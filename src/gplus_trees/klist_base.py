@@ -436,22 +436,7 @@ class KListBase(AbstractSetDataStructure):
         if not self._prefix_counts:
             return RetrievalResult(found_entry=None, next_entry=None)
         node = self.tail
-        # print(print_pretty(self))
-        head = self.head
-        # print(f"head: {head}")
-        h_entries = head.entries
-        # print(h_entries)
-        
-        tail = self.tail
-        # print(f"tail: {tail}")
-        t_entries = tail.entries
-        # print(t_entries)
-
-
-
         entries = node.entries
-        # print(entries)
-        # print(len(entries))
         entry, in_node_succ, _ = node.get_by_offset(len(entries) - 1)
 
         return RetrievalResult(found_entry=entry, next_entry=in_node_succ)
@@ -465,9 +450,9 @@ class KListBase(AbstractSetDataStructure):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
 
         if self.head is None:                        # ··· (1) empty
-            left = type(self)()  # Create new instances of the same class
+            self = type(self)()  # Create new instances of the same class
             right = type(self)()
-            return left, None, right
+            return self, None, right
 
         # --- locate split node ------------------------------------------------
         # Using bisect_left to find the first node that contains a key >= split key
@@ -492,19 +477,19 @@ class KListBase(AbstractSetDataStructure):
         left_subtree = split_node.entries[i].left_subtree if exact else None
 
         # ------------- build LEFT --------------------------------------------
-        left = type(self)()
+        # left = type(self)()
         if left_entries:                             # reuse split_node
             split_node.entries = left_entries
             split_node.next    = None
-            left.head = self.head
-            left.tail = split_node
+            # left.head = self.head
+            self.tail = split_node
         else:                                        # nothing in split node
             if prev_node:                            # skip it
                 prev_node.next = None
-                left.head = self.head
-                left.tail = prev_node
+                # left.head = self.head
+                self.tail = prev_node
             else:                                    # key at very first entry
-                left.head = left.tail = None
+                self.head = self.tail = None
 
         # ------------- build RIGHT -------------------------------------------
         right = type(self)()
@@ -532,10 +517,10 @@ class KListBase(AbstractSetDataStructure):
             self._rebalance_for_compaction(right)
         
         # ------------- rebuild indexes ---------------------------------------
-        left._rebuild_index()
+        self._rebuild_index()
         right._rebuild_index()
 
-        return left, left_subtree, right
+        return self, left_subtree, right
         
     # @track_performance
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
