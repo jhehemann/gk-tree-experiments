@@ -788,7 +788,7 @@ def gtree_stats_(t: GPlusTreeBase,
         
         for entry in node_set:
             item = entry.item
-            if item.key != DUMMY_KEY:
+            if item.key >= 0:  # Skip dummy items
                 true_count += 1
                 if item.value is None:
                     all_values_present = False

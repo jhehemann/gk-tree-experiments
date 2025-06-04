@@ -54,7 +54,7 @@ def get_dummy(dim: int) -> Item:
     Returns:
         Item: A dummy item with key=-(dim) and value=None
     """
-    return Item(-1, None)
+    # return Item(-1, None)
 
     # Check if we already have a dummy item for this dimension in cache
     if dim in _DUMMY_ITEM_CACHE:
@@ -226,6 +226,52 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         
         return node
     
+    def unlink_last_leaf(self) -> GKPlusTreeBase:
+        self.get_max_leaf().next = None
+        return self
+
+
+    def _make_leaf_klist(self, x_item: Item, x_left: Optional[GPlusTreeBase] = None) -> AbstractSetDataStructure:
+        """Builds a KList for a single leaf node containing the dummy and x_item."""
+        TreeClass = type(self)
+        SetClass = self.SetClass
+        
+        # start with a fresh empty set of entries
+        leaf_set = SetClass()
+        
+        # insert the dummy entry, pointing at an empty subtree
+        leaf_set = leaf_set.insert(get_dummy(type(self).DIM), None)
+
+        # now insert the real item, also pointing at an empty subtree
+        leaf_set = leaf_set.insert(x_item, x_left)
+        
+        return leaf_set
+
+    def _make_leaf_trees(self, x_item, x_left: Optional[GPlusTreeBase] = None) -> Tuple[GPlusTreeBase, GPlusTreeBase]:
+        """
+        Builds two linked leaf-level GPlusTreeBase nodes for x_item insertion.
+        and returns the corresponding G+-trees.
+        """
+        TreeK = type(self)
+        NodeK = self.NodeClass
+        SetK = self.SetClass
+
+        # Build right leaf
+        right_set = SetK()
+        right_set = right_set.insert(x_item, x_left)
+        right_node = NodeK(1, right_set, None)
+        right_leaf = TreeK(right_node)
+
+        # Build left leaf with dummy entry
+        left_set = SetK()
+        left_set = left_set.insert(get_dummy(type(self).DIM), None)
+        left_node = NodeK(1, left_set, None)
+        left_leaf = TreeK(left_node)
+
+        # Link leaves
+        left_leaf.node.next = right_leaf
+        return left_leaf, right_leaf
+    
     @classmethod
     def with_dimension(cls: Type[t], dim: int) -> Type[t]:
         """
@@ -246,6 +292,25 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     #     self.node.get_size()
         
     #     return tree, inserted
+
+    def _insert_empty(self, x_item: Item, rank: int, x_left: Optional[GKPlusTreeBase] = None) -> GKPlusTreeBase:
+        """Build the initial tree structure depending on rank."""
+        inserted = True
+        # Single-level leaf
+        if rank == 1:
+            leaf_set = self._make_leaf_klist(x_item, x_left)
+            self.node = self.NodeClass(rank, leaf_set, None)
+            # logger.info(f"Tree after empty insert rank == 1:\n{self.print_structure()}")
+            return self, inserted
+
+        # Higher-level root with two linked leaf children
+        l_leaf_t, r_leaf_t = self._make_leaf_trees(x_item, x_left)
+        logger.debug(f"DUMMY ITEM: {get_dummy(dim=self.DIM)}")
+        root_set = self.SetClass().insert(get_dummy(dim=self.DIM), None)
+        root_set = root_set.insert(_create_replica(x_item.key), l_leaf_t)
+        self.node = self.NodeClass(rank, root_set, r_leaf_t)
+        # logger.info(f"Tree after empty insert rank > 1:\n{self.print_structure()}")
+        return self, inserted
 
 
     def _insert_non_empty(self, x_item: Item, rank: int, x_left: Optional[GPlusTreeBase] = None) -> GKPlusTreeBase:
@@ -970,7 +1035,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """Yields each entry of the gk-plus-tree in order."""
         # if self.is_empty():
         #     return
+        dummy_key = get_dummy(dim=self.DIM).key
         for node in self.iter_leaf_nodes():
             for entry in node.set:
-                if entry.item is not get_dummy(dim=self.DIM):
+                if entry.item.key is not dummy_key:
                     yield entry

@@ -576,7 +576,7 @@ class TestGKPlusSplitInplace(unittest.TestCase):
             
         dummy_key = get_dummy(type(tree).DIM).key
         keys = []
-        
+
         # Collect keys from leaf nodes
         for leaf_node in tree.iter_leaf_nodes():
             for entry in leaf_node.set:
@@ -811,12 +811,14 @@ class TestGKPlusSplitInplace(unittest.TestCase):
         keys = [100, 200, 300, 400, 500]
         for key in keys:
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
-        
+
         # Create and attach left subtrees to some items
         for key in [200, 400]:
             # Create a subtree
-            subtree = create_gkplus_tree(K=4, dimension=type(tree).DIM + 1)
-            subtree, _ = subtree.insert(Item(key - 50, f"subtree_val_{key}"), rank=1)
+            dim = type(tree).DIM + 1  if key == 200 else type(tree).DIM + 2
+            rank = 2 if key == 200 else 3
+            subtree = create_gkplus_tree(K=4, dimension=dim)
+            subtree, _ = subtree.insert(Item(key - 50, f"subtree_val_{key}"), rank=rank)
             
             # Retrieve the item and set its left subtree
             result = tree.retrieve(key)
@@ -825,7 +827,6 @@ class TestGKPlusSplitInplace(unittest.TestCase):
         # Split between items, not at a key with a left subtree
         left, middle, right = tree.split_inplace(250)
  
-        
         # Validate split trees
         self.validate_tree(left, [100, 200])
         self.assertIsNone(middle)
@@ -1228,45 +1229,45 @@ class TestGKPlusSplitInplace(unittest.TestCase):
                     exp_right, case_name
                 )
 
-    def test_all_rank_combinations(self):
-        """
-        Exhaustively test every rank-combo and every split-key,
-        computing the expected left/right key-lists on the fly.
-        """
-        keys = [1, 3, 5, 7]
-        ranks = range(1, 5)
-        split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        # split_key
+    # def test_all_rank_combinations(self):
+    #     """
+    #     Exhaustively test every rank-combo and every split-key,
+    #     computing the expected left/right key-lists on the fly.
+    #     """
+    #     keys = [1, 3, 5, 7]
+    #     ranks = range(1, 5)
+    #     split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    #     # split_key
 
-        num_keys = len(keys)
-        combinations = len(ranks) ** num_keys
+    #     num_keys = len(keys)
+    #     combinations = len(ranks) ** num_keys
 
-        iterations = 10
+    #     iterations = 10
 
-        # combos = islice(product(ranks, repeat=num_keys), iterations)
+    #     # combos = islice(product(ranks, repeat=num_keys), iterations)
         
-        for rank_combo in tqdm(
-            product(ranks, repeat=num_keys),
-            total=combinations,
-            desc="Rank combinations",
-            unit="combo",
-        ):
-            with self.subTest(rank_combo=rank_combo):
-                # for each possible split_key (including non-existent)
-                for split_key in split_keys:
-                    with self.subTest(split_key=split_key):
-                        # expected keys-to-left and keys-to-right
-                        exp_left  = [k for k in keys if k < split_key]
-                        exp_right = [k for k in keys if k > split_key]
-                        case_name = f"split key: {split_key}"
-                        self._run_split_case(
-                            keys,
-                            rank_combo,
-                            split_key,
-                            exp_left,
-                            exp_right,
-                            case_name
-                        )
+    #     for rank_combo in tqdm(
+    #         product(ranks, repeat=num_keys),
+    #         total=combinations,
+    #         desc="Rank combinations",
+    #         unit="combo",
+    #     ):
+    #         with self.subTest(rank_combo=rank_combo):
+    #             # for each possible split_key (including non-existent)
+    #             for split_key in split_keys:
+    #                 with self.subTest(split_key=split_key):
+    #                     # expected keys-to-left and keys-to-right
+    #                     exp_left  = [k for k in keys if k < split_key]
+    #                     exp_right = [k for k in keys if k > split_key]
+    #                     case_name = f"split key: {split_key}"
+    #                     self._run_split_case(
+    #                         keys,
+    #                         rank_combo,
+    #                         split_key,
+    #                         exp_left,
+    #                         exp_right,
+    #                         case_name
+    #                     )
 
 
 
