@@ -931,28 +931,41 @@ def print_pretty(set):
     layers_raw  = collections.defaultdict(list)  # rank -> list of node-strings
     max_len     = 0
 
-    def collect(node, parent=None):
+    def collect(tree, parent=None):
         nonlocal max_len
-        rank     = node.rank
-        parent_rank = parent.rank if parent else 0
+        dim = tree.DIM
+        p_dim = parent.DIM if parent else None
+        other_dim = dim != p_dim and parent is not None
+        node = tree.node
+        rank = node.rank
+        parent_rank = parent.node.rank if parent else None
 
-        fill_rank = parent_rank - 1
+        logger.debug(f"Other dim: {other_dim}")
+
+        fill_rank = parent_rank - 1 if parent_rank is not None else rank
         while fill_rank > rank:
             layers_raw[fill_rank].append("")
             fill_rank -= 1
         
         text     = SEP.join(str(e.item.key) for e in node.set)
-        layers_raw[rank].append(text)
-        max_len = max(max_len, len(text))
+        if parent is None or not other_dim:
+            layers_raw[rank].append(text)
+            max_len = max(max_len, len(text))
+        else:
+            # handle leaf items' left subtrees in separate layer (only root)
+            new_text = f"(D{dim}R{rank}) " + text
+            layers_raw[0].append(new_text)
+            max_len = max(max_len, len(new_text))
 
         # recurse left→right
-        for e in node.set:
-            if e.left_subtree:
-                collect(e.left_subtree.node, node)
-        if node.right_subtree:
-            collect(node.right_subtree.node, node)
+        if not other_dim:
+            for e in node.set:
+                if e.left_subtree:
+                    collect(e.left_subtree, tree)
+            if node.right_subtree:
+                collect(node.right_subtree, tree)
 
-    collect(tree.node, None)
+    collect(tree, None)
 
     # 2) Define a fixed column width: widest text + 1 space padding
     column_width = max_len + 1
@@ -1000,7 +1013,9 @@ def print_pretty(set):
             prefix = "  " + spaces * " "
             # prefix = ""
         line   = "".join(layers[rank])
-        out_lines.append(f"Rank {rank}:{prefix}{line}")
+        layer_id = f"Rank {rank}" if rank > 0 else "LSub"
+
+        out_lines.append(f"{layer_id}:{prefix}{line}")
 
     # join with newlines and return
     res_text = set_type + "\n" + "\n\n".join(reversed(out_lines)) + "\n"
