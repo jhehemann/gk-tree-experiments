@@ -164,23 +164,13 @@ def calculate_rank(key, group_size: int) -> int:
     Returns:
         int: The rank calculated for this item.
     """
-    # hash the decimal string of the int key
-    # key_bytes = str(key).encode("utf-8")
+
     key_bytes = key.to_bytes(32, 'big')
 
     digest = hashlib.sha256(key_bytes).digest()
-
-    # convert to integer.
-    # hash_int = int.from_bytes(digest, byteorder="big", signed=False)
-    
-    # print(f"\nkey: {key}\nkey_bytes: {key_bytes}\ndigest: {digest.hex()}")
     
     tz = count_trailing_zero_bits(digest)
     
-    # count trailing-zero bits
-    # tz = (hash_int & -hash_int).bit_length() - 1
-    
-    # final rank = complete groups + 1
     return (tz // group_size) + 1
 
 def count_trailing_zero_bits(digest: bytes) -> int:
