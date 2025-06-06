@@ -16,10 +16,6 @@ from gplus_trees.base import (
     RetrievalResult,
 )
 from gplus_trees.klist_base import KListBase
-from gplus_trees.profiling import (
-    track_performance,
-    PerformanceTracker
-)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -52,7 +48,7 @@ class GPlusNodeBase:
     """
     __slots__ = ("rank", "set", "right_subtree", "next")
 
-    # these two get injected by your factory.py
+    # set by factory
     SetClass: Type[AbstractSetDataStructure]
     TreeClass: Type[GPlusTreeBase]
 
@@ -66,7 +62,6 @@ class GPlusNodeBase:
             raise ValueError("rank must be > 0")
         self.rank = rank
         self.set = set
-        # self.right_subtree = right if right is not None else self.TreeClass()
         self.right_subtree = right
         self.next = None    # leaf‐chain pointer
     
@@ -78,23 +73,13 @@ class GPlusTreeBase(AbstractSetDataStructure):
     """
     __slots__ = ("node",)
     
-    # Will be set by the factory
+    # set by factory
     NodeClass: Type[GPlusNodeBase]
     SetClass: Type[AbstractSetDataStructure]
     
     def __init__(self, node: Optional[GPlusNodeBase] = None):
         self.node: Optional[GPlusNodeBase] = node
 
-    # @classmethod
-    # def from_root(cls: Type[t], root_node: GPlusNodeBase) -> t:
-    #     """
-    #     Create a new tree instance wrapping an existing node.
-    #     """
-    #     tree = cls.__new__(cls)
-    #     tree.node = root_node
-    #     return tree
-
-    # @track_performance
     def is_empty(self) -> bool:
         return self.node is None
     
@@ -123,9 +108,9 @@ class GPlusTreeBase(AbstractSetDataStructure):
         if not isinstance(rank, int) or rank <= 0:
             raise TypeError(f"insert(): rank must be a positive int, got {rank!r}")
         if self.is_empty():
-            return self._insert_empty(x, rank)
-        return self._insert_non_empty(x, rank)
-    
+            return self._insert_empty(x, rank, x_left)
+        return self._insert_non_empty(x, rank, x_left)
+
     def retrieve(
         self, key: int
     ) -> RetrievalResult:
@@ -147,8 +132,11 @@ class GPlusTreeBase(AbstractSetDataStructure):
         """
         # logger.debug(f"retrieve() called with key: {key} on tree:\n{self.print_structure()}")
 
-        if not isinstance(key, int) or key < 0:
-            raise TypeError(f"retrieve(): key must be a non-negative int, got {key!r}")
+        # if not isinstance(key, int) or key < 0:
+        #     raise TypeError(f"retrieve(): key must be a non-negative int, got {key!r}")
+
+        if not isinstance(key, int):
+            raise TypeError(f"retrieve(): key must be an int, got {type(key).__name__}")
         
         if self.is_empty():
             return RetrievalResult(None, None)
@@ -161,7 +149,6 @@ class GPlusTreeBase(AbstractSetDataStructure):
             node = cur.node
             # Attempt to retrieve from this node's set
             res = node.set.retrieve(key)
-            logger.debug(f"result: {res}")
             
             found_entry = res.found_entry
             next_entry = res.next_entry
@@ -499,14 +486,27 @@ class GPlusTreeBase(AbstractSetDataStructure):
         """
         # Descend to the leftmost leaf
         current = self
-        while current.node.rank > 1:
+        
+        # Exit early if the tree is empty
+        if current is None or current.is_empty():
+            return
+            
+        # Save the starting point to find the leftmost leaf
+        leftmost = None
+        
+        # Find the leftmost leaf node in current tree dimension
+        while current and not current.is_empty() and current.node.right_subtree is not None:
             result = current.node.set.get_min()
             if result.next_entry is not None:
                 current = result.next_entry.left_subtree
             else:
                 current = current.node.right_subtree
-
-        # At this point, current is the leftmost leaf-level GPlusTreeBase
+        
+        # # Store the leftmost leaf
+        # leftmost = current
+        
+        # # Now iterate through the leaf nodes
+        # current = leftmost
         while current is not None:
             yield current.node
             current = current.node.next
@@ -708,8 +708,6 @@ def gtree_stats_(t: GPlusTreeBase,
         if prev_key is not None and prev_key >= current_key:
             stats.is_search_tree = False
             
-        
-        
         # Process child stats if they exist (will be empty for leaf nodes)
         if i < len(child_stats):
             cs = child_stats[i]
@@ -758,7 +756,6 @@ def gtree_stats_(t: GPlusTreeBase,
         elif right_stats.least_item and prev_key is not None and right_stats.least_item.key < prev_key:
             stats.is_search_tree = False
 
-
     stats.is_search_tree       &= right_stats.is_search_tree
     if right_stats.least_item and right_stats.least_item.key < prev_key:
         stats.is_search_tree = False
@@ -776,8 +773,6 @@ def gtree_stats_(t: GPlusTreeBase,
     if right_stats.greatest_item is not None:
         stats.greatest_item = right_stats.greatest_item
     else:
-        # print_pretty(node_set)
-
         stats.greatest_item = node_set.get_max().found_entry.item
 
     # ---------- leaf walk ONCE at the root -----------------------------
@@ -853,7 +848,7 @@ def collect_leaf_keys(tree: 'GPlusTreeBase') -> list[str]:
                 out.append(e.item.key)
     return out
 
-def _find_capacity(set_cls):
+def _get_capacity(set_cls):
     """
     Walks set_cls.SetClass until we find a subclass of KListBase,
     then returns its KListNodeClass.CAPACITY.
@@ -865,36 +860,9 @@ def _find_capacity(set_cls):
     # now cls is a KListBase, so its node class has the capacity
     return cls.KListNodeClass.CAPACITY
 
-# def print_prett(tree):
-#     """
-#     Print the B+-tree so that all nodes on the same layer
-#     appear on the same line, correctly indented.
-#     """
-#     # 1) Determine indent unit from the tree’s capacity
-#     capacity    = _find_capacity(tree.SetClass)
-#     indent_unit = capacity
-#     print(f"Indent unit: {indent_unit}")
-
-#     layers = collections.defaultdict(list)  # rank -> list of (indent, segment)
-
-#     def _collect(node):
-#         rank       = node.rank
-#         indent     = indent_unit ** rank 
-#         keys_line  = " | ".join(str(entry.item.key) for entry in node.set)
-#         layers[rank-1].append((indent, keys_line))
-
-#         # Recurse left‐to‐right
-#         for entry in node.set:
-#             if entry.left_subtree is not None:
-#                 _collect(entry.left_subtree.node)
-#         if node.right_subtree is not None:
-#             _collect(node.right_subtree.node)
-
-#     _collect(tree.node)
-
-def print_pretty(set):
+def print_pretty(set: AbstractSetDataStructure):
     """
-    Prints a B+-tree so:
+    Prints a G+-tree so:
       • Lines go from highest rank down to 1.
       • Within a line, nodes appear left→right in traversal order.
       • All columns have the same width, so initial indent and
@@ -921,7 +889,6 @@ def print_pretty(set):
             texts.append(text)
             node_idx += 1
             node = node.next
-        # print(f"Klist Height: {height}")
         res_text = " ".join(texts)
         return f"({set_type}): {res_text}"
 
@@ -933,14 +900,18 @@ def print_pretty(set):
 
     def collect(tree, parent=None):
         nonlocal max_len
-        dim = tree.DIM
-        p_dim = parent.DIM if parent else None
-        other_dim = dim != p_dim and parent is not None
+        dim = tree.DIM if hasattr(tree, 'DIM') else None
+        p_dim = parent.DIM if parent and hasattr(parent, 'DIM') else None
+        other_dim = False
+        other_dim_processed = False
+
+        if parent is not None and dim != p_dim:
+            other_dim = True
+            other_dim_processed = True
+            
         node = tree.node
         rank = node.rank
         parent_rank = parent.node.rank if parent else None
-
-        logger.debug(f"Other dim: {other_dim}")
 
         fill_rank = parent_rank - 1 if parent_rank is not None else rank
         while fill_rank > rank:
@@ -953,7 +924,8 @@ def print_pretty(set):
             max_len = max(max_len, len(text))
         else:
             # handle leaf items' left subtrees in separate layer (only root)
-            new_text = f"(D{dim}R{rank}) " + text
+            dim_str = str(dim) if dim is not None else "?"
+            new_text = f"(D{dim_str}R{rank}) " + text
             layers_raw[0].append(new_text)
             max_len = max(max_len, len(new_text))
 
@@ -964,6 +936,10 @@ def print_pretty(set):
                     collect(e.left_subtree, tree)
             if node.right_subtree:
                 collect(node.right_subtree, tree)
+        
+        # Special case: if node.set is a tree of different dimension, traverse it
+        if isinstance(node.set, GPlusTreeBase) and not node.set.is_empty() and not other_dim_processed:
+            collect(node.set, tree)
 
     collect(tree, None)
 
@@ -995,29 +971,18 @@ def print_pretty(set):
     cumm_indent = 0.0      # cumulative indent (number of columns)
     for i, rank in enumerate(all_ranks):
         # indent to reflect depth
-        # prefix = " " * ((rank - 1) * column_width) + "  "
         if i == 0:
             # first line: constant indent
-            prefix = "  "
+            prefix = "     "
         else:
-            # print(layers[i+1])
             column_diff = column_counts[i-1] - column_counts[i]
-            # print(f"all_ranks[{i-1}]: {all_ranks[i-1]}")
-            # print(f"\nrank: {rank}")
-            # print(f"column_diff: {column_diff}")
             cumm_indent += float(column_diff) / 2
-            
-            # print(f"cumm_indent: {cumm_indent}")
             spaces = int(math.floor(((2 + column_width) * cumm_indent) + 0.5))
-            # print(f"spaces: {spaces}")
-            prefix = "  " + spaces * " "
-            # prefix = ""
+            prefix = "     " + spaces * " "
         line   = "".join(layers[rank])
-        layer_id = f"Rank {rank}" if rank > 0 else "LSub"
-
+        layer_id = f"Rank {rank}" if rank > 0 else "Higher Dims"
         out_lines.append(f"{layer_id}:{prefix}{line}")
 
     # join with newlines and return
     res_text = set_type + "\n" + "\n\n".join(reversed(out_lines)) + "\n"
     return res_text
-    

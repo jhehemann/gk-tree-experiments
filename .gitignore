@@ -35,3 +35,4 @@ src/gplus_trees/archive/*
 /stats/run_stats.py
 
 .vscode/
+debug_print_pretty.py
