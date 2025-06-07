@@ -980,7 +980,7 @@ def print_pretty(set: AbstractSetDataStructure):
             spaces = int(math.floor(((2 + column_width) * cumm_indent) + 0.5))
             prefix = "     " + spaces * " "
         line   = "".join(layers[rank])
-        layer_id = f"Rank {rank}" if rank > 0 else "Higher Dims"
+        layer_id = f"Rank {rank}" if rank > 0 else "Other Dims"
         out_lines.append(f"{layer_id}:{prefix}{line}")
 
     # join with newlines and return
