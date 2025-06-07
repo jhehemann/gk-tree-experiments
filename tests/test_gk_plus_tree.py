@@ -2,13 +2,12 @@ import sys
 import os
 import unittest
 import random
-from typing import List, Tuple, Optional, Iterator
+from typing import List, Tuple, Optional, Iterator, TYPE_CHECKING
 from itertools import product, islice
 from pprint import pprint
 import copy
 from tqdm import tqdm
 from statistics import median_low
-
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -18,6 +17,9 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from tests.utils import assert_tree_invariants_tc
+
+if TYPE_CHECKING:
+    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
 class TestGKPlusSizeTracking(unittest.TestCase):
     
@@ -47,191 +49,15 @@ class TestGKPlusSizeTracking(unittest.TestCase):
         
         return sorted(keys)
     
-    def test_empty_tree_size(self):
-        """Test that an empty tree has a node with size 0"""
-        tree = create_gkplus_tree(K=4)
-        self.assertTrue(tree.is_empty())
-        # Size is a property of nodes, not empty trees
-        
-    def test_single_insertion_size(self):
-        """Test size is 1 after inserting a single item"""
-        item = Item(1000, "val")
-        tree, inserted = self.tree_k2.insert(item, rank=1)
-        self.assertTrue(inserted)
-        actual_size = tree.node.get_size()
-        self.assertIsNotNone(actual_size)
-        self.assertEqual(1, actual_size, "Tree size should be 1 after single insertion")
-    
-    def test_multiple_insertions_size(self):
-        """Test size increases properly with multiple insertions"""
-        tree = self.tree_k4
-        expected_size = 0
-        
-        # Insert 10 items sequentially
-        for i in range(1, 11):
-            item = Item(i * 1000, "val") 
-            tree, inserted = tree.insert(item, rank=1)
-            expected_size += 1
-            actual_size = tree.node.get_size()
-            self.assertEqual(expected_size, actual_size, 
-                             f"Tree size should be {expected_size} after {i} insertions, got {actual_size}")
-    
-    def test_duplicate_insertion_size(self):
-        """Test size doesn't change when inserting duplicates"""
-        tree = self.tree_k2
-        
-        # First insertion
-        item = Item(5000, "val")
-        tree, inserted = tree.insert(item, rank=1)
-        self.assertTrue(inserted)
-        self.assertEqual(1, tree.node.get_size())
-        
-        # Duplicate insertion
-        item_duplicate = Item(5000, "new_val")
-        tree, inserted = tree.insert(item_duplicate, rank=1)
-        self.assertFalse(inserted)
-        self.assertEqual(1, tree.node.get_size(), "Size should not change after duplicate insertion")
-    
-    def test_size_with_node_splitting(self):
-        """Test size is correctly maintained when nodes are split"""
-        tree = self.tree_k2  # Use K=2 to force early splits
-        
-        # Insert enough items to force node splits
-        keys = [100, 200, 300, 400, 500, 600, 700, 800]
-        for i, key in enumerate(keys, 1):
-            item = Item(key, "val")
-            tree, _ = tree.insert(item, rank=1)
-            self.assertEqual(i, tree.node.get_size(), f"Tree should have size {i} after inserting {key}")
-        
-        tree, _ = tree.insert(Item(450, "val"), rank=2)
-        
-        # Verify size after all insertions
-        self.assertEqual(len(keys) + 1, tree.node.get_size())
-        
-        # Also verify that node sizes are consistent throughout the tree
-        self.assertTrue(self.verify_subtree_sizes(tree))
-    
-    def test_size_with_different_ranks(self):
-        """Test size is correctly tracked with items at different ranks"""
-        tree = self.tree_k4
-        
-        # Insert items with different ranks
-        items_and_ranks = [
-            (Item(1000, "val"), 1),
-            (Item(2000, "val"), 2),
-            (Item(3000, "val"), 1),
-            (Item(4000, "val"), 3),
-            (Item(5000, "val"), 2)
-        ]
-        
-        for i, (item, rank) in enumerate(items_and_ranks, 1):
-            tree, _ = tree.insert(item, rank)
-            self.assertEqual(i, tree.node.get_size(), f"Tree should have size {i} after inserting item with rank {rank}")
-        
-        # Verify size after all insertions
-        self.assertEqual(len(items_and_ranks), tree.node.size)
-        
-        # Verify subtree sizes are consistent
-        self.assertTrue(self.verify_subtree_sizes(tree))
-    
-    def test_large_tree_size(self):
-        """Test size is correctly maintained in a larger tree with random insertions"""
-        tree = self.tree_k4
-        keys = random.sample(range(1, 10000), 100)  # 100 unique random keys
-        ranks = random.choices(range(1, 6), k=100)  # Random ranks between 1 and 5
-        
-        # Insert all items
-        for i, (key, rank) in enumerate(zip(keys, ranks), 1):
-            item = Item(key, "val")
-            tree, _ = tree.insert(item, rank=rank)
-            self.assertEqual(i, tree.node.get_size(), f"Tree should have size {i} after inserting {key}")
-        
-        # Verify size after all insertions
-        self.assertEqual(len(keys), tree.node.size)
-        
-        # Verify subtree sizes
-        self.assertTrue(self.verify_subtree_sizes(tree))
-    
-    def test_complex_tree_structure(self):
-        """Test size in a complex tree with various ranks and splits"""
-        tree = self.tree_k4
-        
-        # Create a mix of items with different ranks
-        items = []
-        for i in range(1, 51):  # 50 items
-            key = i * 100
-            rank = 1 if i % 3 == 0 else (2 if i % 3 == 1 else 3)  # Mix of ranks 1, 2, 3
-            items.append((Item(key, "val"), rank))
-        
-        # Insert all items
-        for i, (item, rank) in enumerate(items, 1):
-            tree, _ = tree.insert(item, rank)
-            actual_size = tree.node.get_size()
-            self.assertEqual(i, actual_size, 
-                            f"Tree should have size {i} after inserting item {item.key} with rank {rank}")
-        
-        # Verify size after all insertions
-        self.assertEqual(len(items), actual_size)
-        
-        # Verify subtree sizes
-        self.assertTrue(self.verify_subtree_sizes(tree))
-    
-    def test_size_after_insert_empty(self):
-        """Test that _insert_empty correctly initializes node size"""
-        # Case 1: Leaf node (rank 1)
-        tree, inserted = self.tree_k4._insert_empty(Item(1000, "val"), rank=1)
-        self.assertTrue(inserted)
-        self.assertEqual(1, tree.node.get_size())
-        
-        # Case 2: Internal node (rank > 1)
-        tree, inserted = self.tree_k4._insert_empty(Item(2000, "val"), rank=3)
-        self.assertTrue(inserted)
-        self.assertEqual(1, tree.node.get_size())
-    
-    # TODO: TEST THIS
-    def test_size_consistency_with_calculate_size(self):
-        """Test that node.size matches the result of calculate_size()"""
-        tree = self.tree_k4
-        
-        # Use subtests to track individual insertions
-        for i in range(4, 11):
-            with self.subTest(f"Insert item with key {i * 500}"):
-                tree, inserted = tree.insert(Item(i * 500, "val"), rank=1)
-                self.assertTrue(inserted, f"Item with key {i * 500} should be inserted successfully")
-                
-                # max_dim = tree.get_max_dim()
-                # expanded_leafs = tree.get_expanded_leaf_count()
-                # expected_keys = [entry.item.key for entry in tree]
-                # print(f"Tree after inserting {i} items: {print_pretty(tree)}")
-                # print(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
-                # self.assertEqual(i + expanded_leafs + 1, tree.node.get_size(), f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+    def get_dummy_count(self, tree: 'GKPlusTreeBase') -> int:
+        """Count the number of dummy items in the tree."""
+        # Count the number of recursively instantiated trees
+        # 1 dummy per tree instance + 1 for the initial tree
+        expanded_leaf_count = tree.get_expanded_leaf_count()
+        dummy_count = expanded_leaf_count + 1
+        print(f"Expanded leaf count for tree {print_pretty(tree)}: {expanded_leaf_count}")
+        return dummy_count
 
-                # Verify structure at each step
-                # expected_real_keys = [j * 500 for j in range(1, i+1)]
-                # real_keys = [entry.item.key for entry in tree.iter_real_entries()]
-                # self.assertEqual(expected_real_keys, real_keys, 
-                #                 f"Tree should contain keys {expected_real_keys} after {i} insertions")
-            print(f"Tree after all insertions evaluated after individual subtest: {print_pretty(tree)}")
-        print(f"Tree after all insertions evaluated after for loop: {print_pretty(tree)}")
-        # print(f"Tree structure after all insertions: {tree.print_structure()}")
-
-        # print(f"Tree after all insertions: {tree.print_structure()}")
-        # print(f"Tree after all insertions: {print_pretty(tree)}")
-
-        # node_size = tree.node.size
-        # # self.assertIsNone(node_size, "Expected node size to be invalidated (none) after insert calculation")
-        # calculated_size = tree.node.calculate_tree_size()
-        
-        # # Check if the calculated size has been set
-        # node_size = tree.node.size
-        # self.assertEqual(node_size, calculated_size, f"Expected tree size to be set to {calculated_size} after calculate_tree_size(); got {node_size}")
-        
-        # # Check size consistency for the root node
-        # self.assertEqual(node_size, calculated_size, f"Expected size {node_size} to match calculated size {calculated_size}")
-        
-        # Verify size consistency throughout the tree
-        # self.verify_calculated_sizes_match(tree)
-    
     def verify_subtree_sizes(self, tree):
         """
         Recursive helper to verify that the size of each node equals the sum of its children's sizes
@@ -245,12 +71,13 @@ class TestGKPlusSizeTracking(unittest.TestCase):
             
         node = tree.node
         
-        # For leaf nodes, size should be the count of non-dummy items
-        dummy_key = get_dummy(tree.__class__.DIM).key
-        if node.rank == 1:
-            calculated_size = sum(1 for entry in node.set if entry.item.key != dummy_key)
+        # For leaf nodes, size should be the count of all items (incl. dummies)
+        # dummy_key = get_dummy(tree.__class__.DIM).key
+        if node.right_subtree is None:
+            calculated_size = sum(1 for entry in node.set)
+            print(f"Leaf node at rank {node.rank} has {calculated_size} items; node set (print_pretty): {print_pretty(node.set)}\n node set (print_structure): {node.set.print_structure()}")
             if calculated_size != node.size:
-                print(f"Leaf node has size {node.size} but contains {calculated_size} items")
+                print(f"Leaf node has size {node.size} but contains {calculated_size} items, node set: {print_pretty(node.set)}")
                 return False
             return True
             
@@ -318,7 +145,202 @@ class TestGKPlusSizeTracking(unittest.TestCase):
                 return False
                 
         return True
+    
+    def test_empty_tree_size(self):
+        """Test that an empty tree has no node"""
+        tree = create_gkplus_tree(K=4)
+        self.assertTrue(tree.is_empty())
+        # Size is a property of nodes, not empty trees
         
+    def test_single_insertion_size(self):
+        """Test size is 1 after inserting a single item"""
+        item = Item(1000, "val")
+        tree, inserted = self.tree_k2.insert(item, rank=1)
+        self.assertTrue(inserted)
+        self.assertIsNone(tree.node.size, "node.size should be None before get_size() is called")
+        actual_size = tree.node.get_size()
+        self.assertIsNotNone(actual_size)
+        self.assertEqual(2, actual_size, "Tree size should be 2 after single insertion")
+        self.assertEqual(2, tree.node.size, "node.size should be 2 after get_size() is called")
+
+    def test_multiple_insertions_size(self):
+        """Test size increases properly with multiple insertions"""
+        tree = self.tree_k4
+        inserted_items = 0
+        
+        # Insert 10 items sequentially
+        for i in range(1, 11):
+            item = Item(i * 1000, "val") 
+            tree, inserted = tree.insert(item, rank=1)
+            inserted_items += 1
+            actual_size = tree.node.get_size()
+            dummy_count = self.get_dummy_count(tree)
+            print(f"Dummy count: {dummy_count}, inserted items: {inserted_items}, actual size: {actual_size}")
+            expected_items = inserted_items + dummy_count
+            self.assertEqual(expected_items, actual_size,
+                             f"Tree size should be {expected_items} after {i} insertions, got {actual_size}, tree: {print_pretty(tree)}")
+
+    def test_duplicate_insertion_size(self):
+        """Test size doesn't change when inserting duplicates"""
+        tree = self.tree_k2
+        
+        # First insertion
+        item = Item(5000, "val")
+        tree, inserted = tree.insert(item, rank=1)
+        self.assertTrue(inserted)
+        self.assertEqual(1, tree.node.get_size())
+        
+        # Duplicate insertion
+        item_duplicate = Item(5000, "new_val")
+        tree, inserted = tree.insert(item_duplicate, rank=1)
+        self.assertFalse(inserted)
+        self.assertEqual(1, tree.node.get_size(), "Size should not change after duplicate insertion")
+    
+    def test_size_with_node_splitting(self):
+        """Test size is correctly maintained when nodes are split"""
+        tree = self.tree_k2  # Use K=2 to force early splits
+        
+        # Insert enough items to force more dimensions
+        keys = [100, 200, 300, 400, 500, 600, 700, 800]
+        for i, key in enumerate(keys, 1):
+            item = Item(key, "val")
+            tree, _ = tree.insert(item, rank=1)
+            expanded_leaf_count = tree.get_expanded_leaf_count()
+            self.assertEqual(i + expanded_leaf_count + 1, tree.node.get_size(),
+                             f"Tree should have size {i + expanded_leaf_count + 1} after inserting {key} and expanded leaf count {expanded_leaf_count}; tree: {print_pretty(tree)}")
+
+        tree, _ = tree.insert(Item(450, "val"), rank=2)
+        
+        # Verify size after all insertions
+        self.assertEqual((len(keys) + 1) + (1 + expanded_leaf_count + 1), tree.node.get_size(), 
+                         f"Tree should have size {len(keys) + (1 + expanded_leaf_count + 1)} after all insertions; tree: {print_pretty(tree)}")
+
+        print(f"Tree after all insertions: {print_pretty(tree)}")
+
+        # Verify that node sizes are consistent throughout the tree
+        self.assertTrue(self.verify_subtree_sizes(tree))
+    
+    def test_size_with_different_ranks(self):
+        """Test size is correctly tracked with items at different ranks"""
+        tree = self.tree_k8
+        
+        # Insert items with different ranks
+        items_and_ranks = [
+            (Item(1000, "val"), 1),
+            (Item(2000, "val"), 2),
+            (Item(3000, "val"), 1),
+            (Item(4000, "val"), 3),
+            (Item(5000, "val"), 2)
+        ]
+        
+        for i, (item, rank) in enumerate(items_and_ranks, 1):
+            tree, _ = tree.insert(item, rank)
+            self.assertEqual(i + 1, tree.node.get_size(), 
+                             f"Tree should have size {i + 1} after inserting item with rank {rank}; tree: {print_pretty(tree)}")
+        
+        # Verify size after all insertions
+        self.assertEqual(len(items_and_ranks) + 1, tree.node.size)
+        
+        # Verify subtree sizes are consistent
+        self.assertTrue(self.verify_subtree_sizes(tree))
+    
+    def test_large_tree_size(self):
+        """Test size is correctly maintained in a larger tree with random insertions"""
+        tree = self.tree_k4
+        keys = random.sample(range(1, 10000), 100)  # 100 unique random keys
+        ranks = random.choices(range(1, 6), k=100)  # Random ranks between 1 and 5
+        
+        # Insert all items
+        for i, (key, rank) in enumerate(zip(keys, ranks), 1):
+            item = Item(key, "val")
+            tree, _ = tree.insert(item, rank=rank)
+            self.assertEqual(i, tree.node.get_size(), f"Tree should have size {i} after inserting {key}")
+        
+        # Verify size after all insertions
+        self.assertEqual(len(keys), tree.node.size)
+        
+        # Verify subtree sizes
+        self.assertTrue(self.verify_subtree_sizes(tree))
+    
+    def test_complex_tree_structure(self):
+        """Test size in a complex tree with various ranks and splits"""
+        tree = self.tree_k4
+        
+        # Create a mix of items with different ranks
+        items = []
+        for i in range(1, 51):  # 50 items
+            key = i * 100
+            rank = 1 if i % 3 == 0 else (2 if i % 3 == 1 else 3)  # Mix of ranks 1, 2, 3
+            items.append((Item(key, "val"), rank))
+        
+        # Insert all items
+        for i, (item, rank) in enumerate(items, 1):
+            tree, _ = tree.insert(item, rank)
+            actual_size = tree.node.get_size()
+            self.assertEqual(i, actual_size, 
+                            f"Tree should have size {i} after inserting item {item.key} with rank {rank}")
+        
+        # Verify size after all insertions
+        self.assertEqual(len(items), actual_size)
+        
+        # Verify subtree sizes
+        self.assertTrue(self.verify_subtree_sizes(tree))
+    
+    def test_size_after_insert_empty(self):
+        """Test that _insert_empty correctly initializes node size"""
+        # Case 1: Leaf node (rank 1)
+        tree, inserted = self.tree_k4._insert_empty(Item(1000, "val"), rank=1)
+        self.assertTrue(inserted)
+        self.assertEqual(2, tree.node.get_size(), f"Leaf node should have size 2: dummy and key {1000}; tree: {print_pretty(tree)}")
+        
+        # Case 2: Internal node (rank > 1)
+        tree, inserted = self.tree_k4._insert_empty(Item(2000, "val"), rank=3)
+        self.assertTrue(inserted)
+        self.assertEqual(2, tree.node.get_size(), f"Internal node should have size 2: dummy and key {2000}; tree: {print_pretty(tree)}")
+    
+    def test_size_consistency_with_calculate_size(self):
+        """Test that node.size matches the result of calculate_size()"""
+        tree = self.tree_k4
+        
+        # Use subtests to track individual insertions
+        for i in range(4, 11):
+            with self.subTest(f"Insert item with key {i * 500}"):
+                tree, inserted = tree.insert(Item(i * 500, "val"), rank=1)
+                self.assertTrue(inserted, f"Item with key {i * 500} should be inserted successfully")
+                
+                max_dim = tree.get_max_dim()
+                expanded_leafs = tree.get_expanded_leaf_count()
+                expected_keys = [entry.item.key for entry in tree]
+                print(f"Tree after inserting {i} items: {print_pretty(tree)}")
+                print(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+                self.assertEqual(i + expanded_leafs + 1, tree.node.get_size(), f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+
+                # Verify structure at each step
+                expected_real_keys = [j * 500 for j in range(1, i+1)]
+                real_keys = [entry.item.key for entry in tree.iter_real_entries()]
+                self.assertEqual(expected_real_keys, real_keys, 
+                                f"Tree should contain keys {expected_real_keys} after {i} insertions")
+            print(f"Tree after all insertions evaluated after individual subtest: {print_pretty(tree)}")
+        print(f"Tree after all insertions evaluated after for loop: {print_pretty(tree)}")
+        # print(f"Tree structure after all insertions: {tree.print_structure()}")
+
+        # print(f"Tree after all insertions: {tree.print_structure()}")
+        # print(f"Tree after all insertions: {print_pretty(tree)}")
+
+        # node_size = tree.node.size
+        # # self.assertIsNone(node_size, "Expected node size to be invalidated (none) after insert calculation")
+        # calculated_size = tree.node.calculate_tree_size()
+        
+        # # Check if the calculated size has been set
+        # node_size = tree.node.size
+        # self.assertEqual(node_size, calculated_size, f"Expected tree size to be set to {calculated_size} after calculate_tree_size(); got {node_size}")
+        
+        # # Check size consistency for the root node
+        # self.assertEqual(node_size, calculated_size, f"Expected size {node_size} to match calculated size {calculated_size}")
+        
+        # Verify size consistency throughout the tree
+        # self.verify_calculated_sizes_match(tree)
+    
     def test_rank_mismatch_size_handling(self):
         """Test that size is correctly maintained when handling rank mismatches"""
         tree = self.tree_k4
