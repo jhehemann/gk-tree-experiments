@@ -490,28 +490,22 @@ class GPlusTreeBase(AbstractSetDataStructure):
         # Exit early if the tree is empty
         if current is None or current.is_empty():
             return
-            
-        # Save the starting point to find the leftmost leaf
-        leftmost = None
         
         # Find the leftmost leaf node in current tree dimension
         while current and not current.is_empty() and current.node.right_subtree is not None:
-            result = current.node.set.get_min()
-            if result.next_entry is not None:
-                current = result.next_entry.left_subtree
+            for entry in current.node.set:
+                if entry.left_subtree is not None:
+                    # If we have a left subtree, we need to go deeper
+                    current = entry.left_subtree
+                    break
             else:
                 current = current.node.right_subtree
         
-        # # Store the leftmost leaf
-        # leftmost = current
-        
-        # # Now iterate through the leaf nodes
-        # current = leftmost
         while current is not None:
             yield current.node
             current = current.node.next
     
-    # @track_performance
+
     def physical_height(self) -> int:
         """
         The “real” pointer-follow height of the G⁺-tree:
@@ -923,7 +917,7 @@ def print_pretty(set: AbstractSetDataStructure):
             layers_raw[rank].append(text)
             max_len = max(max_len, len(text))
         else:
-            # handle leaf items' left subtrees in separate layer (only root)
+            # print leaf items' left subtrees in separate layer (only roots)
             dim_str = str(dim) if dim is not None else "?"
             new_text = f"(D{dim_str}R{rank}) " + text
             layers_raw[0].append(new_text)
