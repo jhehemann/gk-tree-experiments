@@ -31,7 +31,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
@@ -86,12 +86,6 @@ class GKPlusNodeBase(GPlusNodeBase):
         super().__init__(*args, **kwargs)
         self.size = None  # Will be computed on-demand
 
-    def _invalidate_tree_size(self) -> None:
-        """
-        Invalidate the tree size. This is a placeholder for future implementation.
-        """
-        self.size = None
-
     def get_node_item_count(self) -> bytes:
         """
         Get the number of items in this node (incl. dummy items).
@@ -99,11 +93,7 @@ class GKPlusNodeBase(GPlusNodeBase):
         Returns:
             bytes: The hash value for this node and its subtrees.
         """
-        if self.size is None:
-            logger.debug(f"Calculating size for node with rank {self.rank}")
-            self.size = self.set.item_count() if self.set else 0
-            return self.size
-        return self.size    
+        return self.set.item_count() if self.set else 0  
 
 class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     """
@@ -146,7 +136,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     
     def item_count(self) -> int:
         if self.is_empty():
-            return 0
+            self.item_cnt = 0
+            return self.item_cnt
         return self.get_tree_item_count()
     
     def get_tree_item_count(self) -> int:
@@ -163,6 +154,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             count += self.node.right_subtree.get_tree_item_count() if self.node.right_subtree is not None else 0
             self.item_cnt = count
             return self.item_cnt
+    
+    def _invalidate_tree_size(self) -> None:
+        """
+        Invalidate the tree size. This is a placeholder for future implementation.
+        """
+        self.item_cnt = None
 
     def get_max_dim(self) -> int:
         """
@@ -465,7 +462,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         
         while True:
             node = cur.node
-            node._invalidate_tree_size()
+            cur._invalidate_tree_size()
             is_leaf = node.right_subtree is None
             # Use correct item type based on node rank
             insert_obj = x_item if is_leaf else replica
@@ -500,6 +497,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # logger.debug(f"Node set after inserting {insert_obj.key} before conversion check: {print_pretty(node.set)}")
 
                 logger.debug(f"Now checking initial insertion node set after inserting {insert_obj.key}: {print_pretty(node.set)}")
+                # logger.debug(node.set.print_structure())
                 node.set = self.check_and_convert_set(node.set)
                 logger.debug(f"Node set after inserting {insert_obj.key} and conversion: {print_pretty(node.set)}")
 
@@ -897,7 +895,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 # Update current node to use left split
                 logger.debug(f"Left split item count: {l_count} (incl. dummy items)")
                 cur.node.set = left_split
-                cur.node._invalidate_tree_size()
+                cur._invalidate_tree_size()
 
                 if left_parent is None:
                     logger.debug("Left parent is None, set the left tree to cur and update self reference to this node.")
@@ -1048,6 +1046,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if self.is_empty():
             return
         
+        # stop iteration after processing the last leaf node
+        last_leaf = self.get_max_leaf()
+        
         for node in self.iter_leaf_nodes():
             for entry in node.set:
                 yield entry
+            if node is last_leaf:
+                # Stop iteration after processing the last leaf node
+                break
