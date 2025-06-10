@@ -94,6 +94,17 @@ class GKPlusNodeBase(GPlusNodeBase):
             bytes: The hash value for this node and its subtrees.
         """
         return self.set.item_count() if self.set else 0  
+    
+    def _update_left_subtree(self, key: int, new_left: GKPlusTreeBase) -> GKPlusNodeBase:
+        """
+        Update the left subtree of the current node.
+        """
+        logger.debug(f"Updating left subtree of key {key} in set {print_pretty(self.set)} with new left: {new_left}")
+        entry = self.set.retrieve(key).found_entry
+        if entry is not None:
+            logger.debug(f"Found entry with key {key}, updating left subtree.")
+            entry.left_subtree = new_left
+        return self
 
 class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     """
@@ -164,7 +175,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     def get_max_dim(self) -> int:
         """
         Get the maximum dimension of the GK+-tree.
-        
+
         Returns:
             int: The maximum dimension of the tree.
         """
@@ -562,8 +573,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     new_tree.node = self.NodeClass(node.rank, right_split, node.right_subtree)
 
                     # Update parent reference to the new tree
-                    if right_entry is not None:
-                        right_entry.left_subtree = new_tree
+                    if right_entry is not None:                        
+                        # TODO: Use right entry instance after klist_to_tree has been updated to use inplace entries
+                        # right_entry.left_subtree = new_tree
+                        right_parent.node = right_parent.node._update_left_subtree(
+                            right_entry.item.key, new_tree
+                        )
                     else:
                         right_parent.node.right_subtree = new_tree
 
