@@ -27,7 +27,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
@@ -37,6 +37,36 @@ t = Type["GPlusTreeBase"]
 DUMMY_KEY = int("-1", 16)
 DUMMY_VALUE = None
 DUMMY_ITEM = Item(DUMMY_KEY, DUMMY_VALUE)
+
+# Cache for dimension-specific dummy items
+_DUMMY_ITEM_CACHE: Dict[int, Item] = {}
+
+def get_dummy(dim: int) -> Item:
+    """
+    Get a dummy item for the specified dimension.
+    This function caches created dummy items to avoid creating new instances
+    for the same dimension repeatedly.
+    
+    Args:
+        dim (int): The dimension for which to get a dummy item.
+        
+    Returns:
+        Item: A dummy item with key=-(dim) and value=None
+    """
+    # return Item(-1, None)
+
+    # Check if we already have a dummy item for this dimension in cache
+    if dim in _DUMMY_ITEM_CACHE:
+        return _DUMMY_ITEM_CACHE[dim]
+    
+    # Create a new dummy item for this dimension
+    dummy_key = -(dim)  # Negative dimension as key 
+    dummy_item = Item(dummy_key, None)
+    
+    # Cache it for future use
+    _DUMMY_ITEM_CACHE[dim] = dummy_item
+    
+    return dummy_item
 
 DEBUG = False
 
@@ -699,9 +729,15 @@ def gtree_stats_(t: GPlusTreeBase,
         current_key = entry.item.key
         
         # Check search tree property within the node
+        # Only check if the current key is not a dummy key since dummy keys are not part of the search 
         if prev_key is not None and prev_key >= current_key:
-            stats.is_search_tree = False
-            
+            if hasattr(t, 'DIM'):
+                # search tree property is violated if the keys equal to and greater than the current trees dummy item are not in order
+                if current_key >= get_dummy(t.DIM).key:
+                    logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                                 f"current key {current_key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                    stats.is_search_tree = False
+
         # Process child stats if they exist (will be empty for leaf nodes)
         if i < len(child_stats):
             cs = child_stats[i]
@@ -731,9 +767,22 @@ def gtree_stats_(t: GPlusTreeBase,
                 if not cs.is_search_tree:
                     stats.is_search_tree = False
                 elif cs.least_item and cs.least_item.key < prev_key:
-                    stats.is_search_tree = False
+                    if hasattr(t, 'DIM'):
+                        if cs.least_item.key >= get_dummy(t.DIM).key:
+                            logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                                        f" {cs.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                            stats.is_search_tree = False
+                    else:
+                        stats.is_search_tree = False
+
                 elif cs.greatest_item and cs.greatest_item.key >= current_key:
-                    stats.is_search_tree = False
+                    if hasattr(t, 'DIM'):
+                        if cs.greatest_item.key >= get_dummy(t.DIM).key:
+                            logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                                            f" {cs.greatest_item.key} is not less than current key {current_key} for dim {t.DIM}.")
+                            stats.is_search_tree = False
+                    else:
+                        stats.is_search_tree = False
 
         prev_key = current_key
     
@@ -748,11 +797,24 @@ def gtree_stats_(t: GPlusTreeBase,
         if not right_stats.is_search_tree:
             stats.is_search_tree = False
         elif right_stats.least_item and prev_key is not None and right_stats.least_item.key < prev_key:
-            stats.is_search_tree = False
+            if hasattr(t, 'DIM'):
+                if right_stats.least_item.key >= get_dummy(t.DIM).key:
+                    logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                                f" {right_stats.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                    stats.is_search_tree = False
+            else:
+                stats.is_search_tree = False
 
     stats.is_search_tree       &= right_stats.is_search_tree
     if right_stats.least_item and right_stats.least_item.key < prev_key:
-        stats.is_search_tree = False
+        if hasattr(t, 'DIM'):
+            if right_stats.least_item.key >= get_dummy(t.DIM).key:
+                logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                            f" {right_stats.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                stats.is_search_tree = False
+        else:
+            stats.is_search_tree = False
+
 
     stats.internal_has_replicas &= right_stats.internal_has_replicas
     stats.internal_packed       &= right_stats.internal_packed

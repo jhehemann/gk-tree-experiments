@@ -15,7 +15,7 @@ from gplus_trees.base import (
 )
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
-    GPlusTreeBase, GPlusNodeBase, Stats, print_pretty
+    GPlusTreeBase, GPlusNodeBase, Stats, print_pretty, get_dummy
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
@@ -39,37 +39,6 @@ t = TypeVar('t', bound='GKPlusTreeBase')
 
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
 DEFAULT_L_FACTOR = 1  # Default threshold factor for KList to GKPlusTree conversion
-
-
-# Cache for dimension-specific dummy items
-_DUMMY_ITEM_CACHE: Dict[int, Item] = {}
-
-def get_dummy(dim: int) -> Item:
-    """
-    Get a dummy item for the specified dimension.
-    This function caches created dummy items to avoid creating new instances
-    for the same dimension repeatedly.
-    
-    Args:
-        dim (int): The dimension for which to get a dummy item.
-        
-    Returns:
-        Item: A dummy item with key=-(dim) and value=None
-    """
-    # return Item(-1, None)
-
-    # Check if we already have a dummy item for this dimension in cache
-    if dim in _DUMMY_ITEM_CACHE:
-        return _DUMMY_ITEM_CACHE[dim]
-    
-    # Create a new dummy item for this dimension
-    dummy_key = -(dim)  # Negative dimension as key 
-    dummy_item = Item(dummy_key, None)
-    
-    # Cache it for future use
-    _DUMMY_ITEM_CACHE[dim] = dummy_item
-    
-    return dummy_item
 
 class GKPlusNodeBase(GPlusNodeBase):
     """
@@ -118,9 +87,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     """
     __slots__ = GPlusTreeBase.__slots__ + ("l_factor", "item_cnt",)  # Only add new slots beyond what parent has
     
-    # Default dimension value that will be overridden by factory-created subclasses
-    DIM: int = 1  # Default dimension value, will be set by the factory
     # Will be set by the factory
+    DIM: int = 1  # Default dimension value
     NodeClass: Type[GKPlusNodeBase]
     SetClass: Type[AbstractSetDataStructure]
     KListClass: Type[KListBase]
@@ -274,16 +242,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             RetrievalResult: The minimum entry and the next entry (if any).
         """
-        logger.debug(f"Getting minimum entry from GKPlusTree {print_pretty(self)}")
         if self.is_empty():
-            logger.debug("Tree is empty, returning None for min entry.")
             return RetrievalResult(None, None)
 
-        logger.debug("Tree is not empty, create generator and get first leaf.")
         first_leaf = next(self.iter_leaf_nodes(), None)
         if first_leaf is None:
             return RetrievalResult(None, None)
-        logger.debug(f"First leaf found: {print_pretty(first_leaf.set)}")
         return first_leaf.set.get_min()
     
     def get_max(self) -> RetrievalResult:
