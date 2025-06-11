@@ -99,7 +99,7 @@ class GKPlusNodeBase(GPlusNodeBase):
         """
         Update the left subtree of the current node.
         """
-        logger.debug(f"Updating left subtree of key {key} in set {print_pretty(self.set)} with new left: {new_left}")
+        logger.debug(f"Updating left subtree of key {key} in set {print_pretty(self.set)} with new left: {print_pretty(new_left)}")
         entry = self.set.retrieve(key).found_entry
         if entry is not None:
             logger.debug(f"Found entry with key {key}, updating left subtree.")
@@ -236,6 +236,37 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         count += node.set.item_slot_count()
         
         return count
+
+    def find_pivot(self) -> RetrievalResult:
+        """
+        Returns the pivot entry for a node of the next higher dimension to be unfolded.
+        
+        This method is always called from a node of the next lower dimension. The pivot entry is the first entry that is either the dummy entry of the lower dimension itself or the next larger entry in the current tree.
+        
+        Returns:
+            RetrievalResult: The pivot entry and the next entry in the tree (if any).
+        """
+        logger.debug(f"Getting pivot entry from GKPlusTree {print_pretty(self)}")
+        if self.is_empty():
+            logger.debug("Tree is empty, returning None for pivot.")
+            return RetrievalResult(None, None)
+
+        dummy_pivot = get_dummy(self.DIM - 1).key
+
+        pivot = None
+        current = None
+        for entry in self:
+            current = entry
+            if pivot is not None:
+                break
+            else:
+                if entry.item.key == dummy_pivot or entry.item.key > dummy_pivot:
+                    logger.debug(f"Found pivot entry: {entry}")
+                    pivot = entry
+        if pivot is None:
+            raise ValueError(f"No pivot entry found in tree {print_pretty(self)}")
+        
+        return RetrievalResult(pivot, current)
 
     def get_min(self) -> RetrievalResult:
         """
@@ -420,15 +451,17 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         if parent is None:
             # create a new root node
+            logger.debug(f"Handling rank mismatch: current rank {cur.node.rank}, target rank {rank}, creating new root node.")
             old_node = self.node
             dummy = get_dummy(dim=TreeClass.DIM)
             root_set = self.SetClass().insert(dummy, None)
             self.node = self.NodeClass(rank, root_set, TreeClass(old_node))
             return self
 
+        logger.debug(f"Handling rank mismatch: current rank {cur.node.rank}, target rank {rank}, unfolding node.")
         # Unfold intermediate node between parent and current
         # Set replica of the current node's min as first entry.
-        min_entry = cur.node.set.get_min().found_entry
+        min_entry = cur.node.set.find_pivot().found_entry
         min_replica = _create_replica(min_entry.item.key)
         new_set = self.SetClass().insert(min_replica, None)
         new_tree = TreeClass()
@@ -436,6 +469,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
        
         if p_next:
             p_next.left_subtree = new_tree
+            parent.node = parent.node._update_left_subtree(
+                p_next.item.key, new_tree
+            )
         else:
             parent.node.right_subtree = new_tree
 
@@ -778,7 +814,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # logger.debug(f"New iteration with cur: {print_pretty(cur.node.set)}")
             logger.debug(f"Split node at key {key}.")
             node = cur.node
-            is_leaf = node.rank == 1
+            is_leaf = node.right_subtree is None
 
             # Node splitting required - get updated next_entry
             res = node.set.retrieve(key)

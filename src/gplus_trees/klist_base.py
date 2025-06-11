@@ -413,6 +413,10 @@ class KListBase(AbstractSetDataStructure):
         # No successor found
         return RetrievalResult(found_entry=None, next_entry=None)
     
+    def find_pivot(self) -> RetrievalResult:
+        """Find the pivot entry (minimum entry) in the KList."""
+        return self.get_min()
+
     # @track_performance
     def get_min(self) -> RetrievalResult:
         """Retrieve the minimum entry from the sorted KList."""
