@@ -183,15 +183,34 @@ class GPlusTreeBase(AbstractSetDataStructure):
             found_entry = res.found_entry
             next_entry = res.next_entry
 
-
             if node.rank == 1:
-                if next_entry is None and node.next is not None:
-                    # If leaf has a linked next node, update next_entry
-                    next_entry = node.next.node.set.get_min().found_entry
+                while True:
+                    node = cur.node
+                    # Attempt to retrieve from this node's set
+                    res = node.set.retrieve(key)
+                    
+                    found_entry = res.found_entry
+                    next_entry = res.next_entry
+
+                    # if node.rank == 1:
+                    while next_entry is None and node.next is not None:
+                        # Find the next entry (no dummy) in the linked leaf list
+                        node = node.next.node
+                        for entry in node.set:
+                            if entry.item.key > key:
+                                next_entry = entry
+                                break
+                    
                     return RetrievalResult(found_entry, next_entry)
-                else:
-                    # Leaf node: return found_entry and next_entry
-                    return RetrievalResult(found_entry, next_entry)
+
+            # if node.rank == 1:
+            #     if next_entry is None and node.next is not None:
+            #         # If leaf has a linked next node, update next_entry
+            #         next_entry = node.next.node.set.get_min().found_entry
+            #         return RetrievalResult(found_entry, next_entry)
+            #     else:
+            #         # Leaf node: return found_entry and next_entry
+            #         return RetrievalResult(found_entry, next_entry)
             
             # Descend based on presence of next_entry
             cur = next_entry.left_subtree if next_entry else node.right_subtree
