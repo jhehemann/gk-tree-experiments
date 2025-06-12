@@ -5,10 +5,12 @@ from pprint import pprint
 # Import from factory and base modules instead of archive
 from gplus_trees.factory import make_gplustree_classes, create_gplustree
 from gplus_trees.base import Item
-from gplus_trees.gplus_tree_base import DUMMY_KEY, DUMMY_ITEM, gtree_stats_
+from gplus_trees.gplus_tree_base import DUMMY_KEY, DUMMY_ITEM, gtree_stats_, print_pretty
 
 # Constants for test configuration
 K_VALUE = 4  # Capacity value for KList nodes
+
+from tests.logconfig import logger
 
 class TestGTreeStatsInvalidProperties(unittest.TestCase):
     def setUp(self):
@@ -65,7 +67,8 @@ class TestGTreeStatsInvalidProperties(unittest.TestCase):
         """Test stats computed for an empty tree"""
         # Swap first item (DUMMY_ITEM) with item 3
         self.single_node_tree.node.set.head.entries[0].item = self.item3
-        
+        logger.debug(f"Single node tree: {print_pretty(self.single_node_tree)}")
+
         stats = gtree_stats_(self.single_node_tree)
         
         self.assertEqual(stats.least_item.key, 3,

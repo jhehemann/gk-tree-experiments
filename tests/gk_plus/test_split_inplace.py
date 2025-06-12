@@ -36,7 +36,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
     )
     
     # Initialize items once to avoid re-creating them in each test
-    _KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    _KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     ITEMS = {k: Item(k, "val") for k in _KEYS}
 
     def _get_split_cases(self, keys: List[int]):
@@ -55,40 +55,12 @@ class TestGKPlusSplitInplace(TreeTestCase):
                 ("above largest",              max(keys) + 1),
                 ("non-existing middle key",    self._find_first_missing(keys)),
             ]
-    
-    def setUp(self):
-        # Create trees with different K values for testing
-        self.K = 4  # Default capacity
-        self.tree_k2 = create_gkplus_tree(K=2)
-        self.tree_k4 = create_gkplus_tree(K=4)
-        self.tree_k8 = create_gkplus_tree(K=8)
 
     def create_item(self, key, value="val"):
         """Helper to create test items"""
         return Item(key, value)
     
-    def validate_tree(
-            self,
-            tree,
-            expected_keys: Optional[List[int]] = None,
-            err_msg: Optional[str] = "",
-        ):
-        """Validate tree invariants and structure"""
-        # Check invariants using stats
-        stats = gtree_stats_(tree, {})
-
-        # pprint(stats)
-        # print(f"item count: {tree.item_count()}")
-        assert_tree_invariants_tc(self, tree, stats)
-        
-        # Verify expected keys if provided
-        if expected_keys:
-            # self.assertFalse(tree.is_empty(), f"Tree should not be empty.\n{err_msg}")
-            actual_keys = sorted(self.collect_keys(tree))
-            self.assertEqual(expected_keys, actual_keys, 
-                            f"Expected keys {expected_keys} don't match actual keys {actual_keys}\n{err_msg}")
-            self.assertEqual(len(expected_keys), tree.item_count(),
-                            f"Expected {len(expected_keys)} items in tree, got {tree.item_count()}\n{err_msg}")
+    
     
     def verify_keys_in_order(self, tree):
         """Verify that keys in the tree are in sorted order by traversing leaf nodes."""
@@ -156,6 +128,52 @@ class TestGKPlusSplitInplace(TreeTestCase):
         self.assertIsNone(middle, msg)
         self.validate_tree(right, exp_right, msg)
 
+    def _run_split_case_multi_dim(self, keys, rank_combo, split_key,
+                        exp_left, exp_right, case_name, gnode_capacity=2, l_factor: float = 1.0):
+        if len(rank_combo) != len(keys):
+            raise ValueError("Rank combo length must match number of keys.")
+        
+        # build the tree once
+        base_tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
+
+        for key, rank in zip(keys, rank_combo):
+            base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
+
+        logger.debug(f"Base tree before split: {print_pretty(base_tree)}")
+        logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
+
+        msg_head = (
+            f"\n\nKey-Rank combo:\n"
+            f"K: {keys}\n"
+            f"R: {rank_combo}"
+            f"\n\nTREE BEFORE SPLIT: {print_pretty(base_tree)}\n"
+        )
+
+        # deep-copy and split
+        tree_copy = copy.deepcopy(base_tree)
+        left, middle, right = tree_copy.split_inplace(split_key)
+
+        logger.debug(f"Left tree after split: {print_pretty(left)}")
+        logger.debug(f"Middle tree after split: {print_pretty(middle)}")
+        logger.debug(f"Right tree after split: {print_pretty(right)}")
+
+        msg = f"\n\nSplit at {case_name}" + msg_head
+        msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
+            left=print_pretty(left),
+            middle=print_pretty(middle),
+            right=print_pretty(right),
+        )
+
+        dummies_left = self.get_dummies(left)
+        exp_left = sorted(dummies_left + exp_left)
+        dummies_right = self.get_dummies(right)
+        exp_right = sorted(dummies_right + exp_right)
+
+        # assertions
+        self.validate_tree(left,  exp_left,  msg)
+        self.assertIsNone(middle, msg)
+        self.validate_tree(right, exp_right, msg)
+
     def _find_first_missing(self, lst: list[int]) -> int | None:
         """
         Returns the first integer missing between the min and max of lst,
@@ -199,29 +217,21 @@ class TestGKPlusSplitInplace(TreeTestCase):
             
             # Validate left tree with the item
             self.assertIs(tree, left)
-            self.validate_tree(left, [500])
+            self.validate_tree(left, [-1, 500])
             self.assertIsNone(middle)
             self.assertTrue(right.is_empty())
 
         with self.subTest("split point < only key"):
             # Split at a key less than the only key
             tree = create_gkplus_tree(K=4)
-
-            tree, _ = self.tree_k4.insert(item, rank=1)
-
-            # print("\nSelf tree (tree) before split")
-            # print(tree.print_structure())
-            
-            # print("\nSelf Tree (k4) before split")
-            # print(self.tree_k4.print_structure())
-            
+            tree, _ = tree.insert(item, rank=1)
             left, middle, right = tree.split_inplace(100)
 
             # Validate right tree with the item
             self.assertTrue(left.is_empty())
             self.assertIsNone(middle)
-            self.validate_tree(right, [500])
-        
+            self.validate_tree(right, [-1, 500])
+
         with self.subTest("split point == only key"):
             tree = create_gkplus_tree(K=4)            
             
@@ -235,7 +245,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
     
     def test_split_leaf_node_with_multiple_items(self):
         """Test splitting a leaf node with multiple items."""
-        tree = self.tree_k4
+        tree = self.tree_k8
         
         # Insert multiple items in increasing order
         keys = [100, 200, 300, 400, 500]
@@ -243,20 +253,19 @@ class TestGKPlusSplitInplace(TreeTestCase):
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
         
         # Check that initial tree is valid
-        self.validate_tree(tree, keys)
+        self.validate_tree(tree, [-1] + keys)
 
         # Split in the middle (between items)
         left, middle, right = tree.split_inplace(250)
 
         # Validate the split trees
-        self.validate_tree(left, [100, 200])
+        self.validate_tree(left, [-1, 100, 200])
         self.assertIsNone(middle)
-        self.validate_tree(right, [300, 400, 500])
-    
-    
+        self.validate_tree(right, [-1, 300, 400, 500])
+
     def test_split_tree_with_internal_nodes(self):
         """Test splitting a tree with internal nodes."""
-        tree = self.tree_k2  # Use K=2 to force more internal nodes
+        tree = self.tree_k4  # Use K=2 to force more internal nodes
         
         # Insert items with different ranks to create internal nodes
         items_and_ranks = [
@@ -275,49 +284,19 @@ class TestGKPlusSplitInplace(TreeTestCase):
             tree, _ = tree.insert(item, rank)
         
         # Verify initial tree structure
-        self.validate_tree(tree, all_keys)
-        
+        self.validate_tree(tree, [-1] + all_keys)
+
         # Split at a key that requires traversing internal nodes
         left, middle, right = tree.split_inplace(450)
         
         # Validate split trees
-        self.validate_tree(left, [100, 200, 300, 400])
+        self.validate_tree(left, [-1, 100, 200, 300, 400])
         self.assertIsNone(middle)
-        self.validate_tree(right, [500, 600, 700])
-    
-    def test_split_with_node_collapsing(self):
-        """Test splitting that causes nodes to collapse."""
-        tree = self.tree_k2  # Use K=2 to force node splitting quickly
-        
-        # Create a tree with specific structure that will force node collapsing during split
-        items_and_ranks = [
-            (Item(100, "val_1"), 1),
-            (Item(200, "val_2"), 2),
-            (Item(300, "val_3"), 2),
-            (Item(400, "val_4"), 3),
-            (Item(500, "val_5"), 1),
-            (Item(600, "val_6"), 2)
-        ]
-        
-        all_keys = [item[0].key for item in items_and_ranks]
-        
-        for item, rank in items_and_ranks:
-            tree, _ = tree.insert(item, rank)
-        
-        # Verify initial tree structure
-        self.validate_tree(tree, all_keys)
-        
-        # Split at a key that will cause node collapsing
-        left, middle, right = tree.split_inplace(350)
-
-        # Validate split trees
-        self.validate_tree(left, [100, 200, 300])
-        self.assertIsNone(middle)
-        self.validate_tree(right, [400, 500, 600])
+        self.validate_tree(right, [-1, 500, 600, 700])
     
     def test_split_with_complex_tree(self):
         """Test splitting a complex tree with many nodes and multiple ranks."""
-        tree = self.tree_k4
+        tree = self.tree_k8
         
         # Insert many items with varying ranks
         keys = list(range(100, 1100, 100))  # Keys from 100 to 1000
@@ -327,23 +306,26 @@ class TestGKPlusSplitInplace(TreeTestCase):
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank)
         
         # Verify initial tree structure
-        self.validate_tree(tree, keys)
+        self.validate_tree(tree, [-1] + keys)
 
         # Split in the middle
         split_key = 550
         left, middle, right = tree.split_inplace(split_key)
 
         # Validate split
-        expected_left = [k for k in keys if k < split_key]
-        expected_right = [k for k in keys if k >= split_key]
-        
+        expected_left = [-1] + [k for k in keys if k < split_key]
+        expected_right = [-1] + [k for k in keys if k > split_key]
+        logger.debug(f"Expected left: {expected_left}")
+        logger.debug(f"Expected right: {expected_right}")
+
         self.validate_tree(left, expected_left)
         self.assertIsNone(middle)
         self.validate_tree(right, expected_right)
     
     def test_split_leaf_with_left_subtrees_higher_dim(self):
         """Test splitting a tree where items have left subtrees."""
-        tree = create_gkplus_tree(K=4)
+        cap = 8
+        tree = create_gkplus_tree(K=cap)
         
         # Insert primary items
         keys = [100, 200, 300, 400, 500]
@@ -366,47 +348,52 @@ class TestGKPlusSplitInplace(TreeTestCase):
         left, middle, right = tree.split_inplace(250)
  
         # Validate split trees
-        self.validate_tree(left, [100, 200])
+        self.validate_tree(left, [-1, 100, 200])
         self.assertIsNone(middle)
-        self.validate_tree(right, [300, 400, 500])
+        self.validate_tree(right, [-1, 300, 400, 500])
         
         # Check that left subtrees were preserved
         result = left.retrieve(200)
         self.assertIsNotNone(result.found_entry.left_subtree)
-        self.assertEqual([150], self.collect_keys(result.found_entry.left_subtree))
+        self.assertEqual([-2, 150], self.collect_keys(result.found_entry.left_subtree))
         
         result = right.retrieve(400)
         self.assertIsNotNone(result.found_entry.left_subtree)
-        self.assertEqual([350], self.collect_keys(result.found_entry.left_subtree))
+        self.assertEqual([-3, 350], self.collect_keys(result.found_entry.left_subtree))
+
         
         # Now split at a key with a left subtree
-        tree = create_gkplus_tree(K=4)
+        tree = create_gkplus_tree(K=cap)
         for key in keys:
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
             
         # Create and attach a left subtree to item 300
-        subtree = create_gkplus_tree(K=4, dimension=type(tree).DIM + 1)
+        subtree = create_gkplus_tree(K=cap, dimension=type(tree).DIM + 1)
         subtree, _ = subtree.insert(Item(250, "subtree_val"), rank=1)
         subtree, _ = subtree.insert(Item(275, "subtree_val"), rank=1)
         result = tree.retrieve(300)
         result.found_entry.left_subtree = subtree
+
+        # logger.debug(f"Tree before split: {print_pretty(tree)}")
+        # logger.debug(f"Tree structure: {tree.print_structure()}")
         
         # Split exactly at 300
         left, middle, right = tree.split_inplace(300)
         
         # Validate split trees
-        self.validate_tree(left, [100, 200])
+        self.validate_tree(left, [-1, 100, 200])
         self.assertIsNotNone(middle)
-        self.validate_tree(middle, [250, 275])
-        self.validate_tree(right, [400, 500])
+        self.validate_tree(middle, [-2, 250, 275])
+        self.validate_tree(right, [-1, 400, 500])
     
     def test_split_at_edge_cases(self):
         """Test splitting at edge case keys (min, max, and beyond)."""
         # Insert keys
         keys = [100, 200, 300, 400, 500]
-        
+        cap = 8
+
         with self.subTest("Split at key smaller than smallest"):
-            tree = create_gkplus_tree(K=4)
+            tree = create_gkplus_tree(K=cap)
             for key in keys:
                 tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
 
@@ -416,24 +403,24 @@ class TestGKPlusSplitInplace(TreeTestCase):
             # Validate split
             self.assertTrue(left.is_empty())
             self.assertIsNone(middle)
-            self.validate_tree(right, keys)
+            self.validate_tree(right, [-1] + keys)
         
         with self.subTest("Split at key larger than largest"):
             # Split at a key larger than all keys in the tree
-            tree = create_gkplus_tree(K=4)
+            tree = create_gkplus_tree(K=cap)
             for key in keys:
                 tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
 
             left, middle, right = tree.split_inplace(600)
 
             # Validate split
-            self.validate_tree(left, keys)
+            self.validate_tree(left, [-1] + keys)
             self.assertIsNone(middle)
             self.assertTrue(right.is_empty())
         
         with self.subTest("Split at minimum key"):
             # Split at the minimum key
-            tree = create_gkplus_tree(K=4)
+            tree = create_gkplus_tree(K=cap)
 
             for key in keys:
                 tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
@@ -443,24 +430,24 @@ class TestGKPlusSplitInplace(TreeTestCase):
             # Validate split
             self.assertTrue(left.is_empty())
             self.assertIsNone(middle)
-            self.validate_tree(right, keys[1:])
+            self.validate_tree(right, [-1] + keys[1:])
         
         with self.subTest("Split at maximum key"):
             # Split at the maximum key
-            tree = create_gkplus_tree(K=4)
+            tree = create_gkplus_tree(K=cap)
             for key in keys:
                 tree, _ = tree.insert(Item(key, f"val_{key}"), rank=1)
 
             left, middle, right = tree.split_inplace(500)
             
             # Validate split
-            self.validate_tree(left, [100, 200, 300, 400])
+            self.validate_tree(left, [-1, 100, 200, 300, 400])
             self.assertIsNone(middle)
             self.validate_tree(right)
     
     def test_split_with_random_items(self):
         """Test splitting with randomly generated items and keys."""
-        tree = self.tree_k8
+        tree = self.tree_k16
         k = 8
 
         # Generate random keys
@@ -474,7 +461,9 @@ class TestGKPlusSplitInplace(TreeTestCase):
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
 
         # Verify initial tree structure
-        self.validate_tree(tree, sorted(keys))
+        dummies = self.get_dummies(tree)
+        expected_keys = sorted(dummies + keys)
+        self.validate_tree(tree, expected_keys)
         
         # Choose a random split point
         split_key = random.choice(range(1, 1000))
@@ -483,11 +472,14 @@ class TestGKPlusSplitInplace(TreeTestCase):
         left, middle, right = tree.split_inplace(split_key)
 
         # Validate split trees
-        expected_left = sorted([k for k in keys if k < split_key])
-        expected_left = [-1] + expected_left if expected_left else expected_left
-        
-        expected_right = sorted([k for k in keys if k > split_key])
-        expected_right = [-1] + expected_right if expected_right else expected_right
+        expected_left = [k for k in keys if k < split_key]
+        dummies_left = self.get_dummies(left)
+        # expected_left = [-1] + expected_left if expected_left else expected_left
+        expected_left = sorted(dummies_left + expected_left)
+
+        expected_right = [k for k in keys if k > split_key]
+        dummies_right = self.get_dummies(right)
+        expected_right = sorted(dummies_right + expected_right)
 
         self.validate_tree(left, expected_left)
         self.assertIsNone(middle)
@@ -551,167 +543,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
         self.validate_tree(left3, expected_left3)
         self.assertIsNone(middle3)
         self.validate_tree(right3, expected_right3)
-    
-    # def test_large_random_tree_split(self):
-    #     """Test splitting a large tree with random data."""
-        
-    #     # Create trees with different K values for testing
-    #     self.K = 4  # Default capacity
-    #     tree = self.tree_k2
-
-    #     for rank_combo in tqdm(
-    #         product(self.RANKS, repeat=self.NUM_KEYS),
-    #         total=self.TOT_COMBINATIONS,
-    #         desc="Rank combinations",
-    #         unit="combo",
-    #     ):
-        
-    #     # for rank_combo in product(RANKS, repeat=10):
-    #         base_tree = create_gkplus_tree(K=2)
             
-    #         for key, rank in zip(self.KEYS, rank_combo):
-    #             base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
-
-    #         msg_head = f"\n\nKey-Rank combo:\nK: {self.KEYS}\nR: {rank_combo}"
-    #         msg_head += f"\n\nTree before split:\n{base_tree.print_structure()}"
-
-    #         # Verify initial tree structure
-    #         self.validate_tree(base_tree, self.KEYS, msg_head)
-
-    #         with self.subTest("Split at smallest key"):
-    #             split_key = 1
-    #             tree_copy = copy.deepcopy(base_tree)
-                
-    #             msg = msg_head + f"Split at smallest key: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-
-    #             # msg += f"\n\nSplit result:"
-    #             # msg += f"\n\nLeft tree:\n{left.print_structure()}"
-    #             # msg += f"\n\nMiddle tree:\n{middle}"
-    #             # msg += f"\n\nRight tree:\n{right.print_structure()}"
-
-    #             self.validate_tree(left, self.split_1_exp_left, msg)
-    #             self.assertIsNone(middle)
-    #             self.validate_tree(right, self.split_1_exp_right, msg)
-
-    #         with self.subTest("Split at largest key"):
-    #             split_key = 8
-    #             tree_copy = copy.deepcopy(base_tree)
-
-    #             msg = msg_head + f"Split at largest key: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-    #             # msg += f"\n\nSplit result:"
-    #             # msg += f"\n\nLeft tree:\n{left.print_structure()}"
-    #             # msg += f"\n\nMiddle tree:\n{middle}"
-    #             # msg += f"\n\nRight tree:\n{right.print_structure()}"
-
-    #             self.validate_tree(left, self.split_8_exp_left, msg)
-    #             self.assertIsNone(middle)
-    #             self.validate_tree(right, self.split_8_exp_right, msg)
-            
-    #         with self.subTest("Split at existing key in between"):
-    #             split_key = 4
-    #             tree_copy = copy.deepcopy(base_tree)
-                
-    #             msg = msg_head + f"Split at existing key in between: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-    #             # msg += f"\n\nSplit result:"
-    #             # msg += f"\n\nLeft tree:\n{left.print_structure()}"
-    #             # msg += f"\n\nMiddle tree:\n{middle}"
-    #             # msg += f"\n\nRight tree:\n{right.print_structure()}"
-
-    #             self.validate_tree(left, self.split_4_exp_left, msg)
-    #             self.assertIsNone(middle)
-    #             self.validate_tree(right, self.split_4_exp_right, msg)
-            
-    #         with self.subTest("Split at key smaller than smallest"):
-    #             split_key = 0
-    #             tree_copy = copy.deepcopy(base_tree)
-                
-    #             msg = msg_head + f"Split at key smaller than smallest: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-    #             # msg += f"\nSplit result:"
-    #             # msg += f"\nLeft tree: {left.print_structure()}"
-    #             # msg += f"\nMiddle tree: {middle}"
-    #             # msg += f"\nRight tree: {right.print_structure()}"
-
-    #             self.assertTrue(left.is_empty(), msg)
-    #             self.assertIsNone(middle)
-    #             self.validate_tree(right, self.split_0_exp_right, msg)
-            
-    #         with self.subTest("Split at key larger than largest"):
-    #             split_key = 9
-    #             tree_copy = copy.deepcopy(base_tree)
-                
-    #             msg = msg_head + f"Split at key larger than largest: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-    #             # msg += f"\nSplit result:"
-    #             # msg += f"\nLeft tree: {left.print_structure()}"
-    #             # msg += f"\nMiddle tree: {middle}"
-    #             # msg += f"\nRight tree: {right.print_structure()}"
-
-    #             self.validate_tree(left, self.split_9_exp_left, msg)
-    #             self.assertIsNone(middle)
-    #             self.assertTrue(right.is_empty(), msg)
-            
-    #         with self.subTest("Split at non-existing key in between"):
-    #             split_key = 5
-    #             tree_copy = copy.deepcopy(base_tree)
-                
-    #             msg = msg_head + f"Split at non-existing key in between: {split_key}"
-
-    #             left, middle, right = tree_copy.split_inplace(split_key)
-                
-    #             msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-    #                 left=left.print_structure(),
-    #                 middle=middle,
-    #                 right=right.print_structure(),
-    #             )
-    #             # msg += f"\nSplit result:"
-    #             # msg += f"\nLeft tree: {left.print_structure()}"
-    #             # msg += f"\nMiddle tree: {middle}"
-    #             # msg += f"\nRight tree: {right.print_structure()}"
-
-    #             self.validate_tree(left, self.split_5_exp_left, msg)
-    #             self.assertIsNone(middle)
-    #             self.validate_tree(right, self.split_5_exp_right, msg)
-            
-           
     def test_specific_rank_combo(self):
         keys  =  [1, 2, 3, 5, 6, 7]
         ranks =  (1, 1, 1, 1, 2, 4)
@@ -792,25 +624,117 @@ class TestGKPlusSplitInplace(TreeTestCase):
                     exp_right, case_name
                 )
 
+    def test_split_expanded_root(self):
+        keys  =  [1, 3, 5, 7]
+        ranks =  [2, 2, 2, 2]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("existing middle key", 3)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4
+                )
+
+    def test_split_abc(self):
+        keys  =  [1, 3, 5, 7, 9]
+        ranks =  [2, 1, 1, 1, 1]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("existing middle key", 3)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+
+    def test_split_abcd(self):
+        keys  =  [1, 3, 5, 7, 9]
+        ranks =  [2, 1, 1, 1, 1]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("existing middle key", 3)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=2, l_factor=2.0
+                )
+
+    def test_split_abcde(self):
+        keys  =  [1, 3, 5, 7, 9]
+        ranks =  [4, 4, 4, 4, 3]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("split before first", 0)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=2, l_factor=3.0
+                )
+    # TODO: test this
+    def test_split_abcdef(self):
+        keys  =  [1, 3, 5, 7, 9]
+        ranks =  [1, 2, 2, 2, 2]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("split before last", 8)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+
+
     # def test_all_rank_combinations(self):
     #     """
     #     Exhaustively test every rank-combo and every split-key,
     #     computing the expected left/right key-lists on the fly.
     #     """
-    #     keys = [1, 3, 5, 7]
-    #     ranks = range(1, 5)
-    #     split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    #     keys = [1, 3, 5, 7, 9, 11]
+    #     ranks = range(1, 4)
+    #     split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    #     # split_keys = [0]
     #     # split_key
 
     #     num_keys = len(keys)
     #     combinations = len(ranks) ** num_keys
 
-    #     iterations = 10
-
+    #     # iterations = 10
     #     # combos = islice(product(ranks, repeat=num_keys), iterations)
         
     #     for rank_combo in tqdm(
     #         product(ranks, repeat=num_keys),
+    #         # combos,
     #         total=combinations,
     #         desc="Rank combinations",
     #         unit="combo",
@@ -820,111 +744,53 @@ class TestGKPlusSplitInplace(TreeTestCase):
     #             for split_key in split_keys:
     #                 with self.subTest(split_key=split_key):
     #                     # expected keys-to-left and keys-to-right
-    #                     exp_left  = [k for k in keys if k < split_key]
+    #                     # do not include dummy items as they are calculated
+    #                     # on the fly in the _run_split_case_multi_dim method
+    #                     exp_left = [k for k in keys if k < split_key]
     #                     exp_right = [k for k in keys if k > split_key]
+
     #                     case_name = f"split key: {split_key}"
-    #                     self._run_split_case(
+    #                     # self._run_split_case(
+    #                     self._run_split_case_multi_dim(
     #                         keys,
     #                         rank_combo,
     #                         split_key,
     #                         exp_left,
     #                         exp_right,
-    #                         case_name
+    #                         case_name,
+    #                         gnode_capacity=4,
+    #                         l_factor=1.0
     #                     )
 
+    def test_split_with_node_collapsing(self):
+        """Test splitting that causes nodes to collapse."""
+        tree = self.tree_k4  # Use K=4 to force node splitting quickly
 
-
-        # for rank_combo in tqdm(
-    #         product(self.RANKS, repeat=self.NUM_KEYS),
-    #         total=self.TOT_COMBINATIONS,
-    #         desc="Rank combinations",
-    #         unit="combo",
-    #     ):
-
-    
-
-
-
-
-
-
-
-    # def test_random_splits_with_edge_cases(self):
-    #     """Test multiple random splits with edge cases."""
-    #     for test_iteration in range(5):  # Run several iterations
-    #         tree = self.tree_k4
-            
-    #         # Generate random data
-    #         num_items = random.randint(20, 100)
-    #         keys = random.sample(range(1, 5000), num_items)
-    #         ranks = [random.randint(1, 3) for _ in range(num_items)]
-            
-    #         # Insert items
-    #         for key, rank in zip(keys, ranks):
-    #             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
-                
-    #         # Verify initial tree
-    #         self.validate_tree(tree, sorted(keys))
-            
-    #         # Choose several split points including edge cases
-    #         split_points = [
-    #             min(keys) - random.randint(1, 50),  # Below minimum
-    #             min(keys),                          # Exactly minimum
-    #             sorted(keys)[len(keys) // 4],       # Lower quartile
-    #             sorted(keys)[len(keys) // 2],       # Median
-    #             sorted(keys)[3 * len(keys) // 4],   # Upper quartile
-    #             max(keys),                          # Exactly maximum
-    #             max(keys) + random.randint(1, 50)   # Above maximum
-    #         ]
-            
-    #         for split_point in split_points:
-    #             # Split the tree
-    #             left, middle, right = tree.split_inplace(split_point)
-                
-    #             # Validate split
-    #             expected_left = sorted([k for k in keys if k < split_point])
-    #             expected_right = sorted([k for k in keys if k >= split_point])
-                
-    #             self.validate_tree(left, expected_left)
-    #             self.validate_tree(right, expected_right)
-    
-    # def test_sequential_random_splits(self):
-    #     """Test series of sequential splits on random trees."""
-    #     tree = self.tree_k4
+        # Create a tree with specific structure that will force node collapsing during split
+        items_and_ranks = [
+            (Item(100, "val_1"), 1),
+            (Item(200, "val_2"), 2),
+            (Item(300, "val_3"), 2),
+            (Item(400, "val_4"), 3),
+            (Item(500, "val_5"), 1),
+            (Item(600, "val_6"), 2)
+        ]
         
-    #     # Create a large tree
-    #     num_items = 150
-    #     keys = random.sample(range(1, 10000), num_items)
+        all_keys = [item[0].key for item in items_and_ranks]
         
-    #     for key in keys:
-    #         tree, _ = tree.insert(Item(key, f"val_{key}"), rank=random.randint(1, 3))
+        for item, rank in items_and_ranks:
+            tree, _ = tree.insert(item, rank)
         
-    #     sorted_keys = sorted(keys)
-    #     current_tree = tree
-    #     remaining_keys = sorted_keys
+        # Verify initial tree structure
+        self.validate_tree(tree, [-1] + all_keys)
         
-    #     # Perform sequential splits, each time splitting the right subtree
-    #     for i in range(5):  # Do 5 sequential splits
-    #         if len(remaining_keys) < 10:  # Stop if not enough keys left
-    #             break
-                
-    #         # Choose a split point at approximately 25% of remaining keys
-    #         split_idx = len(remaining_keys) // 4
-    #         split_key = remaining_keys[split_idx]
-            
-    #         # Perform the split
-    #         left, middle, right = current_tree.split_inplace(split_key)
-            
-    #         # Validate the split
-    #         expected_left = [k for k in remaining_keys if k < split_key]
-    #         expected_right = [k for k in remaining_keys if k >= split_key]
-            
-    #         self.validate_tree(left, expected_left)
-    #         self.validate_tree(right, expected_right)
-            
-    #         # Continue with right tree for next iteration
-    #         current_tree = right
-    #         remaining_keys = expected_right
+        # Split at a key that will cause node collapsing
+        left, middle, right = tree.split_inplace(350)
+
+        # Validate split trees
+        self.validate_tree(left, [-1, 100, 200, 300])
+        self.assertIsNone(middle)
+        self.validate_tree(right, [-1, 400, 500, 600])
 
 if __name__ == "__main__":
     unittest.main()

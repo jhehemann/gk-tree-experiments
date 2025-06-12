@@ -36,9 +36,10 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
         # Convert dummy key to positive integer to calculate a rank from its hash
         pos_dummies = [abs(dummies[i]) for i in range(len(dummies))]
         self.dummy_ranks = calc_ranks_for_multiple_dimensions(pos_dummies, k, dimensions=5)
-        print(f"Calculated ranks for dummies {dummies}:")
-        for dim_idx, ranks in enumerate(self.dummy_ranks):
-            print(f"  Dim {dim_idx+1}: {ranks}")
+        
+        # print(f"Calculated ranks for dummies {dummies}:")
+        # for dim_idx, ranks in enumerate(self.dummy_ranks):
+        #     print(f"  Dim {dim_idx+1}: {ranks}")
         
     def create_item(self, key, value="val"):
         """Helper to create test items"""
@@ -151,7 +152,6 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
         ]
         
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        print(f"Keys: {keys}")
         self.validate_keys(keys, rank_lists, k)
         
         with self.subTest(f"Insert items below expansion threshold 4"):
@@ -167,7 +167,7 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
             expanded_leafs = tree.get_expanded_leaf_count()
             expected_keys = [entry.item.key for entry in tree]
             self.assertEqual(tree.DIM, 1)
-            self.assertEqual(tree.node.get_size(), 4, 
+            self.assertEqual(tree.item_count(), 4, 
                              f"Tree size should be 4 after inserting 3 items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
             # Verify structure at each step
             expected_real_keys = [key for key in keys[:3]]
@@ -176,7 +176,6 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
             self.assertEqual(expected_real_keys, real_keys, 
                             f"Tree should contain keys {expected_real_keys} after {i} insertions")
 
-            print(f"Tree after all insertions: {print_pretty(tree)}")
             self.assertEqual(tree.get_max_dim(), 1, "Max dimension should be 1 after inserting 4 items")
 
 
@@ -190,7 +189,7 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
                              "Maximum tree dimension should increase to 2 after expansion")
             expanded_leafs = tree.get_expanded_leaf_count()
             expected_keys = [entry.item.key for entry in tree]
-            self.assertEqual(tree.node.get_size(), 6, 
+            self.assertEqual(tree.item_count(), 6, 
                              f"Tree size should be 6. 4 Real items + 2 dummy items for each of the 2 dimensions.")
 
             # Verify structure after expansion
@@ -199,6 +198,5 @@ class TestGKPlusDimensionTracking(unittest.TestCase):
             self.assertEqual(expected_real_keys, real_keys,
                             f"Tree should contain keys {expected_real_keys} after expansion")
 
-            print(f"Tree after expansion: {print_pretty(tree)}")
             self.assertEqual(tree.get_max_dim(), 2, 
                              "Max dimension should be 2 after inserting 5 items")

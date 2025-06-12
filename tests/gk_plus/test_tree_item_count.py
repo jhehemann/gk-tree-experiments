@@ -187,7 +187,6 @@ class TestGKPlusTreeItemCountTracking(TreeTestCase):
 
         self.assertTrue(self.verify_subtree_sizes(tree))
 
-    # TODO: Fix this test for multiple dimensions
     def test_duplicate_insertion_size(self):
         """Test size doesn't change when inserting duplicates"""
         tree = self.tree_k2
@@ -201,9 +200,13 @@ class TestGKPlusTreeItemCountTracking(TreeTestCase):
         # Duplicate insertion
         item_duplicate = Item(1, "new_val")
         tree, inserted = tree.insert(item_duplicate, rank=1)
-        self.assertEqual(2, tree.item_cnt, 
+        self.assertIsNone(tree.item_cnt,
+                          "item_cnt should be None before triggering item_count()")
+        self.assertEqual(2, tree.item_count(), 
                          "item_cnt should remain 2 after duplicate insertion")
+        self.assertEqual(tree.item_cnt, 2)
     
+
     def test_large_tree_size(self):
         """Test size is correctly maintained in a larger tree with random insertions"""
         tree = self.tree_k2
@@ -213,20 +216,34 @@ class TestGKPlusTreeItemCountTracking(TreeTestCase):
         random.seed(42)  # For reproducibility
         unique_keys = random.sample(range(1, 100), 99)
         # Insert all items
+        inserted_count = 0
         for i, key in enumerate(unique_keys, 1):
         # for i in range(1, 1000):
             item = Item(key, "val")
             tree, _ = tree.insert(item, rank=1)
+
+            inserted_count += 1
             max_dim = tree.get_max_dim()
+            dummy_cnt = self.get_dummy_count(tree)
             expanded_leafs = tree.get_expanded_leaf_count()
             expected_keys = [entry.item.key for entry in tree]
-            logger.debug(f"Tree after inserting {i} items: {print_pretty(tree)}")
+            expected_item_count = inserted_count + dummy_cnt
+
+            # max_dim = tree.get_max_dim()
+            # expanded_leafs = tree.get_expanded_leaf_count()
+            # expected_keys = [entry.item.key for entry in tree]
+
+            logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
             # logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
+            if inserted_count == 6:
+                logger.debug(f"tree: {print_pretty(tree.node.set.node.right_subtree)}")
+                logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
 
-            self.assertEqual(i + expanded_leafs + 1, tree.item_count(), f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
+            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
             # self.assertEqual(i + 1, tree.item_count(), f"Tree should have size {i + 1} after inserting {key}")
+
 
         # # Verify size after all insertions
         # self.assertEqual(len(keys), tree.item_count())

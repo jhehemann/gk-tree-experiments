@@ -116,6 +116,46 @@ class TreeTestCase(unittest.TestCase):
         logger.debug(f"Expanded leaf count for tree {print_pretty(tree)}: {expanded_leaf_count}")
         return dummy_count
     
+    def get_dummies(self, tree: 'GKPlusTreeBase') -> List[int]:
+        """Collect all dummy keys from a tree."""
+        if tree.is_empty():
+            return []
+        
+        if tree.node.right_subtree is None:
+            # If the tree is a leaf, return empty list
+            return [e.item.key for e in tree.node.set if e.item.key < 0]
+
+        dummy_keys = []
+        for e in tree.node.set:
+            if e.left_subtree is not None:
+                dummy_keys.extend(self.get_dummies(e.left_subtree))
+        dummy_keys.extend(self.get_dummies(tree.node.right_subtree))
+
+        return dummy_keys
+    
+    def validate_tree(
+            self,
+            tree,
+            expected_keys: Optional[List[int]] = None,
+            err_msg: Optional[str] = "",
+        ):
+        """Validate tree invariants and structure"""
+        # Check invariants using stats
+        stats = gtree_stats_(tree, {})
+
+        # pprint(stats)
+        # print(f"item count: {tree.item_count()}")
+        assert_tree_invariants_tc(self, tree, stats)
+        
+        # Verify expected keys if provided
+        if expected_keys:
+            # self.assertFalse(tree.is_empty(), f"Tree should not be empty.\n{err_msg}")
+            actual_keys = sorted(self.collect_keys(tree))
+            self.assertEqual(expected_keys, actual_keys, 
+                            f"Expected keys {expected_keys} don't match actual keys {actual_keys}\n{err_msg}")
+            self.assertEqual(len(expected_keys), tree.item_count(),
+                            f"Expected {len(expected_keys)} items in tree, got {tree.item_count()}\n{err_msg}")
+
     def collect_keys(self, tree):
         """Collect all keys from a tree, excluding dummy keys."""
         if tree.is_empty():

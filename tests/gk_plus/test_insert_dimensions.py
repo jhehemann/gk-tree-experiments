@@ -15,6 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
+from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from tests.gk_plus.base import TreeTestCase
 from tests.utils import assert_tree_invariants_tc
@@ -111,3 +112,30 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
         # Verify subtree sizes
         self.assertTrue(self.verify_subtree_sizes(tree))
+
+    def test_specific_keys(self):
+        """Test inserting specific keys into a tree with multiple dimensions"""
+        tree = self.tree_k2
+        k = 2
+
+        # keys = [120, 181, 389, 419, 533, 555, 719, 883]
+        keys = [419, 533, 555, 719, 883, 120, 181, 389]
+
+        # Find keys for the given rank lists
+        ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
+        logger.debug(f"Keys: {keys}")
+        logger.debug(f"Ranks: {ranks}")
+
+        # Insert items into the tree
+        for i, key in enumerate(keys):
+            item = self.create_item(key)
+            rank = ranks[i]
+            tree, _ = tree.insert(item, rank=rank)
+
+        dum_keys = self.get_dummies(tree)
+        exp_keys = sorted(dum_keys + keys)
+
+        logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
+
+        # Validate the tree structure and size
+        self.validate_tree(tree, exp_keys)
