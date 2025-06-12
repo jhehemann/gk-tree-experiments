@@ -845,7 +845,7 @@ def gtree_stats_(t: GPlusTreeBase,
     if child_stats and child_stats[0].least_item is not None:
         stats.least_item = child_stats[0].least_item
     else:
-        stats.least_item = node_set.get_min().found_entry.item
+        stats.least_item = node_set.find_pivot().found_entry.item
 
     if right_stats.greatest_item is not None:
         stats.greatest_item = right_stats.greatest_item

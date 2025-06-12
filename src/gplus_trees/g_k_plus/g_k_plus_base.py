@@ -248,9 +248,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         first_leaf = next(self.iter_leaf_nodes(), None)
         if first_leaf is None:
-            return RetrievalResult(None, None)
+            raise ValueError("Tree is empty, cannot retrieve minimum entry.")
+        
         return first_leaf.set.get_min()
-    
+
     def get_max(self) -> RetrievalResult:
         """
         Get the maximum entry in the tree.

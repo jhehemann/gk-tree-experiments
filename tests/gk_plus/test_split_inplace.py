@@ -732,6 +732,24 @@ class TestGKPlusSplitInplace(TreeTestCase):
                     gnode_capacity=4, l_factor=1.0
                 )
 
+    def test_split_abcdefgh(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [1, 2, 2, 2, 2, 2]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("split at second key", 3)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+
 
     def test_all_rank_combinations(self):
         """

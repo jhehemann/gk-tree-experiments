@@ -1,5 +1,6 @@
 """K-list implementation"""
 
+import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, Type
 from bisect import bisect_left, bisect_right
 
@@ -14,6 +15,20 @@ if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
 
 from gplus_trees.profiling import track_performance
+
+# Configure logging
+logger = logging.getLogger(__name__)
+# Clear all handlers to ensure we don't add duplicates
+if logger.hasHandlers():
+    logger.handlers.clear()
+# Add a single handler with formatting
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+# Prevent propagation to the root logger to avoid duplicate logs
+logger.propagate = False
 
 class KListNodeBase:
     """
