@@ -737,6 +737,8 @@ def gtree_stats_(t: GPlusTreeBase,
                     logger.debug(f"Search tree property violated at node rank {node_rank}: "
                                  f"current key {current_key} is not greater than previous key {prev_key} for dim {t.DIM}.")
                     stats.is_search_tree = False
+            else:
+                stats.is_search_tree = False
 
         # Process child stats if they exist (will be empty for leaf nodes)
         if i < len(child_stats):
@@ -879,9 +881,9 @@ def gtree_stats_(t: GPlusTreeBase,
 
         # Check leaf_count and real_item_count consistency
         if leaf_count != stats.leaf_count or item_count != stats.real_item_count:
-            # print(f"Leaf count mismatch: iter {leaf_count} != stats {stats.leaf_count}")
-            # print(f"Or Item count mismatch: iter {item_count} != stats {stats.item_count}")
-            # print(f"Or real_item_count mismatch: iter {item_count} != stats {stats.real_item_count}")
+            logger.debug(f"Leaf count mismatch: iter {leaf_count} != stats {stats.leaf_count}")
+            logger.debug(f"Or Item count mismatch: iter {item_count} != stats {stats.item_count}")
+            logger.debug(f"Or real_item_count mismatch: iter {item_count} != stats {stats.real_item_count}")
             stats.linked_leaf_nodes = False
             stats.leaf_count = max(leaf_count, stats.leaf_count)
             
