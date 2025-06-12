@@ -5,8 +5,10 @@ import hashlib
 
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
+from gplus_trees.g_k_plus.g_k_plus_base import print_pretty, get_dummy
 from gplus_trees.base import calculate_group_size, count_trailing_zero_bits
+
+from tests.logconfig import logger
 
 def get_rand_rank(K: int) -> int:
     """
@@ -68,7 +70,6 @@ def tree_to_klist(tree: 'GKPlusTreeBase') -> KListBase:
         """
         # Import inside function to avoid circular imports
         from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-        print(f"Converting tree to KList: {print_pretty(tree)}")
 
         if not isinstance(tree, GKPlusTreeBase):
             raise TypeError("tree must be an instance of GKPlusTreeBase")
@@ -77,31 +78,36 @@ def tree_to_klist(tree: 'GKPlusTreeBase') -> KListBase:
             return tree.KListClass()
         
         klist = tree.KListClass()
-        # Process leaf nodes to build the KList
+
+        # Insert items with keys larger than current trees dummy key into the new klist
+        # Smaller keys are dummies from higher dimensions, caused by gnode expansions within the tree to collapse. These are dropped.
+        # Larger dummy keys are from lower dimensions, that must be preserved.
+        # Note: dummy key of DIM j is -j.
         for entry in tree:
-            # Insert each item into the KList
-            klist = klist.insert(entry.item, entry.left_subtree)
+            tree_dummy = get_dummy(tree.DIM)
+            if entry.item.key > tree_dummy.key:
+                klist = klist.insert(entry.item, entry.left_subtree)
         return klist
 
-def klist_to_tree(klist, K, DIM):
+def klist_to_tree(klist, K, DIM, l_factor=1.0) -> 'GKPlusTreeBase':
     """
     Mimics the Rust create_gtree: build a tree by inserting each (item, rank) pair.
     Uses the factory pattern to create a tree with the specified capacity K.
     """
-    if klist.is_empty():
-        return create_gkplus_tree(K, DIM)
+    # Raise an error if klist is not a KListBase instance
+    if not isinstance(klist, KListBase):
+        raise TypeError("klist must be an instance of KListBase")
     
+    if klist.is_empty():
+        return create_gkplus_tree(K, DIM, l_factor)
+
     entries = list(klist)
-    tree = create_gkplus_tree(K, DIM)
-    item_count = len(entries)
+    tree = create_gkplus_tree(K, DIM, l_factor)
     ranks = [] 
     for entry in entries:
         ranks.append(calc_rank(entry.item.key, K, DIM))
 
-    # print(f"Generated {item_count} ranks: {ranks}")
-    # print(f"Ranks after appending ones: {len(ranks)}, {ranks}")
-    # print(f"Entries: {list(entry.item.key for entry in entries)}")
-
+    # TODO: Adjust to insert entry instances with their ranks
     tree_insert = tree.insert
     for i, entry in enumerate(entries):
         if i < len(ranks):
