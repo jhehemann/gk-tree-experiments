@@ -31,7 +31,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)  # Set to DEBUG for detailed output
+logger.setLevel(logging.DEBUG)  # Set to DEBUG for detailed output
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
@@ -794,6 +794,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             left_split = self.check_and_convert_set(left_split)
             right_split = self.check_and_convert_set(right_split)
+            next_entry = right_split.retrieve(key).next_entry if right_split else None
 
             logger.debug(f"LEFT SPLIT after split (and conversion): {print_pretty(left_split)}")
             logger.debug(f"KEY SUBTREE: {print_pretty(key_subtree)}")
@@ -821,7 +822,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                     right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                 else:
-                    # TODO: CHECK IF left_subtree=None is correct here
                     right_split = right_split.insert(dummy, left_subtree=None)
 
                 right_split = self.check_and_convert_set(right_split)
@@ -882,6 +882,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                     else:
                         right_split = right_split.insert(dummy, left_subtree=None)
+                    
+                    right_split = self.check_and_convert_set(right_split)
+                    logger.debug(f"Right split after inserting dummy (and conversion): {print_pretty(right_split)}")
+                    next_entry = right_split.retrieve(key).next_entry
+                    
                     right_node = NodeClass(1, right_split, None)
                     new_tree = TreeClass(l_factor=self.l_factor)
                     new_tree.node = right_node

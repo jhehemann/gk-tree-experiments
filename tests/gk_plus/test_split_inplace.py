@@ -695,7 +695,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
                     exp_right, case_name,
                     gnode_capacity=2, l_factor=3.0
                 )
-    # TODO: test this
+
     def test_split_abcdef(self):
         keys  =  [1, 3, 5, 7, 9]
         ranks =  [1, 2, 2, 2, 2]
@@ -714,53 +714,71 @@ class TestGKPlusSplitInplace(TreeTestCase):
                     gnode_capacity=4, l_factor=1.0
                 )
 
+    def test_split_abcdefg(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [1, 2, 2, 2, 2, 2]
 
-    # def test_all_rank_combinations(self):
-    #     """
-    #     Exhaustively test every rank-combo and every split-key,
-    #     computing the expected left/right key-lists on the fly.
-    #     """
-    #     keys = [1, 3, 5, 7, 9, 11]
-    #     ranks = range(1, 4)
-    #     split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    #     # split_keys = [0]
-    #     # split_key
+        # array of tuples with (case_name, split_key)
+        split_cases = [("split before first", 0)]
 
-    #     num_keys = len(keys)
-    #     combinations = len(ranks) ** num_keys
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
 
-    #     # iterations = 10
-    #     # combos = islice(product(ranks, repeat=num_keys), iterations)
+
+    def test_all_rank_combinations(self):
+        """
+        Exhaustively test every rank-combo and every split-key,
+        computing the expected left/right key-lists on the fly.
+        """
+        keys = [1, 3, 5, 7, 9, 11]
+        ranks = range(1, 4)
+        split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        # split_keys = [0]
+        # split_key
+
+        num_keys = len(keys)
+        combinations = len(ranks) ** num_keys
+
+        # iterations = 10
+        # combos = islice(product(ranks, repeat=num_keys), iterations)
         
-    #     for rank_combo in tqdm(
-    #         product(ranks, repeat=num_keys),
-    #         # combos,
-    #         total=combinations,
-    #         desc="Rank combinations",
-    #         unit="combo",
-    #     ):
-    #         with self.subTest(rank_combo=rank_combo):
-    #             # for each possible split_key (including non-existent)
-    #             for split_key in split_keys:
-    #                 with self.subTest(split_key=split_key):
-    #                     # expected keys-to-left and keys-to-right
-    #                     # do not include dummy items as they are calculated
-    #                     # on the fly in the _run_split_case_multi_dim method
-    #                     exp_left = [k for k in keys if k < split_key]
-    #                     exp_right = [k for k in keys if k > split_key]
+        for rank_combo in tqdm(
+            product(ranks, repeat=num_keys),
+            # combos,
+            total=combinations,
+            desc="Rank combinations",
+            unit="combo",
+        ):
+            with self.subTest(rank_combo=rank_combo):
+                # for each possible split_key (including non-existent)
+                for split_key in split_keys:
+                    with self.subTest(split_key=split_key):
+                        # expected keys-to-left and keys-to-right
+                        # do not include dummy items as they are calculated
+                        # on the fly in the _run_split_case_multi_dim method
+                        exp_left = [k for k in keys if k < split_key]
+                        exp_right = [k for k in keys if k > split_key]
 
-    #                     case_name = f"split key: {split_key}"
-    #                     # self._run_split_case(
-    #                     self._run_split_case_multi_dim(
-    #                         keys,
-    #                         rank_combo,
-    #                         split_key,
-    #                         exp_left,
-    #                         exp_right,
-    #                         case_name,
-    #                         gnode_capacity=4,
-    #                         l_factor=1.0
-    #                     )
+                        case_name = f"split key: {split_key}"
+                        # self._run_split_case(
+                        self._run_split_case_multi_dim(
+                            keys,
+                            rank_combo,
+                            split_key,
+                            exp_left,
+                            exp_right,
+                            case_name,
+                            gnode_capacity=4,
+                            l_factor=1.0
+                        )
 
     def test_split_with_node_collapsing(self):
         """Test splitting that causes nodes to collapse."""
