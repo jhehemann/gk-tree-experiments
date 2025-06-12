@@ -31,14 +31,14 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)  # Set to DEBUG for detailed output
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
-DEFAULT_L_FACTOR = 1  # Default threshold factor for KList to GKPlusTree conversion
+DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conversion
 
 class GKPlusNodeBase(GPlusNodeBase):
     """
@@ -106,6 +106,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         super().__init__(node)
         # Add our additional attribute
         self.l_factor = l_factor
+        logger.debug(f"Creating GKPlusTree with dimension {self.DIM} and l_factor {self.l_factor}")
         self.item_cnt = None  # Initialize item count
     
     def __str__(self):
@@ -303,13 +304,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_set = SetK()
         right_set = right_set.insert(x_item, x_left)
         right_node = NodeK(1, right_set, None)
-        right_leaf = TreeK(right_node)
+        right_leaf = TreeK(right_node, self.l_factor)
 
         # Build left leaf with dummy entry
         left_set = SetK()
         left_set = left_set.insert(get_dummy(type(self).DIM), None)
         left_node = NodeK(1, left_set, None)
-        left_leaf = TreeK(left_node)
+        left_leaf = TreeK(left_node, self.l_factor)
 
         # Link leaves
         left_leaf.node.next = right_leaf
@@ -337,7 +338,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     def _insert_non_empty(self, x_item: Item, rank: int, x_left: Optional[GPlusTreeBase] = None) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
         logger.debug("")
-        logger.debug(f"DIM {self.DIM} insert called with KEY: {x_item.key}, RANK: {rank}")
+        logger.debug(f"DIM {self.DIM} insert called with KEY: {x_item.key}, RANK: {rank} into tree:\n{print_pretty(self)}")
         
         cur = self
         parent = None
@@ -428,11 +429,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         min_entry = cur.node.set.find_pivot().found_entry
         min_replica = _create_replica(min_entry.item.key)
         new_set = self.SetClass().insert(min_replica, None)
-        new_tree = TreeClass()
+        new_tree = TreeClass(l_factor=self.l_factor)
         new_tree.node = self.NodeClass(rank, new_set, cur)
        
         if p_next:
-            p_next.left_subtree = new_tree
+            # p_next.left_subtree = new_tree
             parent.node = parent.node._update_left_subtree(
                 p_next.item.key, new_tree
             )
@@ -563,18 +564,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     else:
                         logger.debug(f"Inserting {insert_obj.key} into right split: {print_pretty(right_split)}")
                         right_split = right_split.insert(insert_obj, left_subtree=insert_subtree)
+                    logger.debug(f"Right split after inserting {insert_obj.key} before conversion: {print_pretty(right_split)}")
 
                     # logger.debug(f"Now checking right split after inserting {insert_obj.key}, before conversion: {print_pretty(right_split)}")
                     right_split = self.check_and_convert_set(right_split)
                     
-                    # logger.debug(f"Right split after insert and conversion: {print_pretty(right_split)}")
+                    logger.debug(f"Right split after insert and conversion: {print_pretty(right_split)}")
 
-                    new_tree = TreeClass()
+                    new_tree = TreeClass(l_factor=self.l_factor)
                     new_tree.node = self.NodeClass(node.rank, right_split, node.right_subtree)
 
                     # Update parent reference to the new tree
                     if right_entry is not None:                        
-                        # TODO: Use right entry instance after klist_to_tree has been updated to use inplace entries
+                        # TODO: Use right_entry instance after klist_to_tree has been updated to use inplace entries
                         # right_entry.left_subtree = new_tree
                         right_parent.node = right_parent.node._update_left_subtree(
                             right_entry.item.key, new_tree
@@ -693,7 +695,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             logger.debug(f"Converting KList to GKPlusTree with new dimension {new_dim}.")
             target_dim = new_dim
             # logger.debug(f"Target dimension for new GKPlusTree: {target_dim}.")
-            return klist_to_tree(klist, k, target_dim)
+            return klist_to_tree(klist, k, target_dim, self.l_factor)
         return klist
     
     def check_and_collapse_tree(self, tree: 'GKPlusTreeBase') -> AbstractSetDataStructure:
@@ -709,19 +711,21 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         # Get the threshold based on the KList capacity
         k = self.KListClass.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
-        # logger.debug(f"Checking GKPlusTree {print_pretty(tree)} "
-        #              f"with item count {tree.item_count()} against threshold {threshold}.")
+        
+        logger.debug(f"Checking GKPlusTree {print_pretty(tree)} "
+                     f"with item count {tree.item_count()} against threshold {threshold}.")
         if tree.is_empty():
             return tree
         
         if tree.DIM == 1:
+            # We want to keep the GKPlusTree structure for dimension 1
             return tree
             
         # Count the tree items (including dummy items)
-        item_count = self.item_count()
+        item_count = tree.item_count()
         # logger.debug(f"Tree item count: {item_count}, threshold: {threshold}.")
 
-        if item_count <= threshold:
+        if item_count - 1 <= threshold: # - 1 because the dummy item will be removed during conversion
             from gplus_trees.g_k_plus.utils import tree_to_klist
             # Collapse into a KList
             logger.debug(f"Collapsing GKPlusTree to KList.")
@@ -756,7 +760,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             logger.debug("")
             return self, None, TreeClass()
         
-        logger.debug("SELF TREE TO SPLIT:")
+        logger.debug(f"SELF TREE TO SPLIT: {print_pretty(self)}")
         # logger.debug(print_pretty(self))
         # logger.debug(f"Root set structure before split:\n{print_pretty(self.node.set)}")
         # logger.debug(self.print_structure())
@@ -788,9 +792,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Split node at key
             left_split, key_subtree, right_split = node.set.split_inplace(key)
 
-            logger.debug(f"LEFT SPLIT: {print_pretty(left_split)}")
+            left_split = self.check_and_convert_set(left_split)
+            right_split = self.check_and_convert_set(right_split)
+
+            logger.debug(f"LEFT SPLIT after split (and conversion): {print_pretty(left_split)}")
             logger.debug(f"KEY SUBTREE: {print_pretty(key_subtree)}")
-            logger.debug(f"RIGHT SPLIT: {print_pretty(right_split)}")
+            logger.debug(f"RIGHT SPLIT after split (and conversion): {print_pretty(right_split)}")
 
             l_count = left_split.item_count()
             r_count = right_split.item_count()
@@ -814,8 +821,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                     right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                 else:
+                    # TODO: CHECK IF left_subtree=None is correct here
                     right_split = right_split.insert(dummy, left_subtree=None)
 
+                right_split = self.check_and_convert_set(right_split)
+                logger.debug(f"Right split after inserting dummy (and conversion): {print_pretty(right_split)}")
+
+                next_entry = right_split.retrieve(key).next_entry
                 right_node = NodeClass(
                     node.rank, right_split, node.right_subtree
                 )
@@ -827,12 +839,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     new_tree = right_return
                 else:
                     logger.debug("Right parent is not None, creating new tree.")
-                    new_tree = TreeClass()
+                    new_tree = TreeClass(l_factor=self.l_factor)
                     new_tree.node = right_node
                     
                     # Update parent reference
                     if right_entry is not None:
-                        right_entry.left_subtree = new_tree
+                        # right_entry.left_subtree = new_tree
+                        right_parent.node = right_parent.node._update_left_subtree(
+                            right_entry.item.key, new_tree
+                        )
                     else:
                         right_parent.node.right_subtree = new_tree
 
@@ -868,12 +883,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     else:
                         right_split = right_split.insert(dummy, left_subtree=None)
                     right_node = NodeClass(1, right_split, None)
-                    new_tree = TreeClass()
+                    new_tree = TreeClass(l_factor=self.l_factor)
                     new_tree.node = right_node
 
                     # Update parent reference
                     if right_entry is not None:
-                        right_entry.left_subtree = new_tree
+                        # right_entry.left_subtree = new_tree
+                        right_parent.node = right_parent.node._update_left_subtree(
+                            right_entry.item.key, new_tree
+                        )
                     else:
                         right_parent.node.right_subtree = new_tree
                     
@@ -961,8 +979,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                                 l_last_leaf = seen_key_subtree.get_max_leaf()
                                 
                         else:
-                            logger.debug("Left parent exists, so leaf is not collapsed. Set l_last_leaf to cur and update leaf next pointers.")
+                            logger.debug(f"Left parent exists: {[e.item.key for e in left_parent.node.set]}, so leaf is not collapsed. Set l_last_leaf to cur and update leaf next pointers.")
                             
+                            cur.node.set = left_split
                             l_last_leaf = cur.node
                             logger.debug(f"l_last_leaf.next: {l_last_leaf.next}")
 
@@ -976,7 +995,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         #     r_first_leaf.node.next = cur.node.next
 
 
-                        left_return = self = TreeClass()
+                        left_return = self = TreeClass(l_factor = self.l_factor)
                         l_last_leaf = None
 
                     next_left_parent = left_parent
@@ -1019,7 +1038,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if is_leaf:
                 # Unlink leaf nodes
                 if l_last_leaf:
-                    logger.debug("Left leaf node exists.")
+                    logger.debug(f"Left leaf node exists with items: {[e.item.key for e in l_last_leaf.set]}")
                     logger.debug("Setting its next pointer to None.")
                     l_last_leaf.next = None
 
