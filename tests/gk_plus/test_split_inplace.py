@@ -142,7 +142,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
         logger.debug(f"\n\n############################################################################################### SPLITTING ###############################################################################################\n\n")
         logger.debug(f"Base tree before split: {print_pretty(base_tree)}")
         logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
-        logger.debug(f"Tree structure: {base_tree.print_structure()}")
+        # logger.debug(f"Tree structure: {base_tree.print_structure()}")
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
@@ -158,7 +158,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
         logger.debug(f"Left tree after split: {print_pretty(left)}")
         logger.debug(f"Middle tree after split: {print_pretty(middle)}")
         logger.debug(f"Right tree after split: {print_pretty(right)}")
-        logger.debug(f"Right structure: {right.print_structure()}")
+        # logger.debug(f"Right structure: {right.print_structure()}")
 
         msg = f"\n\nSplit at {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(

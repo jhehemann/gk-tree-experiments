@@ -789,15 +789,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             is_leaf = node.rank == 1
 
             # Node splitting required - get updated next_entry
-            res = node.set.retrieve(key)
-            next_entry = res.next_entry
-            logger.debug(f"Next entry in cur: {next_entry}")
+            # res = node.set.retrieve(key)
+            # next_entry = res.next_entry
+            # logger.debug(f"Next entry in cur: {next_entry}")
 
             # Split node at key
             left_split, key_subtree, right_split = node.set.split_inplace(key)
 
             left_split = self.check_and_convert_set(left_split)
-            right_split = self.check_and_convert_set(right_split)
+            # right_split = self.check_and_convert_set(right_split)
 
             logger.debug(f"[DIM {self.DIM}] LEFT SPLIT after split (and conversion): {print_pretty(left_split)}")
             logger.debug(f"[DIM {self.DIM}] KEY SUBTREE: {print_pretty(key_subtree)}")
@@ -829,8 +829,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 right_split = self.check_and_convert_set(right_split)
                 logger.debug(f"[DIM {self.DIM}] Right split after inserting dummy (and conversion): {print_pretty(right_split)}")
-                if self.DIM == 1:
-                    logger.debug(f"[DIM {self.DIM}] Right split structure: {right_split.print_structure()}.")
+                # if self.DIM == 1:
+                #     logger.debug(f"[DIM {self.DIM}] Right split structure: {right_split.print_structure()}.")
 
                 next_entry = right_split.retrieve(key).next_entry
                 right_node = NodeClass(
@@ -846,8 +846,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     
                     logger.debug(f"New right return tree: {print_pretty(new_tree)}")
                     logger.debug(f"New right return tree root set: {print_pretty(new_tree.node.set)}")
-                    # if self.DIM == 3:
-                    #     logger.debug(f"[DIM {self.DIM}] New right return tree structure {right_return.print_structure()}.")
                 else:
                     logger.debug(f"[DIM {self.DIM}] Right parent is not None, creating new tree node and make it a subtree of right parent.")
                     logger.debug(f"[DIM {self.DIM}] Right parent tree before update: {print_pretty(right_parent)}")
@@ -907,6 +905,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                     else:
                         right_split = right_split.insert(dummy, left_subtree=None)
+
+                    right_split = self.check_and_convert_set(right_split)
+                    next_entry = right_split.retrieve(key).next_entry
                     
                     right_node = NodeClass(1, right_split, None)
                     new_tree = TreeClass(l_factor=self.l_factor)
@@ -933,7 +934,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     for i, e in enumerate(right_parent_entries):
                         logger.debug(f"[DIM {self.DIM}] Right parent entry {i}: key: {e.item.key}, value: {e.item.value}, left subtree: {print_pretty(e.left_subtree)}")
 
-                    logger.debug(f"Right parent tree structure: {right_parent.print_structure()}")
+                    # logger.debug(f"Right parent tree structure: {right_parent.print_structure()}")
 
                     # Prepare for updating 'next' pointers
                     # r_first_leaf = new_tree
@@ -945,6 +946,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 else:
                     logger.debug("No node creation, keeping existing parent references.")
+                    next_entry = right_split.retrieve(key).next_entry
+                    
                     next_right_parent = right_parent
                     next_cur = (
                         next_entry.left_subtree 
@@ -1094,7 +1097,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     l_last_leaf.next = None
 
                 # prepare key entry subtree for return
-                return_subtree = res.found_entry.left_subtree if res.found_entry else None
+                return_subtree = key_subtree
+                # return_subtree = res.found_entry.left_subtree if res.found_entry else None
                 logger.debug("")
                 logger.debug("LEFT (SELF) RETURN:")
                 logger.debug(print_pretty(self))
