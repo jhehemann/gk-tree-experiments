@@ -139,8 +139,10 @@ class TestGKPlusSplitInplace(TreeTestCase):
         for key, rank in zip(keys, rank_combo):
             base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
 
+        logger.debug(f"\n\n############################################################################################### SPLITTING ###############################################################################################\n\n")
         logger.debug(f"Base tree before split: {print_pretty(base_tree)}")
         logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
+        logger.debug(f"Tree structure: {base_tree.print_structure()}")
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
@@ -156,6 +158,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
         logger.debug(f"Left tree after split: {print_pretty(left)}")
         logger.debug(f"Middle tree after split: {print_pretty(middle)}")
         logger.debug(f"Right tree after split: {print_pretty(right)}")
+        logger.debug(f"Right structure: {right.print_structure()}")
 
         msg = f"\n\nSplit at {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
@@ -735,6 +738,25 @@ class TestGKPlusSplitInplace(TreeTestCase):
     def test_split_abcdefgh(self):
         keys  =  [1, 3, 5, 7, 9, 11]
         ranks =  [1, 2, 2, 2, 2, 2]
+
+        # array of tuples with (case_name, split_key)
+        split_cases = [("split at second key", 3)]
+
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+
+    # TODO: check if splitting on the single existing leaf in dim 1 causes the failures (key=3)
+    def test_split_abcdefghi(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [1, 1, 2, 2, 2, 2]
 
         # array of tuples with (case_name, split_key)
         split_cases = [("split at second key", 3)]

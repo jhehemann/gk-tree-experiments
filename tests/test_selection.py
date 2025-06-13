@@ -8,6 +8,7 @@ import sys
 import os
 import unittest
 import argparse
+import logging
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -95,6 +96,13 @@ def main():
         nargs='+',
         help='Test classes to run (format: file.py:TestClass1,TestClass2)'
     )
+
+    parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        default='INFO',
+        help='Set the logging level (default: INFO)'
+    )
     
     parser.add_argument(
         '-v', '--verbosity',
@@ -105,6 +113,14 @@ def main():
     )
     
     args = parser.parse_args()
+
+    log_level = getattr(logging, args.log_level)
+    # Force=True makes this configuration override existing logger settings
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        force=True
+    )
     
     # Use command line arguments if provided, otherwise use defaults from TEST_FILES
     test_files = args.files if args.files else TEST_FILES

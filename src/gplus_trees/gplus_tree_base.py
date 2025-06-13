@@ -18,7 +18,7 @@ from gplus_trees.base import (
 from gplus_trees.klist_base import KListBase
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("GPlusTree")
 # Clear all handlers to ensure we don't add duplicates
 if logger.hasHandlers():
     logger.handlers.clear()
@@ -551,6 +551,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 current = current.node.right_subtree
         
         while current is not None:
+            # logger.debug(f"[DIM {self.DIM}] Yielding leaf node: {print_pretty(current.node.set)}")
             yield current.node
             current = current.node.next
     
@@ -574,7 +575,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
             left = entry.left_subtree
             if left is not None:
                 max_child = max(max_child, left.physical_height())
-        if node.right_subtree is not None:
+        if node.rank != 1:
             max_child = max(max_child, node.right_subtree.physical_height())
 
         # total physical height = this node’s chain length + deepest child
@@ -767,7 +768,8 @@ def gtree_stats_(t: GPlusTreeBase,
 
             if node_rank >= 2 and entry.item.value is not None:
                 stats.internal_has_replicas = False
-            
+                # logger.debug(f"Node with rank {node_rank} and set {print_pretty(node_set)} has a non-None value ({entry.item.value}) for item {entry.item.key} with value {entry.item.value}. ")
+
             # Accumulate counts for common values
             stats.gnode_count += cs.gnode_count
             stats.item_count += cs.item_count
