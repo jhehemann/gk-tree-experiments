@@ -433,10 +433,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         new_tree.node = self.NodeClass(rank, new_set, cur)
        
         if p_next:
-            # p_next.left_subtree = new_tree
-            parent.node = parent.node._update_left_subtree(
-                p_next.item.key, new_tree
-            )
+            p_next.left_subtree = new_tree
+            # parent.node = parent.node._update_left_subtree(
+            #     p_next.item.key, new_tree
+            # )
         else:
             parent.node.right_subtree = new_tree
 
@@ -580,10 +580,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Update parent reference to the new tree
                     if right_entry is not None:                        
                         # TODO: Use right_entry instance after klist_to_tree has been updated to use inplace entries
-                        # right_entry.left_subtree = new_tree
-                        right_parent.node = right_parent.node._update_left_subtree(
-                            right_entry.item.key, new_tree
-                        )
+                        right_entry.left_subtree = new_tree
+                        # right_parent.node = right_parent.node._update_left_subtree(
+                        #     right_entry.item.key, new_tree
+                        # )
                     else:
                         right_parent.node.right_subtree = new_tree
 
@@ -640,6 +640,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if is_leaf:
                     new_tree.node.next = cur.node.next
                     cur.node.next = new_tree
+                    cur.node.right_subtree = None  # No right subtree at leaf level
                     return self, inserted  # Early return when leaf is processed
                     
                 # Continue to next iteration with updated current node
@@ -860,10 +861,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         logger.debug(f"[DIM {self.DIM}] Right entry left subtree before update: {print_pretty(right_entry.left_subtree)}")
                         logger.debug(f"[DIM {self.DIM}] Updating left subtree of right entry with new tree {print_pretty(new_tree)}.")
                         
-                        # right_entry.left_subtree = new_tree
-                        right_parent.node = right_parent.node._update_left_subtree(
-                            right_entry.item.key, new_tree
-                        )
+                        right_entry.left_subtree = new_tree
+                        # right_parent.node = right_parent.node._update_left_subtree(
+                        #     right_entry.item.key, new_tree
+                        # )
                     else:
                         logger.debug(f"[DIM {self.DIM}] Right entry is None, updating right subtree of right parent with new tree {print_pretty(new_tree)}.")
 
@@ -886,7 +887,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if next_entry else new_tree.node.right_subtree
                 )
                 next_right_parent = new_tree
-                logger.debug(f"[DIM {self.DIM}] Next right parent: {print_pretty(next_right_parent.node.set if next_right_parent else None)}")
+                logger.debug(f"[DIM {self.DIM}] Next right parent set: {print_pretty(next_right_parent.node.set if next_right_parent else None)}")
 
             else:
                 logger.debug(f"Right split item count is {r_count}")
@@ -918,10 +919,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         logger.debug(f"[DIM {self.DIM}] Right entry left subtree before update: {print_pretty(right_entry.left_subtree)}")
                         logger.debug(f"[DIM {self.DIM}] Updating left subtree of right entry with new tree {print_pretty(new_tree)}.")
                         
-                        # right_entry.left_subtree = new_tree
-                        right_parent.node = right_parent.node._update_left_subtree(
-                            right_entry.item.key, new_tree
-                        )
+                        right_entry.left_subtree = new_tree
+                        # right_parent.node = right_parent.node._update_left_subtree(
+                        #     right_entry.item.key, new_tree
+                        # )
                     else:
                         logger.debug(f"[DIM {self.DIM}] Right entry is None, updating right subtree of right parent with new tree {print_pretty(new_tree)}.")
                         right_parent.node.right_subtree = new_tree

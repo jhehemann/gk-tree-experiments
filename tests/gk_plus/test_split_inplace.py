@@ -816,8 +816,8 @@ class TestGKPlusSplitInplace(TreeTestCase):
                             exp_left,
                             exp_right,
                             case_name,
-                            gnode_capacity=4,
-                            l_factor=1.0
+                            gnode_capacity=2,
+                            l_factor=2.0
                         )
 
     def test_split_with_node_collapsing(self):
