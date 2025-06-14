@@ -5,6 +5,7 @@ import unittest
 import random
 
 # Import factory function instead of concrete classes
+from gplus_trees.base import Item
 from gplus_trees.factory import make_gplustree_classes
 import logging
 

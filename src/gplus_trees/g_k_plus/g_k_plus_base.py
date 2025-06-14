@@ -458,15 +458,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             The updated G+-tree
         """
-        # Pre-import and cache frequently used values
+        # Cache frequently used values to reduce attribute access
         from gplus_trees.g_k_plus.utils import calc_rank
-
+        
         inserted = True
         x_key = x_item.key
         replica = _create_replica(x_key)
         TreeClass = type(self)
 
-        # Pre-calculate rank for GKPlusTreeBase insertions to avoid repeated calculations
+        # Pre-calculate rank to avoid repeated calculations in inner loops
         cached_new_rank = calc_rank(
             x_key,
             self.KListClass.KListNodeClass.CAPACITY,
@@ -491,12 +491,18 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 insert_subtree = x_left if is_leaf else subtree
 
-                # Check node set type once and insert accordingly
-                is_gkplus_tree = isinstance(node.set, GKPlusTreeBase)
-                node.set, _ = self._insert_into_node_set(
-                    node.set, insert_obj, insert_subtree, cached_new_rank, x_key, is_gkplus_tree
-                )
-                node.set = self.check_and_convert_set(node.set)
+                # Optimized single type check and insert
+                node_set = node.set
+                if isinstance(node_set, GKPlusTreeBase):
+                    node_set, _ = node_set.insert(
+                        insert_obj, rank=cached_new_rank, x_left=insert_subtree
+                    )
+                else:
+                    node_set = node_set.insert(
+                        insert_obj, left_subtree=insert_subtree
+                    )
+                
+                node.set = self.check_and_convert_set(node_set)
 
                 # Get next_entry once after insertion
                 retrieval_result = node.set.retrieve(x_key)
@@ -523,11 +529,28 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 right_split = self.check_and_convert_set(right_split)
                 next_entry = right_split.retrieve(x_key).next_entry
 
-                # Handle right side of the split
-                new_tree, right_split = self._handle_right_split(
-                    right_split, insert_obj, x_left, is_leaf,
-                    cached_new_rank, x_key, node, TreeClass
-                )
+                # Handle right side of the split with inline optimization
+                new_tree = None
+                if right_split.item_count() > 0 or is_leaf:
+                    insert_subtree = x_left if is_leaf else None
+                    
+                    if isinstance(right_split, GKPlusTreeBase):
+                        right_split, _ = right_split.insert(
+                            insert_obj, rank=cached_new_rank, x_left=insert_subtree
+                        )
+                    else:
+                        right_split = right_split.insert(
+                            insert_obj, left_subtree=insert_subtree
+                        )
+                    
+                    right_split = self.check_and_convert_set(right_split)
+                    new_tree = TreeClass(l_factor=self.l_factor)
+                    new_tree.node = self.NodeClass(
+                        node.rank,
+                        right_split,
+                        node.right_subtree
+                    )
+
                 next_entry = (right_split.retrieve(x_key).next_entry
                              if new_tree else next_entry)
 
@@ -549,7 +572,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 # --- Handle left side of the split ---
                 # Determine if we need to create/update using left split
-                if left_split.item_count() > 1 or is_leaf:
+                left_item_count = left_split.item_count()
+                if left_item_count > 1 or is_leaf:
                     # Update current node to use left split
                     cur.node.set = left_split
                     if next_entry:
@@ -955,40 +979,3 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if node is last_leaf:
                 # Stop iteration after processing the last leaf node
                 break
-
-    def _insert_into_node_set(self, node_set, insert_obj: Item,
-                              insert_subtree, cached_rank: int, x_key: int,
-                              is_gkplus_tree: bool):
-        """Helper method to insert into a node set, handling both GKPlusTreeBase
-        and other types."""
-        if is_gkplus_tree:
-            return node_set.insert(
-                insert_obj,
-                rank=cached_rank,
-                x_left=insert_subtree)
-        else:
-            return node_set.insert(
-                insert_obj,
-                left_subtree=insert_subtree
-            ), None
-
-    def _handle_right_split(self, right_split, insert_obj, x_left, is_leaf,
-                            cached_new_rank, x_key, node, TreeClass):
-        """Helper method to handle right split creation and insertion."""
-        new_tree = None
-        if right_split.item_count() > 0 or is_leaf:
-            insert_subtree = x_left if is_leaf else None
-            is_right_gkplus = isinstance(right_split, GKPlusTreeBase)
-
-            right_split, _ = self._insert_into_node_set(
-                right_split, insert_obj, insert_subtree, cached_new_rank, x_key, is_right_gkplus
-            )
-            right_split = self.check_and_convert_set(right_split)
-            new_tree = TreeClass(l_factor=self.l_factor)
-            new_tree.node = self.NodeClass(
-                node.rank,
-                right_split,
-                node.right_subtree
-            )
-
-        return new_tree, right_split
