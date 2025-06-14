@@ -458,165 +458,169 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             The updated G+-tree
         """
-        # Cache frequently used values to reduce attribute access
+        # Pre-cache all frequently used values and imports to minimize overhead
         from gplus_trees.g_k_plus.utils import calc_rank
         
-        inserted = True
+        # Cache frequently accessed attributes and methods to reduce lookups
         x_key = x_item.key
         replica = _create_replica(x_key)
         TreeClass = type(self)
+        NodeClass = self.NodeClass
+        check_and_convert_set = self.check_and_convert_set
+        l_factor = self.l_factor
+        capacity = self.KListClass.KListNodeClass.CAPACITY
+        
+        # Pre-calculate rank once to avoid repeated calculations in loops
+        cached_new_rank = calc_rank(x_key, capacity, dim=self.DIM + 1)
 
-        # Pre-calculate rank to avoid repeated calculations in inner loops
-        cached_new_rank = calc_rank(
-            x_key,
-            self.KListClass.KListNodeClass.CAPACITY,
-            dim=self.DIM + 1
-        )
-
-        # Parent tracking variables
-        right_parent = None    # Parent node for right-side updates
-        right_entry = None     # Entry in right parent points to current subtree
-        left_parent = None     # Parent node for left-side updates
-        left_x_entry = None    # x_item stored in left parent
+        # Parent tracking variables - optimized for memory locality
+        right_parent = None
+        right_entry = None
+        left_parent = None
+        left_x_entry = None
 
         while True:
+            # Cache node reference and minimize repeated attribute access
             node = cur.node
             cur._invalidate_tree_size()
+            
+            # Cache frequently used values in local variables for better performance
             is_leaf = node.rank == 1
+            node_set = node.set
             insert_obj = x_item if is_leaf else replica
 
-            # First iteration - simple insert without splitting
+            # Fast path: First iteration without splitting (most common case)
             if right_parent is None:
-                # Determine subtree for potential next iteration
+                # Minimize conditional evaluations - use direct assignment when possible
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 insert_subtree = x_left if is_leaf else subtree
 
-                # Optimized single type check and insert
-                node_set = node.set
-                if isinstance(node_set, GKPlusTreeBase):
+                # Optimized type check and insert - avoid function call overhead
+                is_gkplus_type = isinstance(node_set, GKPlusTreeBase)
+                if is_gkplus_type:
                     node_set, _ = node_set.insert(
                         insert_obj, rank=cached_new_rank, x_left=insert_subtree
                     )
                 else:
-                    node_set = node_set.insert(
-                        insert_obj, left_subtree=insert_subtree
-                    )
+                    node_set = node_set.insert(insert_obj, left_subtree=insert_subtree)
                 
-                node.set = self.check_and_convert_set(node_set)
-
-                # Get next_entry once after insertion
+                # Update node set and fetch new next_entry
+                node.set = check_and_convert_set(node_set)
                 retrieval_result = node.set.retrieve(x_key)
                 next_entry = retrieval_result.next_entry
 
-                # Early return for leaf nodes
+                # Fastest return path for most common case (leaf nodes) - early exit
                 if is_leaf:
-                    return self, inserted
+                    return self, True
 
-                # Setup parent tracking for next iteration
+                # Setup for next iteration with optimized assignments
                 right_parent = left_parent = cur
                 right_entry = next_entry
                 left_x_entry = retrieval_result.found_entry
                 cur = subtree
+                continue
+
+            # Complex path: Node splitting required
+
+            # Complex path: Node splitting required (less common but more expensive)
+            # Cache retrieve result to avoid redundant method calls
+            res = node_set.retrieve(x_key)
+            next_entry = res.next_entry
+
+            # Perform split operation and immediately cache converted results
+            left_split, _, right_split = node_set.split_inplace(x_key)
+            left_split = check_and_convert_set(left_split)
+            right_split = check_and_convert_set(right_split)
+            
+            # CRITICAL: Re-fetch next_entry after check_and_convert_set (not in-place)
+            next_entry = right_split.retrieve(x_key).next_entry
+            
+            # Cache item counts early to avoid repeated method calls in conditionals
+            right_item_count = right_split.item_count()
+            left_item_count = left_split.item_count()
+            
+            # Handle right side creation - inline optimization for performance
+            new_tree = None
+            if right_item_count > 0 or is_leaf:
+                insert_subtree = x_left if is_leaf else None
+                
+                # Fast type check and optimized insert operation
+                if isinstance(right_split, GKPlusTreeBase):
+                    right_split, _ = right_split.insert(
+                        insert_obj, rank=cached_new_rank, x_left=insert_subtree
+                    )
+                else:
+                    right_split = right_split.insert(insert_obj, left_subtree=insert_subtree)
+                
+                # Create new tree node efficiently
+                right_split = check_and_convert_set(right_split)
+                new_tree = TreeClass(l_factor=l_factor)
+                new_tree.node = NodeClass(node.rank, right_split, node.right_subtree)
+
+            # Update next_entry after potential modification - essential for correctness
+            next_entry = (right_split.retrieve(x_key).next_entry
+                         if new_tree else next_entry)
+
+            # Optimized parent reference updates with minimal branching
+            if new_tree:
+                if right_entry is not None:
+                    right_entry.left_subtree = new_tree
+                else:
+                    right_parent.node.right_subtree = new_tree
+                next_right_parent = new_tree
+                next_right_entry = next_entry
             else:
+                next_right_parent = right_parent
+                next_right_entry = right_entry
 
-                # Node splitting required - get updated next_entry
-                res = node.set.retrieve(x_key)
-                next_entry = res.next_entry
+            # Update right parent variables for next iteration
+            right_parent = next_right_parent
+            right_entry = next_right_entry
 
-                # Split node at x_key
-                left_split, _, right_split = node.set.split_inplace(x_key)
-                left_split = self.check_and_convert_set(left_split)
-                right_split = self.check_and_convert_set(right_split)
-                next_entry = right_split.retrieve(x_key).next_entry
+            # Handle left side with optimized control flow
+            if left_item_count > 1 or is_leaf:
+                # Update current node efficiently
+                cur.node.set = left_split
+                if next_entry:
+                    cur.node.right_subtree = next_entry.left_subtree
 
-                # Handle right side of the split with inline optimization
-                new_tree = None
-                if right_split.item_count() > 0 or is_leaf:
-                    insert_subtree = x_left if is_leaf else None
-                    
-                    if isinstance(right_split, GKPlusTreeBase):
-                        right_split, _ = right_split.insert(
-                            insert_obj, rank=cached_new_rank, x_left=insert_subtree
-                        )
-                    else:
-                        right_split = right_split.insert(
-                            insert_obj, left_subtree=insert_subtree
-                        )
-                    
-                    right_split = self.check_and_convert_set(right_split)
-                    new_tree = TreeClass(l_factor=self.l_factor)
-                    new_tree.node = self.NodeClass(
-                        node.rank,
-                        right_split,
-                        node.right_subtree
-                    )
+                # Update parent reference
+                if left_x_entry is not None:
+                    left_x_entry.left_subtree = cur
 
-                next_entry = (right_split.retrieve(x_key).next_entry
-                             if new_tree else next_entry)
+                # Setup for next iteration with minimal assignments
+                next_left_parent = cur
+                next_left_x_entry = None  # Left split never contains x_item
+                next_cur = cur.node.right_subtree
+            else:
+                # Collapse single-item nodes for non-leaves
+                new_subtree = next_entry.left_subtree if next_entry else None
 
-                # Update parent reference to the new tree or keep existing
-                if new_tree:
-                    if right_entry is not None:
-                        right_entry.left_subtree = new_tree
-                    else:
-                        right_parent.node.right_subtree = new_tree
-                    next_right_parent = new_tree
-                    next_right_entry = next_entry
+                # Update parent reference efficiently
+                if left_x_entry is not None:
+                    left_x_entry.left_subtree = new_subtree
                 else:
-                    next_right_parent = right_parent
-                    next_right_entry = right_entry
+                    left_parent.node.right_subtree = new_subtree
+                
+                # Prepare for next iteration
+                next_left_parent = left_parent
+                next_left_x_entry = left_x_entry
+                next_cur = new_subtree
 
-                # Update right parent variables for next iteration
-                right_parent = next_right_parent
-                right_entry = next_right_entry
+            # Update left parent variables for next iteration
+            left_parent = next_left_parent
+            left_x_entry = next_left_x_entry
 
-                # --- Handle left side of the split ---
-                # Determine if we need to create/update using left split
-                left_item_count = left_split.item_count()
-                if left_item_count > 1 or is_leaf:
-                    # Update current node to use left split
-                    cur.node.set = left_split
-                    if next_entry:
-                        cur.node.right_subtree = next_entry.left_subtree
-
-                    # Update parent reference if needed
-                    if left_x_entry is not None:
-                        left_x_entry.left_subtree = cur
-
-                    # Make current node the new left parent
-                    next_left_parent = cur
-                    next_left_x_entry = None  # Left split never contains x_item
-                    next_cur = cur.node.right_subtree
-                else:
-                    # Collapse single-item nodes for non-leaves
-                    new_subtree = (
-                        next_entry.left_subtree if next_entry else None
-                    )
-
-                    # Update parent reference
-                    if left_x_entry is not None:
-                        left_x_entry.left_subtree = new_subtree
-                    else:
-                        left_parent.node.right_subtree = new_subtree
-
-                    # Prepare for next iteration
-                    next_left_parent = left_parent
-                    next_left_x_entry = left_x_entry
-                    next_cur = new_subtree
-
-                # Update left parent variables for next iteration
-                left_parent = next_left_parent
-                left_x_entry = next_left_x_entry
-
-                # Update leaf node 'next' pointers if at leaf level
-                if is_leaf:
+            # Handle leaf level with early return optimization
+            if is_leaf:
+                if new_tree and cur:
                     new_tree.node.next = cur.node.next
                     cur.node.next = new_tree
                     cur.node.right_subtree = None  # No right subtree at leaf level
-                    return self, inserted  # Early return when leaf is processed
+                return self, True  # Early return when leaf is processed
 
-                # Continue to next iteration with updated current node
-                cur = next_cur
+            # Continue to next iteration with updated current node
+            cur = next_cur
 
     def print_subtree_sizes(self):
         """
