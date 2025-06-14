@@ -16,6 +16,7 @@ from gplus_trees.gplus_tree_base import (
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
+from gplus_trees.g_k_plus.rank_utils import calc_rank
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
@@ -24,8 +25,7 @@ DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conve
 
 
 class GKPlusNodeBase(GPlusNodeBase):
-    """
-    Base class for GK+-tree nodes.
+    """Base class for GK+-tree nodes.
     Extends GPlusNodeBase with size support.
     """
     __slots__ = GPlusNodeBase.__slots__ + ("size",)  # Add new slots beyond parent
@@ -458,9 +458,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             The updated G+-tree
         """
-        # Pre-cache all frequently used values and imports to minimize overhead
-        from gplus_trees.g_k_plus.utils import calc_rank
-        
+        # Pre-cache all frequently used values to minimize overhead
         # Cache frequently accessed attributes and methods to reduce lookups
         x_key = x_item.key
         replica = _create_replica(x_key)
@@ -743,6 +741,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         check_and_convert_set = self.check_and_convert_set
         KListNodeCapacity = self.KListClass.KListNodeClass.CAPACITY
         tree_dim_plus_one = self.DIM + 1
+        
+        # Cache dummy properties for repeated use
+        dummy_key = dummy.key
 
         # Case 1: Empty tree - return None left, right and key's subtree
         if self.is_empty():
@@ -780,17 +781,21 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
                 
                 if is_gkplus_type:
-                    from gplus_trees.g_k_plus.utils import calc_rank
                     # Calculate the new rank for the item in the next dimension - use cached values
-                    new_rank = calc_rank(dummy.key, KListNodeCapacity, dim=tree_dim_plus_one)
+                    new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                     right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                 else:
                     right_split = right_split.insert(dummy, left_subtree=None)
 
                 # Convert and get next_entry in one step
                 right_split = check_and_convert_set(right_split)
-                next_entry = right_split.retrieve(key).next_entry
-                right_node = NodeClass(node.rank, right_split, node.right_subtree)
+                retrieve_result = right_split.retrieve(key)
+                next_entry = retrieve_result.next_entry
+                
+                # Cache node references for performance
+                node_rank = node.rank
+                node_right_subtree = node.right_subtree
+                right_node = NodeClass(node_rank, right_split, node_right_subtree)
 
                 if right_parent is None:
                     # Create a root node for right return tree
@@ -819,20 +824,20 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 next_right_parent = new_tree
             else:
                 if is_leaf and right_parent:
-                    # Cache type check result
+                    # Cache type check result - reuse from above if possible
                     is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
 
                     # Create a leaf with a single dummy item
                     if is_gkplus_type:
-                        from gplus_trees.g_k_plus.utils import calc_rank
                         # Calculate new rank for item in the next dimension - use cached values
-                        new_rank = calc_rank(dummy.key, KListNodeCapacity, dim=tree_dim_plus_one)
+                        new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                         right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                     else:
                         right_split = right_split.insert(dummy, left_subtree=None)
 
                     right_split = check_and_convert_set(right_split)
-                    next_entry = right_split.retrieve(key).next_entry
+                    retrieve_result = right_split.retrieve(key)
+                    next_entry = retrieve_result.next_entry
 
                     right_node = NodeClass(1, right_split, None)
                     new_tree = TreeClass(l_factor=cached_l_factor)
@@ -848,7 +853,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     new_tree.node.next = node.next
                     next_right_parent = new_tree
                 else:
-                    next_entry = right_split.retrieve(key).next_entry
+                    retrieve_result = right_split.retrieve(key)
+                    next_entry = retrieve_result.next_entry
                     next_right_parent = right_parent
                     next_cur = (
                         next_entry.left_subtree
