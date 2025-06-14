@@ -4,21 +4,10 @@ from dataclasses import dataclass
 from typing import NamedTuple, Optional, TypeVar, Generic
 import hashlib
 import logging
+from gplus_trees.logging_config import get_logger
 
-
-# Configure logging
-logger = logging.getLogger(__name__)
-# Clear all handlers to ensure we don't add duplicates
-if logger.hasHandlers():
-    logger.handlers.clear()
-# Add a single handler with formatting
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-# Prevent propagation to the root logger to avoid duplicate logs
-logger.propagate = False
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class Item:

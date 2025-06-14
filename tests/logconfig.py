@@ -1,16 +1,13 @@
 # logconfig.py
-import logging
+"""Test logging configuration - now using centralized logging."""
 
-logger = logging.getLogger("unittest")
-# Entferne alle vorhandenen Handler, damit es keine Konflikte gibt
-# while logger.hasHandlers():
-#     logger.removeHandler(logger.handlers[0])
-for h in logger.handlers[:]:
-    logger.removeHandler(h)
+import sys
+import os
 
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-logger.propagate = False
+# Add src to path to import logging config
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+from gplus_trees.logging_config import get_test_logger
+
+# Get a logger for tests
+logger = get_test_logger("main")

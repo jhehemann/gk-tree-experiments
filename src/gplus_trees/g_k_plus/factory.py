@@ -1,7 +1,7 @@
 """GKPlusTree factory module"""
 
 from typing import Type, Tuple
-import logging
+from gplus_trees.logging_config import get_logger
 
 from gplus_trees.klist_base import KListBase, KListNodeBase
 from gplus_trees.factory import make_gplustree_classes
@@ -11,7 +11,7 @@ from gplus_trees.g_k_plus.g_k_plus_base import (
     DEFAULT_L_FACTOR
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def make_gkplustree_classes(K: int, dimension: int = 1) -> Tuple[
     Type[GKPlusTreeBase], 
