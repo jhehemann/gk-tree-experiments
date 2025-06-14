@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import NamedTuple, Optional, Tuple, TypeVar, Generic, Iterator
+from typing import NamedTuple, Optional, TypeVar, Generic
 import hashlib
 import logging
 
@@ -16,7 +16,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # Prevent propagation to the root logger to avoid duplicate logs
 logger.propagate = False
 

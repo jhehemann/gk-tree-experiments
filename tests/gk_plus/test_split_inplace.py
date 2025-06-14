@@ -2,9 +2,8 @@ import sys
 import os
 import unittest
 import random
-from typing import List, Tuple, Optional, Iterator, TYPE_CHECKING
-from itertools import product, islice
-from pprint import pprint
+from typing import List, TYPE_CHECKING
+from itertools import product
 import copy
 from tqdm import tqdm
 from statistics import median_low
@@ -16,9 +15,8 @@ from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.g_k_plus.utils import calc_rank
-from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
+from gplus_trees.gplus_tree_base import print_pretty
 from tests.gk_plus.base import TreeTestCase
-from tests.utils import assert_tree_invariants_tc
 
 from tests.logconfig import logger
 

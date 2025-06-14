@@ -1,8 +1,6 @@
 """Factory for the creation of set data structures"""
 
-from typing import Type, Tuple, Dict, Optional
-import logging
-
+from typing import Type, Tuple, Dict
 from gplus_trees.gplus_tree_base import GPlusTreeBase, GPlusNodeBase
 from gplus_trees.klist_base import KListBase, KListNodeBase
 

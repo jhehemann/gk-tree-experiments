@@ -1,9 +1,8 @@
 """GKPlusTree factory module"""
 
-from typing import Type, Dict, Any, Optional, Callable, Tuple
+from typing import Type, Tuple
 import logging
 
-from gplus_trees.base import AbstractSetDataStructure
 from gplus_trees.klist_base import KListBase, KListNodeBase
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import (

@@ -1,11 +1,11 @@
-from typing import TYPE_CHECKING, Any, List
+from typing import List
 from gplus_trees.klist_base import KListBase
 import numpy as np
 import hashlib
 
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import print_pretty, get_dummy
+from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.base import calculate_group_size, count_trailing_zero_bits
 
 from tests.logconfig import logger

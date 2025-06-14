@@ -1,6 +1,6 @@
 """Factory for Merkle-enabled GPlus-trees"""
 
-from typing import Type, Tuple, Dict, Optional
+from typing import Type, Tuple, Dict
 
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.merkle.gp_mkl_tree_base import (

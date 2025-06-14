@@ -1,27 +1,13 @@
 """Tests for G+-trees retrieve method"""
 # pylint: skip-file
 
-from typing import Tuple, Optional, List
 import unittest
 import logging
 
 # Import factory function instead of concrete classes
-from gplus_trees.factory import make_gplustree_classes, create_gplustree
-from gplus_trees.gplus_tree_base import (
-    DUMMY_ITEM,
-    gtree_stats_,
-    collect_leaf_keys,
-    Stats
-)
-from gplus_trees.base import (
-    Item,
-    Entry,
-    AbstractSetDataStructure,
-    _create_replica,
-    RetrievalResult
-)
-from stats.stats_gplus_tree import check_leaf_keys_and_values
-from tests.utils import assert_tree_invariants_tc
+from gplus_trees.gplus_tree_base import collect_leaf_keys
+from gplus_trees.base import Item
+
 
 from tests.gplus.base import TreeTestCase
 

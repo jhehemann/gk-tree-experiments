@@ -5,22 +5,17 @@ allowing each node to store and update cryptographic hashes of its subtrees.
 """
 
 import hashlib
-from typing import Dict, Optional, Tuple, Type, Any
+from typing import Optional, Type
 import logging
 import struct
 
 from gplus_trees.base import (
     Item, 
-    Entry, 
     AbstractSetDataStructure, 
-    RetrievalResult, 
-    _create_replica
 )
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase, 
-    GPlusNodeBase, 
-    DUMMY_ITEM,
-    DUMMY_KEY,
+    GPlusNodeBase,
 )
 
 # Configure logging

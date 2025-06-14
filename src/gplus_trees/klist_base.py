@@ -1,8 +1,6 @@
 """K-list implementation"""
-
-import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, Type
-from bisect import bisect_left, bisect_right
+from typing import TYPE_CHECKING, Optional, Tuple, Type
+from bisect import bisect_left
 
 from gplus_trees.base import (
     Item,
@@ -12,7 +10,6 @@ from gplus_trees.base import (
 )
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
-from gplus_trees.profiling import track_performance
 
 class KListNodeBase:
     """

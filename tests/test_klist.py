@@ -5,9 +5,7 @@ import unittest
 import random
 
 # Import factory function instead of concrete classes
-from gplus_trees.factory import make_gplustree_classes, create_gplustree
-from gplus_trees.base import Item, AbstractSetDataStructure
-from gplus_trees.klist_base import KListBase
+from gplus_trees.factory import make_gplustree_classes
 import logging
 
 # Configure logging for test

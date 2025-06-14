@@ -3,16 +3,11 @@
 
 import unittest
 import numpy as np
-import hashlib
-from typing import Dict, List, Optional, Tuple
 import random
-import logging
 from binascii import hexlify
 
-from gplus_trees.base import Item, Entry
-from gplus_trees.gplus_tree_base import DUMMY_ITEM, gtree_stats_
-from gplus_trees.factory import create_gplustree
-from gplus_trees.merkle.gp_mkl_tree_base import MerkleGPlusNodeBase, MerkleGPlusTreeBase
+from gplus_trees.base import Item
+from gplus_trees.gplus_tree_base import gtree_stats_
 from gplus_trees.merkle import create_merkle_gplustree
 from tests.utils import assert_tree_invariants_tc
 

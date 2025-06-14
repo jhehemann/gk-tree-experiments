@@ -3,12 +3,10 @@ import sys
 import os
 import unittest
 import random
-import numpy as np
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item, Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import tree_to_klist, klist_to_tree
 from gplus_trees.klist_base import KListBase
