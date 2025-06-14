@@ -160,11 +160,6 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 next_pair (Tuple[Optional[Item], Optional[GPlusTreeBase]]):
                     The next item in sorted order and its associated subtree, or (None, None).
         """
-        # logger.debug(f"retrieve() called with key: {key} on tree:\n{self.print_structure()}")
-
-        # if not isinstance(key, int) or key < 0:
-        #     raise TypeError(f"retrieve(): key must be a non-negative int, got {key!r}")
-
         if not isinstance(key, int):
             raise TypeError(f"retrieve(): key must be an int, got {type(key).__name__}")
         
@@ -551,7 +546,6 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 current = current.node.right_subtree
         
         while current is not None:
-            # logger.debug(f"[DIM {self.DIM}] Yielding leaf node: {print_pretty(current.node.set)}")
             yield current.node
             current = current.node.next
     
@@ -754,8 +748,11 @@ def gtree_stats_(t: GPlusTreeBase,
             if hasattr(t, 'DIM'):
                 # search tree property is violated if the keys equal to and greater than the current trees dummy item are not in order
                 if current_key >= get_dummy(t.DIM).key:
-                    logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                    
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Search tree property violated at node rank {node_rank}: "
                                  f"current key {current_key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                        
                     stats.is_search_tree = False
             else:
                 stats.is_search_tree = False
@@ -768,7 +765,6 @@ def gtree_stats_(t: GPlusTreeBase,
 
             if node_rank >= 2 and entry.item.value is not None:
                 stats.internal_has_replicas = False
-                # logger.debug(f"Node with rank {node_rank} and set {print_pretty(node_set)} has a non-None value ({entry.item.value}) for item {entry.item.key} with value {entry.item.value}. ")
 
             # Accumulate counts for common values
             stats.gnode_count += cs.gnode_count
@@ -792,8 +788,11 @@ def gtree_stats_(t: GPlusTreeBase,
                 elif cs.least_item and cs.least_item.key < prev_key:
                     if hasattr(t, 'DIM'):
                         if cs.least_item.key >= get_dummy(t.DIM).key:
-                            logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                            
+                            if logger.isEnabledFor(logging.DEBUG):    
+                                logger.debug(f"Search tree property violated at node rank {node_rank}: "
                                         f" {cs.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                            
                             stats.is_search_tree = False
                     else:
                         stats.is_search_tree = False
@@ -801,8 +800,11 @@ def gtree_stats_(t: GPlusTreeBase,
                 elif cs.greatest_item and cs.greatest_item.key >= current_key:
                     if hasattr(t, 'DIM'):
                         if cs.greatest_item.key >= get_dummy(t.DIM).key:
-                            logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                            
+                            if logger.isEnabledFor(logging.DEBUG):
+                                logger.debug(f"Search tree property violated at node rank {node_rank}: "
                                             f" {cs.greatest_item.key} is not less than current key {current_key} for dim {t.DIM}.")
+                            
                             stats.is_search_tree = False
                     else:
                         stats.is_search_tree = False
@@ -822,8 +824,11 @@ def gtree_stats_(t: GPlusTreeBase,
         elif right_stats.least_item and prev_key is not None and right_stats.least_item.key < prev_key:
             if hasattr(t, 'DIM'):
                 if right_stats.least_item.key >= get_dummy(t.DIM).key:
-                    logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                    
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Search tree property violated at node rank {node_rank}: "
                                 f" {right_stats.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                    
                     stats.is_search_tree = False
             else:
                 stats.is_search_tree = False
@@ -832,8 +837,11 @@ def gtree_stats_(t: GPlusTreeBase,
     if right_stats.least_item and right_stats.least_item.key < prev_key:
         if hasattr(t, 'DIM'):
             if right_stats.least_item.key >= get_dummy(t.DIM).key:
-                logger.debug(f"Search tree property violated at node rank {node_rank}: "
+                
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Search tree property violated at node rank {node_rank}: "
                             f" {right_stats.least_item.key} is not greater than previous key {prev_key} for dim {t.DIM}.")
+                
                 stats.is_search_tree = False
         else:
             stats.is_search_tree = False
@@ -902,9 +910,12 @@ def gtree_stats_(t: GPlusTreeBase,
 
         # Check leaf_count and real_item_count consistency
         if leaf_count != stats.leaf_count or item_count != stats.real_item_count:
-            logger.debug(f"Leaf count mismatch: iter {leaf_count} != stats {stats.leaf_count}")
-            logger.debug(f"Or Item count mismatch: iter {item_count} != stats {stats.item_count}")
-            logger.debug(f"Or real_item_count mismatch: iter {item_count} != stats {stats.real_item_count}")
+            
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Leaf count mismatch: iter {leaf_count} != stats {stats.leaf_count}")
+                logger.debug(f"Or Item count mismatch: iter {item_count} != stats {stats.item_count}")
+                logger.debug(f"Or real_item_count mismatch: iter {item_count} != stats {stats.real_item_count}")
+            
             stats.linked_leaf_nodes = False
             stats.leaf_count = max(leaf_count, stats.leaf_count)
             

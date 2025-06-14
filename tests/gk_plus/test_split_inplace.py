@@ -816,7 +816,7 @@ class TestGKPlusSplitInplace(TreeTestCase):
                             exp_left,
                             exp_right,
                             case_name,
-                            gnode_capacity=2,
+                            gnode_capacity=4,
                             l_factor=2.0
                         )
 
