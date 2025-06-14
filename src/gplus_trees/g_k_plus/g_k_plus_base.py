@@ -489,7 +489,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             node_set = node.set
             insert_obj = x_item if is_leaf else replica
 
-            # Fast path: First iteration without splitting (most common case)
+            # Fast path: First iteration without splitting
             if right_parent is None:
                 # Minimize conditional evaluations - use direct assignment when possible
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
@@ -735,17 +735,22 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
 
+        # Cache frequently used attributes and classes for better performance
         TreeClass = type(self)
         NodeClass = TreeClass.NodeClass
+        cached_l_factor = self.l_factor
         dummy = get_dummy(dim=TreeClass.DIM)
+        check_and_convert_set = self.check_and_convert_set
+        KListNodeCapacity = self.KListClass.KListNodeClass.CAPACITY
+        tree_dim_plus_one = self.DIM + 1
 
         # Case 1: Empty tree - return None left, right and key's subtree
         if self.is_empty():
-            return self, None, TreeClass(l_factor=self.l_factor)
+            return self, None, TreeClass(l_factor=cached_l_factor)
 
         # Initialize left and right return trees
         left_return = self
-        right_return = TreeClass(l_factor=self.l_factor)
+        right_return = TreeClass(l_factor=cached_l_factor)
 
         # Parent tracking variables
         right_parent = None    # Parent node for right-side updates
@@ -756,50 +761,46 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         key_node_found = False
 
         while True:
+            # Cache node reference and minimize repeated attribute access
             node = cur.node
             is_leaf = node.rank == 1
 
-            # Split node at key
+            # Split node at key - cache results immediately
             left_split, key_subtree, right_split = node.set.split_inplace(key)
-            left_split = self.check_and_convert_set(left_split)
+            left_split = check_and_convert_set(left_split)
             
+            # Cache item counts early to minimize repeated method calls
             l_count = left_split.item_count()
             r_count = right_split.item_count()
 
             # --- Handle right side of the split ---
             # Determine if we need a new tree for the right split
             if r_count > 0:  # incl. dummy items
-
-                if isinstance(right_split, GKPlusTreeBase):
+                # Cache type check to avoid repeated isinstance calls
+                is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
+                
+                if is_gkplus_type:
                     from gplus_trees.g_k_plus.utils import calc_rank
-                    # Calculate the new rank for the item in the next dimension
-                    new_rank = calc_rank(
-                        dummy.key,
-                        self.KListClass.KListNodeClass.CAPACITY,
-                        dim=self.DIM + 1
-                    )
-                    right_split, _ = right_split.insert(
-                        dummy, rank=new_rank, x_left=None
-                    )
+                    # Calculate the new rank for the item in the next dimension - use cached values
+                    new_rank = calc_rank(dummy.key, KListNodeCapacity, dim=tree_dim_plus_one)
+                    right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                 else:
                     right_split = right_split.insert(dummy, left_subtree=None)
 
-                right_split = self.check_and_convert_set(right_split)
+                # Convert and get next_entry in one step
+                right_split = check_and_convert_set(right_split)
                 next_entry = right_split.retrieve(key).next_entry
-                right_node = NodeClass(
-                    node.rank, right_split, node.right_subtree
-                )
+                right_node = NodeClass(node.rank, right_split, node.right_subtree)
 
                 if right_parent is None:
                     # Create a root node for right return tree
-
                     right_return.node = right_node
                     new_tree = right_return
                 else:
-                    new_tree = TreeClass(l_factor=self.l_factor)
+                    new_tree = TreeClass(l_factor=cached_l_factor)
                     new_tree.node = right_node
 
-                    # Update parent reference
+                    # Update parent reference - optimized conditional
                     if right_entry is not None:
                         right_entry.left_subtree = new_tree
                     else:
@@ -807,9 +808,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 if is_leaf:
                     # Prepare for updating 'next' pointers
-                    new_tree.node.next = cur.node.next
+                    new_tree.node.next = node.next
 
-                # Prepare references for next iteration
+                # Prepare references for next iteration - minimize assignments
                 next_right_entry = next_entry
                 next_cur = (
                     next_entry.left_subtree
@@ -818,45 +819,40 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 next_right_parent = new_tree
             else:
                 if is_leaf and right_parent:
+                    # Cache type check result
+                    is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
 
                     # Create a leaf with a single dummy item
-                    if isinstance(right_split, GKPlusTreeBase):
+                    if is_gkplus_type:
                         from gplus_trees.g_k_plus.utils import calc_rank
-                        # Calculate new rank for item in the next dimension
-                        new_rank = calc_rank(
-                            dummy.key,
-                            self.KListClass.KListNodeClass.CAPACITY,
-                            dim=self.DIM + 1
-                        )
-                        right_split, _ = right_split.insert(
-                            dummy, rank=new_rank, x_left=None
-                        )
+                        # Calculate new rank for item in the next dimension - use cached values
+                        new_rank = calc_rank(dummy.key, KListNodeCapacity, dim=tree_dim_plus_one)
+                        right_split, _ = right_split.insert(dummy, rank=new_rank, x_left=None)
                     else:
                         right_split = right_split.insert(dummy, left_subtree=None)
 
-                    right_split = self.check_and_convert_set(right_split)
+                    right_split = check_and_convert_set(right_split)
                     next_entry = right_split.retrieve(key).next_entry
 
                     right_node = NodeClass(1, right_split, None)
-                    new_tree = TreeClass(l_factor=self.l_factor)
+                    new_tree = TreeClass(l_factor=cached_l_factor)
                     new_tree.node = right_node
 
                     # Update parent reference
                     if right_entry is not None:
-
                         right_entry.left_subtree = new_tree
                     else:
                         right_parent.node.right_subtree = new_tree
 
-                    # Link leaf nodes
-                    new_tree.node.next = cur.node.next
+                    # Link leaf nodes - use cached node reference
+                    new_tree.node.next = node.next
                     next_right_parent = new_tree
                 else:
                     next_entry = right_split.retrieve(key).next_entry
                     next_right_parent = right_parent
                     next_cur = (
                         next_entry.left_subtree
-                        if next_entry else cur.node.right_subtree
+                        if next_entry else node.right_subtree
                     )
 
                 next_right_entry = right_entry
@@ -869,7 +865,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Determine if we need to create/update using left split
             if l_count > 1:  # incl. dummy items
                 # Update current node to use left split
-                cur.node.set = left_split
+                node.set = left_split
                 cur._invalidate_tree_size()
 
                 if left_parent is None:
@@ -879,22 +875,18 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if is_leaf:
                     # Prepare for updating 'next' pointers
                     # do not rearrange subtrees at leaf level
-                    l_last_leaf = cur.node
+                    l_last_leaf = node
                 elif key_subtree:
                     # Highest node containing split key found
                     # All entries in its left subtree are less than key and
                     # are part of the left return tree
                     seen_key_subtree = key_subtree
-                    cur.node.right_subtree = key_subtree
+                    node.right_subtree = key_subtree
                 elif next_entry:
-                    cur.node.right_subtree = next_entry.left_subtree
+                    node.right_subtree = next_entry.left_subtree
 
-                # Check if we need to update the left parent reference
-                if key_node_found:
-                    next_left_parent = left_parent
-                else:
-                    # Make current node the new left parent
-                    next_left_parent = cur
+                # Check if we need to update the left parent reference - optimized
+                next_left_parent = left_parent if key_node_found else cur
             else:
                 if is_leaf:
                     if left_parent or seen_key_subtree:
@@ -903,19 +895,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                             if left_parent:
                                 l_last_leaf = left_parent.get_max_leaf()
                             else:
-
                                 left_return = self = seen_key_subtree
                                 l_last_leaf = seen_key_subtree.get_max_leaf()
                         else:
-                            cur.node.set = left_split
-                            l_last_leaf = cur.node
+                            node.set = left_split
+                            l_last_leaf = node
                     else:
                         # No non-dummy entry in left tree
-                        left_return = self = TreeClass(l_factor=self.l_factor)
+                        left_return = self = TreeClass(l_factor=cached_l_factor)
                         l_last_leaf = None
 
                     next_left_parent = left_parent
                 else:
+                    # Determine new subtree efficiently
                     if key_subtree:
                         # Highest node containing split key found
                         # All entries in its left subtree are less than key and
@@ -925,20 +917,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     elif next_entry:
                         new_subtree = next_entry.left_subtree
                     else:
-                        new_subtree = cur.node.right_subtree # Should not happen
+                        new_subtree = node.right_subtree # Should not happen
 
-                    if left_parent:
-                        if not key_node_found:
-                            left_parent.node.right_subtree = new_subtree
-                            next_left_parent = left_parent
-                        else:
-                            next_left_parent = left_parent
-                    else:
-                        next_left_parent = left_parent
+                    if left_parent and not key_node_found:
+                        left_parent.node.right_subtree = new_subtree
+                        
+                    next_left_parent = left_parent
 
             left_parent = next_left_parent
 
-            # Update leaf node 'next' pointers if at leaf level
+            # Update leaf node 'next' pointers if at leaf level - early return
             if is_leaf:
                 # Unlink leaf nodes
                 if l_last_leaf:
