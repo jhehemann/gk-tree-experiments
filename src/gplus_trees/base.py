@@ -3,6 +3,23 @@ from dataclasses import dataclass
 
 from typing import NamedTuple, Optional, Tuple, TypeVar, Generic, Iterator
 import hashlib
+import logging
+
+
+# Configure logging
+logger = logging.getLogger(__name__)
+# Clear all handlers to ensure we don't add duplicates
+if logger.hasHandlers():
+    logger.handlers.clear()
+# Add a single handler with formatting
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+# Prevent propagation to the root logger to avoid duplicate logs
+logger.propagate = False
+
 
 class Item:
     """
@@ -186,7 +203,11 @@ def count_trailing_zero_bits(digest: bytes) -> int:
             break
     return tz
 
-# @track_performance
 def _create_replica(key):
     """Create a replica item with given key and no value."""
     return Item(key, None)
+
+def debug_log(message, *args, **kwargs):
+    """Log a debug message only if debug logging is enabled"""
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(message, *args, **kwargs)

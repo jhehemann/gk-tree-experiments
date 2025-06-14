@@ -16,20 +16,23 @@ from gplus_trees.base import (
     RetrievalResult,
 )
 from gplus_trees.klist_base import KListBase
+from gplus_trees.base import logger
 
-# Configure logging
-logger = logging.getLogger("GPlusTree")
-# Clear all handlers to ensure we don't add duplicates
-if logger.hasHandlers():
-    logger.handlers.clear()
-# Add a single handler with formatting
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-# Prevent propagation to the root logger to avoid duplicate logs
-logger.propagate = False
+logger.name = "GPlusTree"
+
+# # Configure logging
+# logger = logging.getLogger("GPlusTree")
+# # Clear all handlers to ensure we don't add duplicates
+# if logger.hasHandlers():
+#     logger.handlers.clear()
+# # Add a single handler with formatting
+# handler = logging.StreamHandler()
+# formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
+# logger.setLevel(logging.INFO)
+# # Prevent propagation to the root logger to avoid duplicate logs
+# logger.propagate = False
 
 t = Type["GPlusTreeBase"]
 
