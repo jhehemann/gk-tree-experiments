@@ -363,8 +363,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 return self, inserted
             next = node.set.retrieve(key).next_entry
             cur = next.left_subtree if next else node.right_subtree
-        
-    # @track_performance
+
     def _insert_new_item(
         self,
         cur: 'GPlusTreeBase',
@@ -880,7 +879,6 @@ def gtree_stats_(t: GPlusTreeBase,
 
     return stats
 
-# @track_performance
 def collect_leaf_keys(tree: 'GPlusTreeBase') -> list[str]:
     out = []
     for leaf in tree.iter_leaf_nodes():

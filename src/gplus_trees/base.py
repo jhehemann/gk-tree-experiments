@@ -140,7 +140,6 @@ class RetrievalResult(NamedTuple):
     found_entry: Optional[Entry]
     next_entry: Optional[Entry]
 
-# @track_performance
 def calculate_group_size(k: int) -> int:
     """
     Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).

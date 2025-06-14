@@ -29,7 +29,6 @@ class KListNodeBase:
         self.entries: list[Entry] = []
         self.next: Optional['KListNodeBase'] = None
 
-    # @track_performance
     def insert_entry(
             self, 
             entry: Entry
@@ -76,7 +75,6 @@ class KListNodeBase:
             return entries.pop()
         return None
      
-    # @track_performance
     def retrieve_entry(
         self, key: int
     ) -> Tuple[Optional[Entry], Optional[Entry], bool]:
@@ -111,7 +109,6 @@ class KListNodeBase:
         # Case C: key > max_key in this node → skip to next
         return None, None, True
     
-    # @track_performance
     def get_by_offset(self, offset: int) -> Tuple[Entry, Optional[Entry], bool]:
         """
         offset: 0 <= offset < len(self.entries)
@@ -142,7 +139,7 @@ class KListBase(AbstractSetDataStructure):
         self._prefix_counts = []   # List[int]
         self._bounds = []          # List[int], max key per node (optional)
 
-    # @track_performance
+    
     def _rebuild_index(self):
         """Rebuild the node list and prefix-sum of entry counts."""
         self._nodes.clear()
@@ -162,18 +159,17 @@ class KListBase(AbstractSetDataStructure):
             
             node = node.next
     
-    # @track_performance
+    
     def is_empty(self) -> bool:
         return self.head is None
     
-    # @track_performance
+    
     def item_count(self) -> int:
         """Returns the total number of entries in the KList in O(1) time."""
         if not self._prefix_counts:
             return 0
         return self._prefix_counts[-1]
     
-    # @track_performance
     def item_slot_count(self) -> int:
         """
         Returns the total number of slots available
@@ -186,7 +182,6 @@ class KListBase(AbstractSetDataStructure):
             current = current.next
         return count
     
-    # @track_performance
     def physical_height(self) -> int:
         """
         Returns the number of KListNode segments in this k-list.
@@ -202,7 +197,6 @@ class KListBase(AbstractSetDataStructure):
         # print(f"Klist Height: {height}")
         return height
     
-    # @track_performance
     def insert(
             self, 
             item: Item,
@@ -259,7 +253,6 @@ class KListBase(AbstractSetDataStructure):
 
         return self
 
-    # @track_performance
     def delete(self, key: int) -> "KListBase":
         node = self.head
         prev = None
@@ -330,7 +323,6 @@ class KListBase(AbstractSetDataStructure):
 
         return self
     
-    # @track_performance
     def retrieve(self, key: int) -> RetrievalResult:
         """
         Search for `key` using linear search on the list or binary search O(log l + log k) on the index, based on the number of entries in the node.
@@ -412,7 +404,7 @@ class KListBase(AbstractSetDataStructure):
         """Find the pivot entry (minimum entry) in the KList."""
         return self.get_min()
 
-    # @track_performance
+    
     def get_min(self) -> RetrievalResult:
         """Retrieve the minimum entry from the sorted KList."""
         if not self._prefix_counts:
@@ -429,7 +421,6 @@ class KListBase(AbstractSetDataStructure):
 
         return RetrievalResult(found_entry=entry, next_entry=next_entry)
     
-
     def get_max(self) -> RetrievalResult:
         """Retrieve the maximum entry from the sorted KList."""
         if not self._prefix_counts:
@@ -439,7 +430,6 @@ class KListBase(AbstractSetDataStructure):
         entry, in_node_succ, _ = node.get_by_offset(len(entries) - 1)
 
         return RetrievalResult(found_entry=entry, next_entry=in_node_succ)
-
 
     def split_inplace(
         self, key: int
@@ -521,7 +511,6 @@ class KListBase(AbstractSetDataStructure):
 
         return self, left_subtree, right
         
-    # @track_performance
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
         """
         Helper method to ensure the compaction invariant is maintained in a klist.
@@ -554,7 +543,6 @@ class KListBase(AbstractSetDataStructure):
             # Move to next node for the next iteration
             current = current.next
 
-    # @track_performance
     def print_structure(self, indent: int = 0, depth: int = 0, max_depth: int = 2):
         """
         Returns a string representation of the k-list for debugging.
@@ -585,8 +573,6 @@ class KListBase(AbstractSetDataStructure):
             index += 1
         return "\n".join(result)
 
-
-    # @track_performance
     def __iter__(self):
         """
         Yields each entry of the k-list in order.
@@ -598,7 +584,6 @@ class KListBase(AbstractSetDataStructure):
                 yield entry
             node = node.next
 
-    # @track_performance
     def __str__(self):
         """
         Returns a string representation of the k-list for debugging.
@@ -612,7 +597,6 @@ class KListBase(AbstractSetDataStructure):
             index += 1
         return "\n".join(result)
     
-    # @track_performance
     def check_invariant(self) -> None:
         """
         Verifies that:
