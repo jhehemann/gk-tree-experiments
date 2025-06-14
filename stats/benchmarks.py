@@ -112,7 +112,7 @@ def bench_single_insert(sizes: list[int], node_size: int, space: int, trials: in
 
 def main():
     parser = argparse.ArgumentParser(description="GPlusTree benchmarks")
-    parser.add_argument("--num", type=int, default=100_000,
+    parser.add_argument("--num", type=int, default=10_000,
                         help="Number of calls for rank benchmarks")
     parser.add_argument("--space", type=int, default=1 << 24,
                         help="Key space for conversion and rank benchmarks")
@@ -131,15 +131,10 @@ def main():
     bench_build_gtree([10, 100, 1000, 10_000, 100_000], args.node_size)
 
     print("\n=== random_klist_tree Stats ===")
-    bench_klist_stats(100_000, args.node_size)
+    bench_klist_stats(10_000, args.node_size)
 
     print("\n=== Single-Insert Benchmarks ===")
     bench_single_insert(args.sizes, args.node_size, args.space, args.trials)
-
-    # Add to end of main() in benchmarks.py
-    print("\n=== Method-Level Performance Breakdown ===")
-    print(GPlusTreeBase.get_performance_report())
-    GPlusTreeBase.reset_performance_metrics()  # Reset for next run
 
 if __name__ == "__main__":
     main()

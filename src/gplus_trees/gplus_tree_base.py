@@ -846,7 +846,6 @@ def gtree_stats_(t: GPlusTreeBase,
         else:
             stats.is_search_tree = False
 
-
     stats.internal_has_replicas &= right_stats.internal_has_replicas
     stats.internal_packed       &= right_stats.internal_packed
     stats.linked_leaf_nodes     &= right_stats.linked_leaf_nodes

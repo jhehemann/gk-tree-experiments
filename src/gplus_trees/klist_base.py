@@ -346,7 +346,6 @@ class KListBase(AbstractSetDataStructure):
             return RetrievalResult(found_entry=None, next_entry=None)
         
         # Find node that might contain key using binary search on max keys
-        # Use bisect_left instead of bisect_right to correctly handle exact matches
         node_idx = bisect_left(self._bounds, key)
         
         # Case: key > max of any node
@@ -362,8 +361,7 @@ class KListBase(AbstractSetDataStructure):
             return RetrievalResult(found_entry=None, next_entry=None)
         
         # Case: key < first entry in this node
-        first = entries[0].item.key
-        if key < first:
+        if key < entries[0].item.key:
             return RetrievalResult(found_entry=None, next_entry=entries[0])
         
         if len(entries) < 8:
@@ -388,6 +386,7 @@ class KListBase(AbstractSetDataStructure):
             return RetrievalResult(found_entry=None, next_entry=None)
         else:
             # Binary search for larger lists
+            # TODO: Store keys in a separate list for O(log k) search
             keys = [e.item.key for e in entries]
             i = bisect_left(keys, key)
         
