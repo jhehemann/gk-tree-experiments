@@ -876,7 +876,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 if left_parent is None:
                     # Reuse left split as the root node for the left return tree
-                    left_return = self = cur
+                    left_return.node = cur.node
 
                 if is_leaf:
                     # Prepare for updating 'next' pointers
@@ -901,16 +901,17 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                             if left_parent:
                                 l_last_leaf = left_parent.get_max_leaf()
                             else:
-                                left_return = self = seen_key_subtree
+                                left_return.node = seen_key_subtree.node
                                 l_last_leaf = seen_key_subtree.get_max_leaf()
                         else:
                             node.set = left_split
                             l_last_leaf = node
                     else:
                         # No non-dummy entry in left tree
-                        left_return = self = TreeClass(l_factor=cached_l_factor)
+                        self.node = None
+                        # left_return = self
                         l_last_leaf = None
-
+                        
                     next_left_parent = left_parent
                 else:
                     # Determine new subtree efficiently
