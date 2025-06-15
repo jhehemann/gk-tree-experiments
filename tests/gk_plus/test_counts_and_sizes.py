@@ -4,7 +4,9 @@ import os
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from tests.gk_plus.base import TreeTestCase
+
+from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
+from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 
 from gplus_trees.base import (
@@ -13,10 +15,10 @@ from gplus_trees.base import (
 
 from tests.logconfig import logger
 
-class TestGKPlusNodeItemCounts(TreeTestCase):        
+class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):        
     def test_single_insertion_size(self):
         """Test size is 1 after inserting a single item"""
-        tree = self.tree_k2
+        tree = create_gkplus_tree(K=2)
         key = 1
         item = self.create_item(key)
         tree, _ = tree.insert(item, rank=1)
@@ -29,8 +31,8 @@ class TestGKPlusNodeItemCounts(TreeTestCase):
 
     def test_insertion_triggers_single_expansion_in_leaf(self):
         """Test that inserting an item triggers expansion when necessary"""
-        tree = self.tree_k2
         k = 2
+        tree = create_gkplus_tree(K=k)
         rank_lists = [
             [1, 1],  # Dimension 1
             [1, 2],  # Dimension 2
@@ -118,8 +120,8 @@ class TestGKPlusNodeItemCounts(TreeTestCase):
         
     def test_insertion_triggers_multiple_expansions_in_leaf(self):
         """Test that inserting an item triggers expansion when necessary"""
-        tree = self.tree_k2
         k = 2
+        tree = create_gkplus_tree(K=k)
         rank_lists = [
             [1, 1],  # Dimension 1
             [1, 1],  # Dimension 2
@@ -249,8 +251,8 @@ class TestGKPlusNodeItemCounts(TreeTestCase):
         
     def test_insertion_triggers_single_expansion_in_root(self):
         """Test that inserting an item triggers expansion when necessary"""
-        tree = self.tree_k2
         k = 2
+        tree = create_gkplus_tree(K=k)
         rank_lists = [
             [2, 2],  # Dimension 1
             [1, 2],  # Dimension 2
@@ -379,8 +381,8 @@ class TestGKPlusNodeItemCounts(TreeTestCase):
 
     def test_insertion_triggers_multiple_expansions_in_root(self):
         """Test that inserting an item triggers expansion when necessary"""
-        tree = self.tree_k2
         k = 2
+        tree = create_gkplus_tree(K=k)
         rank_lists = [
             [2, 2],  # Dimension 1
             [3, 3],  # Dimension 2

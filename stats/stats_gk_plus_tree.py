@@ -320,6 +320,13 @@ if __name__ == "__main__":
         ]
     )
 
+    # key = 4
+        # self.print_hash_info(key, k, num_levels=3)
+        
+        # # Check the dimensions of the tree
+        # dim = 8  # Parameter controlling number of lists of ones
+        # rank_lists = [[1] for _ in range(dim)]  # Create 'dim' lists of ones
+
     # List of tree sizes to test.
     sizes = [10000]
     # sizes = [10, 100, 1000, 10_000, 100_000]

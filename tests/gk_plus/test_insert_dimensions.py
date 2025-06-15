@@ -9,7 +9,7 @@ from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import print_pretty
-from tests.gk_plus.base import TreeTestCase
+from tests.test_base import GKPlusTreeTestCase as TreeTestCase
 
 from tests.logconfig import logger
 
@@ -65,38 +65,17 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
     def test_early_return_dim_2(self):
         """Test size is correctly maintained in a larger tree with random insertions"""
-        tree = self.tree_k2
-        # self.print_hash_info(key=15, k=2, num_levels=3)
-        # exit()
-        
+        k = 2
+        tree = create_gkplus_tree(K=k)
         rank_lists = [
             [2, 2],
             [1, 2],
         ]
-
-        # rank_lists = [
-        #     [1, 2, 2],
-        #     [1, 2, 1],
-        # ]
         keys = self.find_keys_for_rank_lists(rank_lists, k=2)
         logger.debug(f"Keys: {keys}")
-        item_map = { k: self.create_item(k) for k in keys}
-
-        # rank_lists_insert_item =[[2], [2]]
-        # insert_key = self.find_keys_for_rank_lists(rank_lists_insert_item, k=2)
         insert_key_idx = 0
         logger.debug(f"Insert key: {keys[insert_key_idx]}")
         insert_item = self.create_item(keys[insert_key_idx])
-
-        # for i in range(len(keys)):
-        #     # Skip the insert key
-        #     if keys[i] == keys[insert_key_idx]:
-        #         logger.debug(f"Skipping key {keys[i]} as it is the insert key")
-        #         continue
-        #     key = keys[i]
-        #     item = item_map[key]
-        #     rank = rank_lists[0][i]
-        #     tree, _ = tree.insert(item, rank=rank)
         
         # Insert all items
         inserted_count = 0
@@ -117,7 +96,6 @@ class TestInsertMultipleDimensions(TreeTestCase):
             logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
             logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
         logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
@@ -132,12 +110,9 @@ class TestInsertMultipleDimensions(TreeTestCase):
         logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
         logger.debug(f"Tree structure: {tree.print_structure()}")
         expected_item_count = inserted_count + dummy_cnt
-
         logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-
         self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
-
 
         text = " | ".join(str(e.item.key) for e in tree.node.set)
         logger.debug(f"Root set keys after all inserts: {text}")
@@ -145,23 +120,14 @@ class TestInsertMultipleDimensions(TreeTestCase):
         for e in tree:
             logger.debug(f"Entry: {e.item.key}, value: {e.item.value}, left_subtree: {e.left_subtree}")
 
-            # self.assertEqual(i + 1, tree.item_count(), f"Tree should have size {i + 1} after inserting {key}")
-
-        # Verify subtree sizes
         self.assertTrue(self.verify_subtree_sizes(tree))
 
     def test_specific_keys(self):
         """Test inserting specific keys into a tree with multiple dimensions"""
-        tree = self.tree_k2
         k = 2
-
-        # keys = [120, 181, 389, 419, 533, 555, 719, 883]
+        tree = create_gkplus_tree(K=k)
         keys = [419, 533, 555, 719, 883, 120, 181, 389]
-
-        # Find keys for the given rank lists
         ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
-        logger.debug(f"Keys: {keys}")
-        logger.debug(f"Ranks: {ranks}")
 
         # Insert items into the tree
         for i, key in enumerate(keys):
@@ -171,17 +137,12 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
         dum_keys = self.get_dummies(tree)
         exp_keys = sorted(dum_keys + keys)
-
         logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
 
-        # Validate the tree structure and size
         self.validate_tree(tree, exp_keys)
 
     def test_insert_middle(self):
         """Test inserting specific keys into a tree with multiple dimensions"""
-        tree = self.tree_k4
-        k = 4
-
         keys  =  [1, 3, 7, 9, 11]
         ranks =  [1, 1, 2, 2, 2]
         

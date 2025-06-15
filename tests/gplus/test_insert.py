@@ -13,7 +13,7 @@ from gplus_trees.base import (
     _create_replica
 )
 
-from tests.gplus.base import TreeTestCase
+from tests.test_base import GPlusTreeTestCase as TreeTestCase
 
 # Configure logging for test
 logging.basicConfig(level=logging.INFO)

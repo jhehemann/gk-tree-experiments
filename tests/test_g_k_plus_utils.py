@@ -13,12 +13,14 @@ from gplus_trees.g_k_plus.utils import tree_to_klist, klist_to_tree
 from gplus_trees.klist_base import KListBase
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
-from gplus_trees.g_k_plus.utils import calc_rank
-from tests.gk_plus.base import TreeTestCase
-from tests.logconfig import logger
+from gplus_trees.g_k_plus.rank_utils import calc_rank
+from tests.test_base import GKPlusTreeTestCase
+from gplus_trees.logging_config import get_test_logger
+
+logger = get_test_logger(__name__)
 
 
-class TestGKPlusUtils(TreeTestCase):
+class TestGKPlusUtils(GKPlusTreeTestCase):
     """Test the utility functions for GKPlus trees"""
     
     def setUp(self):

@@ -22,9 +22,6 @@ from gplus_trees.gplus_tree_base import (
     DUMMY_ITEM,
 )
 from gplus_trees.factory import create_gplustree
-from gplus_trees.profiling import (
-    track_performance,
-)
 
 from tests.utils import (
     assert_tree_invariants_raise,

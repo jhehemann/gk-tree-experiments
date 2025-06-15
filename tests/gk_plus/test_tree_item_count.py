@@ -8,11 +8,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
-from tests.gk_plus.base import TreeTestCase
+from tests.test_base import GKPlusTreeTestCase
+from gplus_trees.logging_config import get_test_logger
 
-from tests.logconfig import logger
+logger = get_test_logger(__name__)
 
-class TestGKPlusTreeItemCountTracking(TreeTestCase):
+class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
     def test_empty_tree(self):
         """Test that an empty tree has no node"""
         tree = create_gkplus_tree(K=4)
