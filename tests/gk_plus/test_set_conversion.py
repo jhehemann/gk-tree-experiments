@@ -9,11 +9,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.utils import tree_to_klist, klist_to_tree
+# from gplus_trees.g_k_plus.utils import _tree_to_klist, _klist_to_tree
 from gplus_trees.klist_base import KListBase
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_to_klist, _klist_to_tree
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
-from gplus_trees.g_k_plus.rank_utils import calc_rank
+from gplus_trees.g_k_plus.utils import calc_rank
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
 
@@ -44,15 +44,15 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         return tree
     
     def test_tree_to_klist_type_validation(self):
-        """Test that tree_to_klist validates the input type"""
+        """Test that _tree_to_klist validates the input type"""
         # Test with a non-GKPlusTreeBase object
         with self.assertRaises(TypeError):
-            tree_to_klist("not a tree")
+            _tree_to_klist("not a tree")
     
-    def test_tree_to_klist_empty_tree(self):
-        """Test that tree_to_klist works with an empty tree"""
+    def test__tree_to_klist_empty_tree(self):
+        """Test that _tree_to_klist works with an empty tree"""
         empty_tree = self.empty_tree
-        klist = tree_to_klist(empty_tree)
+        klist = _tree_to_klist(empty_tree)
         
         # Check that the result is a KList
         self.assertIsInstance(klist, KListBase)
@@ -60,7 +60,7 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         self.assertTrue(klist.is_empty())
     
     def test_tree_to_klist_populated_tree(self):
-        """Test that tree_to_klist correctly converts a populated tree to KList"""
+        """Test that _tree_to_klist correctly converts a populated tree to KList"""
         # Create a tree with some items
         num_items = 10
         populated_tree = self.create_populated_tree(num_items)
@@ -68,7 +68,7 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         exp_tree_count = num_items + dum_count_tree
 
         # Convert to KList
-        klist = tree_to_klist(populated_tree)
+        klist = _tree_to_klist(populated_tree)
         
         # Check that the result is a KList
         self.assertIsInstance(klist, KListBase)
@@ -87,19 +87,19 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
                          "Keys in KList should be in the same order as in the tree")
     
     def test_klist_to_tree_type_validation(self):
-        """Test that klist_to_tree validates the input type"""
+        """Test that _klist_to_tree validates the input type"""
         # Test with a non-KListBase object
         with self.assertRaises(TypeError):
-            klist_to_tree("not a klist", self.K, 1)
+            _klist_to_tree("not a klist", self.K, 1)
     
     def test_klist_to_tree_empty_klist(self):
-        """Test that klist_to_tree works with an empty KList"""
+        """Test that _klist_to_tree works with an empty KList"""
         # Get the KList class from an empty tree
         empty_tree = self.empty_tree
-        empty_klist = tree_to_klist(empty_tree)
+        empty_klist = _tree_to_klist(empty_tree)
         
         # Convert back to tree
-        new_tree = klist_to_tree(empty_klist, self.K, 1)
+        new_tree = _klist_to_tree(empty_klist, self.K, 1)
 
         # Check that the result is a GKPlusTreeBase
         self.assertIsInstance(new_tree, GKPlusTreeBase)
@@ -107,7 +107,7 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         self.assertTrue(new_tree.is_empty())
     
     def test_klist_to_tree_populated_klist(self):
-        """Test that klist_to_tree correctly converts a populated KList to a tree"""
+        """Test that _klist_to_tree correctly converts a populated KList to a tree"""
         # Create a tree with some items and convert to KList
         # tree = self.empty_tree
         tree = create_gkplus_tree(K=2, dimension=1)
@@ -151,11 +151,11 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         dum_count_tree = self.get_dummy_count(tree)
         exp_tree_count = num_items + dum_count_tree
         logger.debug(f"\nInitial tree: {print_pretty(tree)}")
-        klist = tree_to_klist(tree)
+        klist = _tree_to_klist(tree)
         logger.debug(f"\nKList: {print_pretty(klist)}")
 
         # Convert back to tree
-        new_tree = klist_to_tree(klist, self.K, 1)
+        new_tree = _klist_to_tree(klist, self.K, 1)
         logger.debug(f"\nNew tree: {print_pretty(new_tree)}")
 
         # Check that the result is a GKPlusTreeBase
@@ -178,10 +178,10 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         original_tree = self.create_populated_tree(num_items)
         
         # Convert to KList
-        klist = tree_to_klist(original_tree)
+        klist = _tree_to_klist(original_tree)
         
         # Convert back to tree
-        new_tree = klist_to_tree(klist, self.K, original_tree.DIM)
+        new_tree = _klist_to_tree(klist, self.K, original_tree.DIM)
         
         # Check that all keys are preserved
         original_keys = set(entry.item.key for entry in original_tree)

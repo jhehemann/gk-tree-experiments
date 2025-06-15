@@ -22,16 +22,13 @@ TEST_FILES = [
     'gk_plus/test_get_max_dim.py',
     'gk_plus/test_insert_dimensions.py',
     'gk_plus/test_split_inplace.py',
+    'gk_plus/test_set_conversion.py',
 
-    'test_g_k_plus_utils.py',
     'test_gp_mkl_tree.py',
     'test_klist.py',
     'test_stats_gpltree.py',
 
-    
     # 'test_gk_plus_tree.py',
-    
-    
 ]
 
 

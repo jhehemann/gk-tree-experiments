@@ -1,65 +1,15 @@
 import sys
 import os
-import unittest
-
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import hashlib
-from gplus_trees.base import Item
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
-from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
-from tests.utils import assert_tree_invariants_tc
-from gplus_trees.base import calculate_group_size, count_trailing_zero_bits
-from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calc_rank, calc_ranks_for_multiple_dimensions
 from tests.logconfig import logger
 
 
-class TestGKPlusDimensionTracking(GKPlusTreeTestCase):
-
-    # def setUp(self):
-        # Create dummy ranks for each of the dimensions
-        # dummies = [get_dummy(i).key for i in range(1, 5)]
-        # # Convert dummy key to positive integer to calculate a rank from its hash
-        # pos_dummies = [abs(dummies[i]) for i in range(len(dummies))]
-        # self.dummy_ranks = calc_ranks_for_multiple_dimensions(pos_dummies, k, dimensions=5)
-        
-        # print(f"Calculated ranks for dummies {dummies}:")
-        # for dim_idx, ranks in enumerate(self.dummy_ranks):
-        #     print(f"  Dim {dim_idx+1}: {ranks}")
-        
-    
-    # def validate_keys(self, keys, rank_lists, k):
-    #     """
-    #     Validate whether each key in the list produces the correct ranks through repeated SHA-256 hashing.
-        
-    #     Parameters:
-    #         keys (List[int]): List of integer keys to validate.
-    #         rank_lists (List[List[int]]): List of rank lists per hashing level.
-    #         k (int): The group size parameter (must be power of 2).
-            
-    #     Returns:
-    #         bool: True if all keys match the expected rank sequences, False otherwise.
-    #     """
-    #     group_size = calculate_group_size(k)
-    #     num_hashes = len(rank_lists)
-        
-    #     self.assertTrue(num_hashes > 0, "Rank lists must have at least one level")
-    #     self.assertTrue(len(rank_lists[0]) == len(keys), "Rank lists and keys must have the same length")
-        
-    #     for i, key in enumerate(keys):
-    #         current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-    #         for level in range(num_hashes):
-    #             expected_rank = rank_lists[level][i]
-    #             actual_rank = calc_rank_from_digest(current_hash, group_size)
-    #             self.assertEqual(actual_rank, expected_rank, f"Rank mismatch for key {key} at level {level}")
-    #             current_hash = hashlib.sha256(current_hash).digest()
-
-    #     return True
-    
+class TestGKPlusDimensionTracking(GKPlusTreeTestCase):    
     def test_tree_k4(self):
         """Test tree with K=4"""
         k = 4

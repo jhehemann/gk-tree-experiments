@@ -16,7 +16,7 @@ from gplus_trees.gplus_tree_base import (
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-from gplus_trees.g_k_plus.rank_utils import calc_rank
+from gplus_trees.g_k_plus.utils import calc_rank
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
@@ -323,7 +323,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         return self, inserted
 
     def _insert_non_empty(self, x_item: Item, rank: int,
-                          x_left: Optional[GPlusTreeBase] = None
+                          x_left: Optional[GKPlusTreeBase] = None
                           ) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
 
@@ -669,14 +669,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         threshold = int(k * self.l_factor)
 
         if klist.item_count() > threshold:
-            # Import locally to avoid circular dependency
-            from gplus_trees.g_k_plus.utils import klist_to_tree
-
             # Convert to GKPlusTree with increased dimension
             new_dim = type(self).DIM + 1
 
             target_dim = new_dim
-            return klist_to_tree(klist, k, target_dim, self.l_factor)
+            return _klist_to_tree(klist, k, target_dim, self.l_factor)
 
         return klist
 
@@ -707,9 +704,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         item_count = tree.item_count()
         # -1 because the dummy item will be removed during conversion
         if item_count - 1 <= threshold:
-            from gplus_trees.g_k_plus.utils import tree_to_klist
             # Collapse into a KList
-            return tree_to_klist(tree)
+            return _tree_to_klist(tree)
 
         return tree
 
@@ -978,3 +974,70 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if node is last_leaf:
                 # Stop iteration after processing the last leaf node
                 break
+
+
+def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
+    """
+    Convert a GKPlusTree to a KList.
+    
+    Args:
+        tree: The GKPlusTree to convert
+        
+    Returns:
+        A new KList containing all items from this tree
+    """
+    if not isinstance(tree, GKPlusTreeBase):
+        raise TypeError("tree must be an instance of GKPlusTreeBase")
+
+    if tree.is_empty():
+        return tree.KListClass()
+    
+    klist = tree.KListClass()
+
+    # Insert items with keys larger than current trees dummy key into the new klist
+    # Smaller keys are dummies from higher dimensions, caused by gnode expansions within the tree to collapse. These are dropped.
+    # Larger dummy keys are from lower dimensions, that must be preserved.
+    # Note: dummy key of DIM j is -j.
+    for entry in tree:
+        tree_dummy = get_dummy(tree.DIM)
+        if entry.item.key > tree_dummy.key:
+            klist = klist.insert(entry.item, entry.left_subtree)
+    return klist
+
+
+def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) -> GKPlusTreeBase:
+    """
+    Convert a KList to a GKPlusTree by inserting each (item, rank) pair.
+    Uses the factory pattern to create a tree with the specified capacity K.
+    
+    Args:
+        klist: The KList to convert
+        K: The capacity parameter
+        DIM: The dimension for the new tree
+        l_factor: The threshold factor for conversion
+        
+    Returns:
+        A new GKPlusTree containing all items from the KList
+    """
+    from gplus_trees.g_k_plus.factory import create_gkplus_tree
+    
+    # Raise an error if klist is not a KListBase instance
+    if not isinstance(klist, KListBase):
+        raise TypeError("klist must be an instance of KListBase")
+    
+    if klist.is_empty():
+        return create_gkplus_tree(K, DIM, l_factor)
+
+    entries = list(klist)
+    tree = create_gkplus_tree(K, DIM, l_factor)
+    ranks = [] 
+    for entry in entries:
+        ranks.append(calc_rank(entry.item.key, K, DIM))
+
+    # Insert entry instances with their ranks
+    tree_insert = tree.insert
+    for i, entry in enumerate(entries):
+        if i < len(ranks):
+            rank = int(ranks[i])
+            tree, _ = tree_insert(entry.item, rank, entry.left_subtree)
+    return tree

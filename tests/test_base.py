@@ -8,7 +8,7 @@ from gplus_trees.base import Item, Entry, calculate_group_size, count_trailing_z
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-from gplus_trees.g_k_plus.rank_utils import calc_rank_from_digest, calc_rank, calc_ranks_for_multiple_dimensions
+from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calc_rank, calc_ranks_for_multiple_dimensions
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
