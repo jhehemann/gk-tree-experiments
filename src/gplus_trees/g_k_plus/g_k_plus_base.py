@@ -23,6 +23,18 @@ t = TypeVar('t', bound='GKPlusTreeBase')
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
 DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conversion
 
+# Cached import for performance - initialized on first use
+_create_gkplus_tree = None
+
+
+def _get_create_gkplus_tree():
+    """Lazy import of create_gkplus_tree to avoid circular imports while caching for performance."""
+    global _create_gkplus_tree
+    if _create_gkplus_tree is None:
+        from gplus_trees.g_k_plus.factory import create_gkplus_tree
+        _create_gkplus_tree = create_gkplus_tree
+    return _create_gkplus_tree
+
 
 class GKPlusNodeBase(GPlusNodeBase):
     """Base class for GK+-tree nodes.
@@ -1019,7 +1031,8 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     Returns:
         A new GKPlusTree containing all items from the KList
     """
-    from gplus_trees.g_k_plus.factory import create_gkplus_tree
+    # Use cached import for performance
+    create_gkplus_tree = _get_create_gkplus_tree()
     
     # Raise an error if klist is not a KListBase instance
     if not isinstance(klist, KListBase):
