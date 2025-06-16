@@ -15,18 +15,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Test files to run - Add or remove files as needed
 TEST_FILES = [
-    # 'gplus/test_insert.py',
-    # 'gplus/test_retrieve.py',
+    'gplus/test_insert.py',
+    'gplus/test_retrieve.py',
 
-    # 'gk_plus/test_counts_and_sizes.py',
-    # 'gk_plus/test_get_max_dim.py',
-    # 'gk_plus/test_insert_dimensions.py',
-    # 'gk_plus/test_split_inplace.py',
-    # 'gk_plus/test_set_conversion.py',
+    'gk_plus/test_counts_and_sizes.py',
+    'gk_plus/test_get_max_dim.py',
+    'gk_plus/test_insert_dimensions.py',
+    'gk_plus/test_split_inplace.py',
+    'gk_plus/test_set_conversion.py',
 
-    # 'test_gp_mkl_tree.py',
+    'test_gp_mkl_tree.py',
     'test_klist.py',
-    # 'test_stats_gpltree.py',
+    'test_stats_gpltree.py',
 
     # 'test_gk_plus_tree.py',
 ]
