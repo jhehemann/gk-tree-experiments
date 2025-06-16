@@ -114,6 +114,31 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             return self.item_cnt
         return self.get_tree_item_count()
 
+    def insert_entry(self, entry: Entry) -> Tuple['GKPlusTreeBase', bool]:
+        """
+        Insert an entry into the GK+-tree. The rank is calculated automatically
+        based on the entry's item key. The entire entry object is preserved to
+        maintain external references.
+        
+        Args:
+            entry (Entry): The entry to be inserted, containing an item and left_subtree.
+        
+        Returns:
+            Tuple[GKPlusTreeBase, bool]: The updated tree and whether insertion was successful.
+            
+        Raises:
+            TypeError: If entry is not an Entry object.
+        """
+        if not isinstance(entry, Entry):
+            raise TypeError(f"insert_entry(): expected Entry, got {type(entry).__name__}")
+        
+        # Calculate the rank using the item's key
+        capacity = self.KListClass.KListNodeClass.CAPACITY
+        rank = calc_rank(entry.item.key, capacity, self.DIM)
+        
+        # Use Entry-aware insertion logic to preserve the Entry object
+        return self._insert_entry_with_rank(entry, rank)
+
     def get_tree_item_count(self) -> int:
         """Get the number of items in the tree, including dummy items."""
         if self.node.rank == 1:  # indicates a leaf in current dim

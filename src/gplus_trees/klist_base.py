@@ -253,6 +253,60 @@ class KListBase(AbstractSetDataStructure):
 
         return self
 
+    def insert_entry(self, entry: Entry) -> 'KListBase':
+        """
+        Inserts an existing Entry object into the k-list, preserving the Entry object's identity.
+
+        The insertion ensures that the keys are kept in lexicographic order.
+        If a node overflows (more than k entries), the extra entry is recursively inserted into the next node.
+
+        Parameters:
+            entry (Entry): The Entry object to insert (containing item and left_subtree).
+            
+        Returns:
+            KListBase: The updated k-list.
+        """
+        if not isinstance(entry, Entry):
+            raise TypeError(f"insert_entry(): expected Entry, got {type(entry).__name__}")
+        
+        # If the k-list is empty, create a new node.
+        if self.head is None:
+            node = self.KListNodeClass()
+            self.head = self.tail = node
+        else:
+            # Fast-Path: If the new key > the last key in the tail, insert there.
+            if self.tail.entries and entry.item.key > self.tail.entries[-1].item.key:
+                node = self.tail
+            else:
+                # linear search from the head
+                node = self.head
+                while node.next is not None and node.entries and entry.item.key > node.entries[-1].item.key:
+                    node = node.next
+        
+        overflow = node.insert_entry(entry)
+
+        if node is self.tail and overflow is None:
+            self._rebuild_index()
+            return self
+
+        MAX_OVERFLOW_DEPTH = 10000
+        depth = 0
+
+        # Propagate overflow if needed.
+        while overflow is not None:
+            if node.next is None:
+                node.next = self.KListNodeClass()
+                self.tail = node.next
+            node = node.next
+            overflow = node.insert_entry(overflow)
+            depth += 1
+            if depth > MAX_OVERFLOW_DEPTH:
+                raise RuntimeError("KList insert_entry overflowed too deeply – likely infinite loop.")
+            
+        self._rebuild_index()
+
+        return self
+
     def delete(self, key: int) -> "KListBase":
         node = self.head
         prev = None
