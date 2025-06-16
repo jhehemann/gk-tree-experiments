@@ -513,15 +513,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     )
                 else:
                     node_set = node_set.insert(insert_obj, left_subtree=insert_subtree)
-                
-                # Update node set and fetch new next_entry
-                node.set = check_and_convert_set(node_set)
-                retrieval_result = node.set.retrieve(x_key)
-                next_entry = retrieval_result.next_entry
+                    # Update node set and fetch new next_entry
+                    node.set = check_and_convert_set(node_set)
 
                 # Fastest return path for most common case (leaf nodes) - early exit
                 if is_leaf:
                     return self, True
+                
+                retrieval_result = node.set.retrieve(x_key)
+                next_entry = retrieval_result.next_entry
 
                 # Setup for next iteration with optimized assignments
                 right_parent = left_parent = cur

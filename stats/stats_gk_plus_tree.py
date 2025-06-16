@@ -328,7 +328,7 @@ if __name__ == "__main__":
         # rank_lists = [[1] for _ in range(dim)]  # Create 'dim' lists of ones
 
     # List of tree sizes to test.
-    sizes = [10000]
+    sizes = [1000]
     # sizes = [10, 100, 1000, 10_000, 100_000]
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
