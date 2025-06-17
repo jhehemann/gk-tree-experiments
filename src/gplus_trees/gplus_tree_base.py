@@ -841,6 +841,8 @@ def gtree_stats_(t: GPlusTreeBase,
 
         stats.all_leaf_values_present = all_values_present
         stats.real_item_count = true_count
+        # logger.debug(f"  Leaf: {[e.item.key for e in node_set]} item_count={node_item_count}, real_item_count={stats.real_item_count}")
+        # logger.debug(f"  Leaf: {print_pretty(node_set)} item_count={node_item_count}, real_item_count={stats.real_item_count}")
         stats.leaf_count = 1
 
     # Root-level validation (only occurs once)
@@ -874,6 +876,13 @@ def gtree_stats_(t: GPlusTreeBase,
 
         # Check leaf_count and real_item_count consistency
         if leaf_count != stats.leaf_count or item_count != stats.real_item_count:
+            if leaf_count != stats.leaf_count:
+                logger.debug(f"  leaf_count: {leaf_count}, stats.leaf_count: {stats.leaf_count}")
+                # for idx, leaf in enumerate(t.iter_leaf_nodes()):
+                #     logger.debug(f"    Leaf {idx} (item_count={len(list(leaf.set))}): {[e.item.key for e in leaf.set]}")
+                #     logger.debug(f"    Leaf {idx} (item_count={len(list(leaf.set))}): {print_pretty(leaf.set)}")
+            else:
+                logger.debug(f"  item_count: {item_count}, stats.real_item_count: {stats.real_item_count}")
             stats.linked_leaf_nodes = False
             stats.leaf_count = max(leaf_count, stats.leaf_count)
             
@@ -915,6 +924,10 @@ def print_pretty(set: AbstractSetDataStructure):
       • All columns have the same width, so initial indent and
         inter-node spacing are uniform.
     """
+    PRIMARY = '\033[32m'    # green
+    SECONDARY = '\033[33m'  # yellow
+    RESET = '\033[0m'
+    
     if set is None:
         return f"{type(set).__name__}: None"
 
@@ -940,6 +953,14 @@ def print_pretty(set: AbstractSetDataStructure):
         return f"({set_type}): {res_text}"
 
     tree = set
+    
+    if hasattr(tree, 'DIM'):
+        dim = tree.DIM if hasattr(tree, 'DIM') else None
+        # logger.debug(f"print_pretty() called for {set_type} with DIM={dim}")
+        dum_key = get_dummy(dim).key
+    else:
+        # logger.debug(f"print_pretty() called for {set_type} without DIM")
+        dum_key = DUMMY_KEY
 
     # 1) First pass: collect each node's text and track max length
     layers_raw  = collections.defaultdict(list)  # rank -> list of node-strings
@@ -948,6 +969,7 @@ def print_pretty(set: AbstractSetDataStructure):
     def collect(tree, parent=None):
         nonlocal max_len
         dim = tree.DIM if hasattr(tree, 'DIM') else None
+
         p_dim = parent.DIM if parent and hasattr(parent, 'DIM') else None
         other_dim = False
         other_dim_processed = False
@@ -965,7 +987,22 @@ def print_pretty(set: AbstractSetDataStructure):
             layers_raw[fill_rank].append("")
             fill_rank -= 1
         
-        text     = SEP.join(str(e.item.key) for e in node.set)
+        # text     = SEP.join(str(e.item.key) for e in node.set)
+        text = ""
+        for e in node.set:
+            if parent is not None and other_dim:
+                if e.item.key < dum_key:
+                    text += (SEP if text else "") + f"{SECONDARY}{e.item.key}{RESET}"
+                else:
+                    text += (SEP if text else "") + str(e.item.key)
+            else:
+                if e.item.key == dum_key:
+                    text += (SEP if text else "") + f"{PRIMARY}{e.item.key}{RESET}"
+                elif e.item.key < dum_key:
+                    text += (SEP if text else "") + f"{SECONDARY}{e.item.key}{RESET}"
+                else:
+                    text += (SEP if text else "") + str(e.item.key)
+
         if parent is None or not other_dim:
             layers_raw[rank].append(text)
             max_len = max(max_len, len(text))
@@ -1027,7 +1064,7 @@ def print_pretty(set: AbstractSetDataStructure):
             spaces = int(math.floor(((2 + column_width) * cumm_indent) + 0.5))
             prefix = "     " + spaces * " "
         line   = "".join(layers[rank])
-        layer_id = f"Rank {rank}" if rank > 0 else "Other Dims"
+        layer_id = f"{PRIMARY}Rank {rank}{RESET}" if rank > 0 else f"{SECONDARY}Other Dims{RESET}"
         out_lines.append(f"{layer_id}:{prefix}{line}")
 
     # join with newlines and return
