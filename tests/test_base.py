@@ -3,6 +3,9 @@
 from typing import Tuple, Optional, List, TYPE_CHECKING
 import unittest
 import hashlib
+from dataclasses import asdict
+from pprint import pformat
+
 
 from gplus_trees.base import Item, Entry, calculate_group_size, count_trailing_zero_bits
 from gplus_trees.factory import make_gplustree_classes
@@ -242,7 +245,9 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         # Check tree invariants
         self.assertIsNotNone(tree, "Tree should not be None")
         stats = gtree_stats_(tree, {})
-        assert_tree_invariants_tc(self, tree, stats)
+        # add stats to the error message if provided
+        err_msg += str(asdict(stats))
+        assert_tree_invariants_tc(self, tree, stats, err_msg)
         
         # Verify expected keys if provided
         if expected_keys:
@@ -373,6 +378,34 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
                 raise ValueError(f"No matching key found for rank_lists[{key_idx}] "
                                  f"({rank_lists[key_idx]}) within {MAX_SEARCH_LIMIT} attempts")
         return result_keys
+    
+    def sort_and_calculate_rank_lists_from_keys(self, keys, k, dim_limit):
+        """Validate that keys match expected rank lists."""
+        group_size = calculate_group_size(k)
+        keys = sorted(keys)
+        logger.debug(f"Sorted keys: {keys}")
+        
+        # Create a list to hold rank lists for each dimension
+        if dim_limit < 1:
+            raise ValueError("dim_limit must be at least 1")
+
+        rank_lists = [[] for _ in range(dim_limit)]
+        for key_idx, key in enumerate(keys):
+            current_dim = 1
+            current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
+            while current_dim <= dim_limit:
+                rank = calc_rank_from_digest(current_hash, group_size)
+                rank_lists[current_dim - 1].append(rank)
+                current_hash = hashlib.sha256(current_hash).digest()
+                current_dim += 1
+        
+        # Ensure all rank lists are of equal length
+        for dim_idx, dim in enumerate(rank_lists):
+            if len(dim) != len(keys):
+                raise ValueError(f"Rank list for dimension {dim_idx + 1} has length "
+                                 f"{len(dim)}, expected {len(keys)}")
+
+        return rank_lists
 
     def validate_key_ranks(self, keys, rank_lists, k):
         """Validate that keys match expected rank lists."""
