@@ -33,7 +33,6 @@ def make_gkplustree_classes(K: int, dimension: int = 1) -> Tuple[
         KListK: Subclass of KListBase with KListNodeClass=KListNodeK
         KListNodeK: Subclass of KListNodeBase with CAPACITY=K
     """
-    logger.debug(f"Creating GKPlusTree classes with K={K}, dimension={dimension}")
     
     # Get the base G+tree classes from the main factory
     GPlusTreeK, GPlusNodeK, KListK, KListNodeK = make_gplustree_classes(K)
