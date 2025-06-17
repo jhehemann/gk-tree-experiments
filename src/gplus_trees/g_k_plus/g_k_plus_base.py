@@ -158,7 +158,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             return self._insert_empty(x_entry, rank)
         return self._insert_non_empty(x_entry, rank)
 
-    
 
     def _invalidate_tree_size(self) -> None:
         """
@@ -508,11 +507,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         while True:
             # Cache node reference and minimize repeated attribute access
             node = cur.node
-            # cur._invalidate_tree_size()
             
             # Cache frequently used values in local variables for better performance
             is_leaf = node.rank == 1
-            # insert_obj = x_item if is_leaf else replica
 
             # Fast path: First iteration without splitting
             if right_parent is None:
@@ -533,7 +530,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 node.set = check_and_convert_set(node.set)
                 logger.debug(f"[DIM {self.DIM}] [INSERT {insert_entry.item.key}] Node set AFTER conversion (item_count:{node.set.item_count()}): {print_pretty(node.set)}")
                 
-                # cur._invalidate_tree_size()
                 # Fastest path for leaf nodes - direct return
                 if is_leaf:
                     self._invalidate_tree_size()

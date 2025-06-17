@@ -133,11 +133,15 @@ class TestInsertMultipleDimensions(TreeTestCase):
         for i, key in enumerate(keys):
             item = self.create_item(key)
             rank = ranks[i]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _ = tree.insert(item, rank=rank)        
 
         dum_keys = self.get_dummies(tree)
+        logger.debug(f"Keys ({len(keys)}): {keys}")
+        logger.debug(f"Dummies ({len(dum_keys)}): {dum_keys}")
         exp_keys = sorted(dum_keys + keys)
+        logger.debug(f"Expected keys after insertions ({len(exp_keys)}): {exp_keys}")
         logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
+        logger.debug(f"Root node: {print_pretty(tree.node.set)}")
 
         self.validate_tree(tree, exp_keys)
 
