@@ -5,7 +5,7 @@ This package provides Merkle tree functionality for GPlus-trees,
 allowing verification of data integrity through cryptographic hashing.
 """
 
-from gplus_trees.merkle.gp_mkl_tree_base import (
+from gplus_trees.merkle.gplus_mkl_base import (
     MerkleGPlusNodeBase,
     MerkleGPlusTreeBase
 )

@@ -3,7 +3,7 @@
 from typing import Type, Tuple, Dict
 
 from gplus_trees.factory import make_gplustree_classes
-from gplus_trees.merkle.gp_mkl_tree_base import (
+from gplus_trees.merkle.gplus_mkl_base import (
     MerkleGPlusTreeBase,
     MerkleGPlusNodeBase
 )
