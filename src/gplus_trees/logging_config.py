@@ -6,7 +6,7 @@ from typing import Optional
 
 
 def setup_logging(
-    level: int = logging.DEBUG,
+    level: int = logging.INFO,
     format_string: Optional[str] = None,
     handler_type: str = "stream"
 ) -> logging.Logger:
@@ -83,7 +83,7 @@ def get_test_logger(name: str) -> logging.Logger:
         formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
         logger.propagate = False
     
     return logger

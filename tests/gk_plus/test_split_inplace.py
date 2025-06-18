@@ -3,10 +3,12 @@ import os
 import unittest
 import random
 from typing import List, TYPE_CHECKING
-from itertools import product
+from itertools import product, islice
 from tqdm import tqdm
 import copy
 from statistics import median_low
+
+
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -70,17 +72,17 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         # Check if the keys are in sorted order
         return keys == sorted(keys)
     
-    def collect_keys(self, tree):
-        """Collect all keys from a tree, including dummy keys."""
-        if tree.is_empty():
-            return []
+    # def collect_keys(self, tree):
+    #     """Collect all keys from a tree, including dummy keys."""
+    #     if tree.is_empty():
+    #         return []
         
-        keys = []
-        for leaf_node in tree.iter_leaf_nodes():
-            for entry in leaf_node.set:
-                keys.append(entry.item.key)
+    #     keys = []
+    #     for leaf_node in tree.iter_leaf_nodes():
+    #         for entry in leaf_node.set:
+    #             keys.append(entry.item.key)
 
-        return sorted(keys)
+    #     return sorted(keys)
     
     def _run_split_case(self, keys, rank_combo, split_key,
                         exp_left, exp_right, case_name, gnode_capacity=2):
@@ -323,7 +325,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.validate_tree(middle, [-2, 250, 275])
             self.validate_tree(right, [-1, 400, 500])
     
-    def test_split_at_edge_cases(self):
+    def test_split_at_edge_cases_rank_1(self):
         """Test splitting at edge case keys (min, max, and beyond)."""
         k = 8
         base_tree = create_gkplus_tree(K=k)
@@ -370,6 +372,56 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.assertIsNone(middle)
             self.validate_tree(right)
             self.assertTrue(right.is_empty())
+
+    def test_split_at_edge_cases_rank_gt_1(self):
+        """Test splitting at edge case keys (min, max, and beyond)."""
+        k = 8
+        base_tree = create_gkplus_tree(K=k)
+        keys = [100, 200, 300, 400, 500]
+        ranks = [2, 1, 2, 3, 1]
+        for key, rank in zip(keys, ranks):
+            base_tree, _ = base_tree.insert(Item(key, "val"), rank=rank)
+
+        with self.subTest("Split at key smaller than smallest"):
+            tree = copy.deepcopy(base_tree)
+            left, middle, right = tree.split_inplace(50)
+            self.validate_tree(left)
+            self.assertIs(tree, left, "Left tree should be the original tree")
+            self.assertTrue(left.is_empty())
+            self.assertIsNone(middle)
+            exp_right = [-1] + keys
+            self.validate_tree(right, exp_right)
+        with self.subTest("Split at key larger than largest"):
+            # Split at a key larger than all keys in the tree
+            tree = copy.deepcopy(base_tree)
+            left, middle, right = tree.split_inplace(600)
+            exp_left = [-1] + keys
+            self.validate_tree(left, exp_left)
+            self.assertIs(tree, left, "Left tree should be the original tree")
+            self.assertIsNone(middle)
+            self.validate_tree(right)
+            self.assertTrue(right.is_empty())
+        with self.subTest("Split at minimum key"):
+            # Split at the minimum key
+            tree = copy.deepcopy(base_tree)
+            left, middle, right = tree.split_inplace(100)
+            self.validate_tree(left)
+            self.assertTrue(left.is_empty())
+            self.assertIs(tree, left, "Left tree should be the original tree")
+            self.assertIsNone(middle)
+            exp_right = [-1] + keys[1:]  # Exclude the minimum key
+            self.validate_tree(right, exp_right)
+        with self.subTest("Split at maximum key"):
+            # Split at the maximum key
+            tree = copy.deepcopy(base_tree)
+            left, middle, right = tree.split_inplace(500)
+            exp_left = [-1] + keys[:-1]  # Exclude the maximum key
+            self.validate_tree(left, exp_left)
+            self.assertIs(tree, left, "Left tree should be the original tree")
+            self.assertIsNone(middle)
+            self.validate_tree(right)
+            self.assertTrue(right.is_empty())
+
 
     def test_split_with_node_collapsing(self):
         """Test splitting at a keythat causes nodes to collapse."""
@@ -515,6 +567,21 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                     gnode_capacity=4
                 )
 
+    def test_split_at_first_item_having_rank_2(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [2, 1, 2, 2, 2, 2]
+        split_cases = [("split at first key", 1)]
+        for case_name, split_key in split_cases:
+            exp_left = []
+            exp_right = [-1] + [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=8,
+                )
+
     # Tests for complex rank combinations used to cause errors in test_all_rank_combinations()
     def test_split_ab(self):
         keys  =  [1, 2, 3, 5, 6, 7]
@@ -639,16 +706,6 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     def test_split_abcdefghij(self):
         keys  =  [651, 704, 654, 473, 517, 904, 268, 26, 453, 398, 114, 14, 962, 801, 83, 459, 393, 513, 810, 34, 221, 279, 29, 540, 570, 909, 498, 998, 90, 36, 107, 24, 74, 597, 389, 97, 88, 762, 374, 596, 898, 599, 826, 875, 55, 624, 639, 583, 718, 497]
         ranks =  [2, 1, 1, 2, 3, 2, 1, 2, 1, 1, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2]
-        k = 4
-        # tree = create_gkplus_tree(K=4, l_factor=1.0)
-        # for key, rank in zip(keys, ranks):
-        #     tree, _ = tree.insert(self.ITEMS[key], rank=rank)
-        # max_dim = tree.get_max_dim()
-        # logger.debug(f"Max dimension of the tree: {max_dim}")
-        # rank_lists = self.sort_and_calculate_rank_lists_from_keys(keys=keys, k=k, dim_limit=max_dim)
-        # keys_equivalent = self.find_keys_for_rank_lists(rank_lists, k=k)
-        # logger.debug(f"Keys equivalent for split: {keys_equivalent}")
-
         split_cases = [("split at key 389", 389)]
         for case_name, split_key in split_cases:
             exp_left = [k for k in keys if k < split_key]
@@ -664,22 +721,8 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     def test_split_abcdefghijk(self):
         keys  =  [851, 90, 775, 902, 973, 76, 754]
         ranks =  [1, 1, 1, 1, 1, 3, 1]
-        logger.debug(f"Keys: {keys}")
-        logger.debug(f"Ranks: {ranks}")
         k = 4
         ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
-        logger.debug(f"Calculated ranks: {ranks}")
-        
-        
-        # tree = create_gkplus_tree(K=4, l_factor=1.0)
-        # for key, rank in zip(keys, ranks):
-        #     tree, _ = tree.insert(self.ITEMS[key], rank=rank)
-        # max_dim = tree.get_max_dim()
-        # logger.debug(f"Max dimension of the tree: {max_dim}")
-        # rank_lists = self.sort_and_calculate_rank_lists_from_keys(keys=keys, k=k, dim_limit=max_dim)
-        # keys_equivalent = self.find_keys_for_rank_lists(rank_lists, k=k)
-        # logger.debug(f"Keys equivalent for split: {keys_equivalent}")
-        
         split_cases = [("split at smallest key", 76)]
         for case_name, split_key in split_cases:
             exp_left = [k for k in keys if k < split_key]
@@ -706,6 +749,23 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                     exp_right, case_name,
                     gnode_capacity=4, l_factor=1.0
                 )
+
+    def test_split_abcdefghijklm(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [2, 1, 2, 2, 2, 2]
+        split_cases = [("split at first key", 1)]
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=8, l_factor=1.0
+                )
+
+
             
     # # Uncomment to run exhaustive tests of all rank combinations and split keys.
     # def test_all_rank_combinations_specific_keys(self):
@@ -749,6 +809,48 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     #                         l_factor=1.0
     #                     )
 
+    # # Uncomment to run exhaustive tests of all rank combinations and split keys.
+    # def test_all_rank_combinations_specific_keys(self):
+    #     """
+    #     Exhaustively test every rank-combo and every split-key,
+    #     computing the expected left/right key-lists on the fly.
+    #     """
+    #     keys = [1, 3, 5, 7, 9, 11]
+    #     ranks = range(1, 4)
+    #     split_keys = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    #     num_keys = len(keys)
+    #     combinations = len(ranks) ** num_keys
+    #     # iterations = 1
+    #     # combos = islice(product(ranks, repeat=num_keys), iterations)
+        
+    #     for rank_combo in tqdm(
+    #         product(ranks, repeat=num_keys),
+    #         # combos,
+    #         total=combinations,
+    #         desc="Rank combinations",
+    #         unit="combo",
+    #     ):
+    #         with self.subTest(rank_combo=rank_combo):
+    #             # for each possible split_key (including non-existent)
+    #             for split_key in split_keys:
+    #                 with self.subTest(split_key=split_key):
+    #                     # expected keys-to-left and keys-to-right
+    #                     # do not include dummy items as they are calculated
+    #                     # on the fly in the _run_split_case_multi_dim method
+    #                     exp_left = [k for k in keys if k < split_key]
+    #                     exp_right = [k for k in keys if k > split_key]
+    #                     case_name = f"split key: {split_key}"
+    #                     self._run_split_case(
+    #                         keys,
+    #                         rank_combo,
+    #                         split_key,
+    #                         exp_left,
+    #                         exp_right,
+    #                         case_name,
+    #                         gnode_capacity=8,
+    #                         # l_factor=1.0
+    #                     )
+
     # def test_random_keys_random_split_points(self):
     #     """Test splitting with randomly generated items and keys for multiple split points."""
     #     k = 4
@@ -775,17 +877,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     #             msg += f"\nExpected keys: {expected_keys}"
     #             self.validate_tree(tree, expected_keys, msg)
 
-    #             # Choose a random split key and split the tree
-    #             # split_key = random.choice(range(1, 1000))
-    #             # split_key = self.get_split_key(keys)
     #             split_cases = self._get_split_cases(keys)
-
-                
-
-
-
-    #             # with self.subTest(rank_combo=ranks):
-    #             # for each possible split_key (including non-existent)
     #             for split_case, split_key in split_cases:
     #                 with self.subTest(split_case=split_case, split_key=split_key, keys=keys, ranks=ranks):
     #                     # expected keys-to-left and keys-to-right

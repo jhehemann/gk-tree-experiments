@@ -60,7 +60,6 @@ class KListNodeBase:
             keys.append(x_key)
             if not is_dummy:
                 real_keys.append(x_key)
-            logger.debug(f"ENTRY INSERTED {x_key} (POP none): entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
             return None
 
         # Fast path: Append at end
