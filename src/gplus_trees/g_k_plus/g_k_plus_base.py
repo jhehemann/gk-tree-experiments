@@ -1014,20 +1014,28 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             else:
                 if is_leaf:
                     if left_parent or seen_key_subtree:
+                        # Prepare unlinking leaf nodes and determine left return if needed
                         if l_count == 0:
                             # find the previous leaf node by traversing the left parent
                             if left_parent:
                                 l_last_leaf = left_parent.get_max_leaf()
                             else:
+                                # no left parent, so seen_key_subtree is the left return tree
                                 left_return.node = seen_key_subtree.node
-                                l_last_leaf = seen_key_subtree.get_max_leaf()
+                                if left_return.item_count() == 1:
+                                    # Only the dummy item in left return
+                                    left_return.node = None
+                                    l_last_leaf = None
+                                else:
+                                    # At least one non-dummy item in left return
+                                    l_last_leaf = seen_key_subtree.get_max_leaf()
+                                left_return._invalidate_tree_size()
                         else:
                             node.set = left_split
                             l_last_leaf = node
                     else:
                         # No non-dummy entry in left tree
                         self.node = None
-                        # left_return = self
                         l_last_leaf = None
                         
                     next_left_parent = left_parent
