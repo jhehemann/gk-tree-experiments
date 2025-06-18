@@ -81,7 +81,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         DIM (int): The dimension of the GK+-tree (class attribute).
         l_factor (float): The threshold factor for conversion between KList and GKPlusTree.
     """
-    __slots__ = GPlusTreeBase.__slots__ + ("l_factor", "item_cnt",)  # Add new slots
+    __slots__ = GPlusTreeBase.__slots__ + ("l_factor", "item_cnt", "size")  # Add new slots
 
     # Will be set by the factory
     DIM: int = 1  # Default dimension value
@@ -102,6 +102,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         super().__init__(node)
         self.l_factor = l_factor
         self.item_cnt = None  # Initialize item count
+        self.size = None  # Initialize tree size (excluding dummy items)
 
     def __str__(self):
         if self.is_empty():
@@ -115,6 +116,39 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             return self.get_tree_item_count()
         return self.item_cnt
     
+    def real_item_count(self) -> int:
+        if self.size is None:
+            return self.get_size()
+        return self.size
+
+    def item_count_geq_dummy_leq_n(self, set: GKPlusTreeBase, n: int) -> bool:
+        """
+        Check if the item count in the tree of items with keys >= dummy is equal to or smaller than n.
+
+        Args:
+            n (int): The threshold count to compare against.
+
+        Returns:
+            bool: True if item count <= n, False otherwise.
+        """
+        if set.is_empty():
+            return False
+
+        dummy = get_dummy(set.DIM).key
+        logger.debug(f"Checking item count >= {dummy} <= {n} in GKPlusTree with dimension {set.DIM}")
+
+        count = 0
+        current = None
+        for entry in set:
+            current = entry
+            if current.item.key > dummy:
+                count += 1
+            if count > n:
+                logger.debug(f"Count exceeded {n} at item {current.item.key}")
+                return False  # Early exit if count exceeds n
+        logger.debug(f"Final count of items >= {dummy}: {count}")
+        return True
+
     def get_tree_item_count(self) -> int:
         """Get the number of items in the tree, including dummy items."""
         if self.is_empty():
@@ -135,6 +169,26 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                      if self.node.right_subtree is not None else 0)
             self.item_cnt = count
             return self.item_cnt
+
+    def get_size(self) -> int:
+        """Get the number of real items in the tree, excluding dummy items."""
+        if self.is_empty():
+            self.size = 0
+            return self.size
+
+        if self.node.rank == 1:  # indicates a leaf in current dim
+            self.size = self.node.set.real_item_count()
+            return self.size
+        else:
+            count = 0
+            for entry in self.node.set:
+                count += (entry.left_subtree.real_item_count()
+                         if entry.left_subtree is not None else 0)
+
+            count += (self.node.right_subtree.real_item_count()
+                     if self.node.right_subtree is not None else 0)
+            self.size = count
+            return self.size
 
     def insert_entry(self, x_entry: Entry, rank: int) -> Tuple['GKPlusTreeBase', bool]:
         """
@@ -164,6 +218,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Invalidate the tree size. This is a placeholder for future implementation.
         """
         self.item_cnt = None
+        self.size = None
 
     def get_max_dim(self) -> int:
         """
@@ -746,10 +801,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # We want to keep the GKPlusTree structure for dimension 1
             return tree
 
+        below_threshold = self.item_count_geq_dummy_leq_n(tree, threshold)
         # Count the tree items (including dummy items)
-        item_count = tree.item_count()
+        # item_count = tree.item_count()
         # -1 because the dummy item will be removed during conversion
-        if item_count - 1 <= threshold:
+        # if item_count - 1 <= threshold:
+        if below_threshold:
             # Collapse into a KList
             return _tree_to_klist(tree)
 
@@ -802,6 +859,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         seen_key_subtree = None  # Cache last seen left_parents left subtree
         cur = left_return
         key_node_found = False
+
+        logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] tree before split: {print_pretty(self)}")
 
         while True:
             # Cache node reference and minimize repeated attribute access

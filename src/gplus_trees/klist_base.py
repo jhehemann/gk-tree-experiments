@@ -169,6 +169,12 @@ class KListBase(AbstractSetDataStructure):
         if not self._prefix_counts:
             return 0
         return self._prefix_counts[-1]
+
+    def real_item_count(self) -> int:
+        """Returns the total number of real entries in the KList in O(1) time."""
+        if not self._prefix_counts:
+            return 0
+        return self._prefix_counts[-1]
     
     def item_slot_count(self) -> int:
         """

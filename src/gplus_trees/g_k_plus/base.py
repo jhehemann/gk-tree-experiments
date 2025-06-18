@@ -36,6 +36,15 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
         pass
 
     @abstractmethod
+    def real_item_count(self) -> int:
+        """
+        Get the count of real items (excluding dummy items) in the set data structure.
+        Returns:
+            int: The number of real items in the set.
+        """
+        pass
+
+    @abstractmethod
     def item_slot_count(self) -> int:
         """
         Get the total number of item slots reserved by the set data structure. This is the sum of the capacity of all nodes.

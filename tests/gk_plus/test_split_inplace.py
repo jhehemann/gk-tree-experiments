@@ -136,7 +136,11 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         )
         tree_copy = copy.deepcopy(base_tree)
         left, middle, right = tree_copy.split_inplace(split_key)
-        
+
+        logger.debug(f"Left after split: {print_pretty(left)}")
+        logger.debug(f"Middle after split: {print_pretty(middle) if  middle else 'None'}")
+        logger.debug(f"Right after split: {print_pretty(right)}")
+
         msg = f"\n\nSplit at {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
             left=print_pretty(left),
@@ -636,19 +640,19 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys  =  [651, 704, 654, 473, 517, 904, 268, 26, 453, 398, 114, 14, 962, 801, 83, 459, 393, 513, 810, 34, 221, 279, 29, 540, 570, 909, 498, 998, 90, 36, 107, 24, 74, 597, 389, 97, 88, 762, 374, 596, 898, 599, 826, 875, 55, 624, 639, 583, 718, 497]
         ranks =  [2, 1, 1, 2, 3, 2, 1, 2, 1, 1, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2]
         k = 4
-        tree = create_gkplus_tree(K=4, l_factor=1.0)
-        for key, rank in zip(keys, ranks):
-            tree, _ = tree.insert(self.ITEMS[key], rank=rank)
-        max_dim = tree.get_max_dim()
-        logger.debug(f"Max dimension of the tree: {max_dim}")
-        rank_lists = self.sort_and_calculate_rank_lists_from_keys(keys=keys, k=k, dim_limit=max_dim)
-        keys_equivalent = self.find_keys_for_rank_lists(rank_lists, k=k)
-        logger.debug(f"Keys equivalent for split: {keys_equivalent}")
+        # tree = create_gkplus_tree(K=4, l_factor=1.0)
+        # for key, rank in zip(keys, ranks):
+        #     tree, _ = tree.insert(self.ITEMS[key], rank=rank)
+        # max_dim = tree.get_max_dim()
+        # logger.debug(f"Max dimension of the tree: {max_dim}")
+        # rank_lists = self.sort_and_calculate_rank_lists_from_keys(keys=keys, k=k, dim_limit=max_dim)
+        # keys_equivalent = self.find_keys_for_rank_lists(rank_lists, k=k)
+        # logger.debug(f"Keys equivalent for split: {keys_equivalent}")
 
         split_cases = [("split at key 389", 389)]
         for case_name, split_key in split_cases:
-            exp_left = [k for k in keys_equivalent if k < split_key]
-            exp_right = [k for k in keys_equivalent if k > split_key]
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
             with self.subTest(case=case_name, split_key=split_key):
                 self._run_split_case_multi_dim(
                     keys, ranks,
@@ -677,6 +681,21 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         # logger.debug(f"Keys equivalent for split: {keys_equivalent}")
         
         split_cases = [("split at smallest key", 76)]
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+        
+    def test_split_abcdefghijkl(self):
+        keys  =  [1, 3, 5, 7, 9, 11]
+        ranks =  [3, 1, 1, 1, 1, 3]
+        split_cases = [("split before last", 10)]
         for case_name, split_key in split_cases:
             exp_left = [k for k in keys if k < split_key]
             exp_right = [k for k in keys if k > split_key]
