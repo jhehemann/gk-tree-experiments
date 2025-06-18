@@ -52,7 +52,7 @@ class KListNodeBase:
         x_key = entry.item.key
         is_dummy = x_key < 0
 
-        logger.debug(f"NODE INSERT {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
+        # logger.debug(f"NODE INSERT {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
 
         # Empty list case
         if not entries:
@@ -106,17 +106,17 @@ class KListNodeBase:
                     insort_left(real_keys, x_key)
 
         # Handle overflow
-        logger.debug(f"ENTRY INSERTED {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
+        # logger.debug(f"ENTRY INSERTED {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
         if len(entries) > self.__class__.CAPACITY:
             pop_entry = entries.pop()
-            logger.debug(f"POP ENTRY {pop_entry.item.key}")
+            # logger.debug(f"POP ENTRY {pop_entry.item.key}")
             keys.pop()
-            logger.debug(f"NODE after POP: entries={[e.item.key for e in entries]}, keys={keys}")
+            # logger.debug(f"NODE after POP: entries={[e.item.key for e in entries]}, keys={keys}")
             if pop_entry.item.key >= 0:
                 real_keys.pop()
-            logger.debug(f"REAL KEYS after POP: real_keys={real_keys}")
+            # logger.debug(f"REAL KEYS after POP: real_keys={real_keys}")
             return pop_entry
-        logger.debug(f"ENTRY INSERTED {x_key} (POP none): entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
+        # logger.debug(f"ENTRY INSERTED {x_key} (POP none): entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
         return None
      
     def retrieve_entry(
@@ -567,7 +567,7 @@ class KListBase(AbstractSetDataStructure):
             return self, None, right
 
         split_node = self._nodes[node_idx]
-        logger.debug(f"Split node at key {key}: entries={[e.item.key for e in split_node.entries]}, keys={split_node.keys}, real_keys={split_node.real_keys}")
+        # logger.debug(f"Split node at key {key}: entries={[e.item.key for e in split_node.entries]}, keys={split_node.keys}, real_keys={split_node.real_keys}")
         prev_node = self._nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
 
@@ -591,7 +591,7 @@ class KListBase(AbstractSetDataStructure):
         left_real_keys = real_keys[:j]
         right_real_keys = real_keys[j + 1 if exact else j :]
         
-        logger.debug(f"Split at key {key}: left_entries={[e.item.key for e in left_entries]}, right_entries={[e.item.key for e in right_entries]}, left_keys={left_keys}, right_keys={right_keys}, left_real_keys={left_real_keys}, right_real_keys={right_real_keys}")
+        # logger.debug(f"Split at key {key}: left_entries={[e.item.key for e in left_entries]}, right_entries={[e.item.key for e in right_entries]}, left_keys={left_keys}, right_keys={right_keys}, left_real_keys={left_real_keys}, right_real_keys={right_real_keys}")
 
         # ------------- build LEFT --------------------------------------------
         # left = type(self)()

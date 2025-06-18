@@ -123,7 +123,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def item_count_geq_dummy_leq_n(self, set: GKPlusTreeBase, n: int) -> bool:
         """
-        Check if the item count in the tree of items with keys >= dummy is equal to or smaller than n.
+        Check if the item count of items with keys >= dummy is equal to or smaller than n.
 
         Args:
             n (int): The threshold count to compare against.
@@ -132,8 +132,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             bool: True if item count <= n, False otherwise.
         """
         if set.is_empty():
-            return False
+            return True
 
+        
         dummy = get_dummy(set.DIM).key
         logger.debug(f"Checking item count >= {dummy} <= {n} in GKPlusTree with dimension {set.DIM}")
 
@@ -179,7 +180,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         node = self.node
         if node.rank == 1:  # indicates a leaf in current dim
             self.size = node.set.real_item_count()
-            logger.debug(f"[DIM {self.DIM}] Leaf node get_size size is {self.size} for set: {print_pretty(node.set)}")
+            # logger.debug(f"[DIM {self.DIM}] Leaf node get_size size is {self.size} for set: {print_pretty(node.set)}")
             return self.size
         else:
             count = 0
@@ -1058,6 +1059,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 # prepare key entry subtree for return
                 return_subtree = key_subtree
+                logger.debug(f"[DIM {self.DIM}] LEFT (SELF) after split: {print_pretty(left_return)}")
+                logger.debug(f"[DIM {self.DIM}] RIGHT (NEW) after split: {print_pretty(right_return)}")
+                logger.debug(f"[DIM {self.DIM}] KEY subtree after split: {print_pretty(return_subtree) if return_subtree else 'None'}")
                 return self, return_subtree, right_return
 
             if key_subtree:
