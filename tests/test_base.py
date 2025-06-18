@@ -15,12 +15,10 @@ from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calc_rank, calc_ra
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
-from gplus_trees.logging_config import get_test_logger
+from gplus_trees.base import logger
 
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
-
-logger = get_test_logger(__name__)
 
 
 class BaseTreeTestCase(unittest.TestCase):
@@ -250,7 +248,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         assert_tree_invariants_tc(self, tree, stats, err_msg)
         
         # Verify expected keys if provided
-        if expected_keys:
+        if expected_keys is not None:
             actual_keys = sorted(self.collect_keys(tree))
             self.assertEqual(expected_keys, actual_keys, 
                             f"Expected keys {expected_keys} don't match actual keys {actual_keys}\n{err_msg}")
