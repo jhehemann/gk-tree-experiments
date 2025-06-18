@@ -1028,7 +1028,7 @@ def print_pretty(set: AbstractSetDataStructure):
     collect(tree, None)
 
     # 2) Define a fixed column width: widest text + 1 space padding
-    column_width = max_len + 1
+    column_width = (max_len // 2) + 1
 
     # 3) Build “slots” per layer, padding every entry to column_width
     #    and inserting blanks where no node lives.
@@ -1044,7 +1044,7 @@ def print_pretty(set: AbstractSetDataStructure):
         texts = layers_raw[rank]
         # pad or truncate texts list to max_slots
         padded = [
-            ("" + txt.center(column_width) + "  " if i < len(texts) else "" + " " * column_width + "")
+            ("" + txt.center(column_width) + "  " if i < len(texts) else "" + " " * (column_width // 2)) + ""
             for i, txt in enumerate(texts + [""] * max_slots)
         ][:max_slots]
         layers[rank] = padded
