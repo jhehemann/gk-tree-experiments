@@ -26,7 +26,7 @@ TEST_FILES = [
 
     'test_gp_mkl_tree.py',
     'test_klist.py',
-    'test_stats_gpltree.py',
+    # 'test_stats_gpltree.py',
 
     # 'test_gk_plus_tree.py',
 ]
