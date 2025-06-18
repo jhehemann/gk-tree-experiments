@@ -176,17 +176,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             self.size = 0
             return self.size
 
-        if self.node.rank == 1:  # indicates a leaf in current dim
-            self.size = self.node.set.real_item_count()
+        node = self.node
+        if node.rank == 1:  # indicates a leaf in current dim
+            self.size = node.set.real_item_count()
+            logger.debug(f"[DIM {self.DIM}] Leaf node get_size size is {self.size} for set: {print_pretty(node.set)}")
             return self.size
         else:
             count = 0
-            for entry in self.node.set:
+            for entry in node.set:
                 count += (entry.left_subtree.real_item_count()
                          if entry.left_subtree is not None else 0)
 
-            count += (self.node.right_subtree.real_item_count()
-                     if self.node.right_subtree is not None else 0)
+            count += (node.right_subtree.real_item_count()
+                     if node.right_subtree is not None else 0)
             self.size = count
             return self.size
 
