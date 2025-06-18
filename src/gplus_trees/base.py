@@ -60,19 +60,19 @@ class AbstractSetDataStructure(ABC, Generic[T]):
     Abstract base class for a set data structure storing tuples of items and their left subtrees.
     """
     
-    @abstractmethod
-    def insert(self, item: 'Item', rank: int) -> T:
-        """
-        Insert an item into the set with the provided rank.
+    # @abstractmethod
+    # def insert_entry(self, entry: 'Entry', rank: int) -> T:
+    #     """
+    #     Insert an entry into the set with the provided rank.
         
-        Parameters:
-            item (Item): The item to be inserted.
-            rank (int): The rank for the item.
+    #     Parameters:
+    #         entry (Entry): The item to be inserted.
+    #         rank (int): The rank for the item.
         
-        Returns:
-            AbstractSetDataStructure: The set data structure instance where the item was inserted.
-        """
-        pass
+    #     Returns:
+    #         AbstractSetDataStructure: The set data structure instance where the item was inserted.
+    #     """
+    #     pass
 
     @abstractmethod
     def delete(self, key: int) -> T:
