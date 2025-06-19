@@ -177,29 +177,29 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
             raise ValueError("Rank combo length must match number of keys.")
         
         # build the tree once
-        base_tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
+        tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
         for key, rank in zip(keys, rank_combo[0]):
-            base_tree, _ = base_tree.insert(Item(key, "val"), rank)
+            tree, _ = tree.insert(Item(key, "val"), rank)
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE BEFORE INSERT: {print_pretty(base_tree)}\n"
+            f"\n\nTREE BEFORE INSERT: {print_pretty(tree)}\n"
         )
-        tree_copy = copy.deepcopy(base_tree)
-        tree, inserted = tree_copy.insert_entry(insert_entry, insert_rank)
+
+        new_tree, inserted = tree.insert_entry(insert_entry, insert_rank)
         self.assertTrue(inserted, "Inserted entry should be True")
         
         insert_key = insert_entry.item.key
         msg = msg_head + f"\n\nInsert {case_name}: {insert_key}\n"
-        msg += f"Tree after insert: {print_pretty(tree)}\n" 
-        self.assertIs(tree_copy, tree, msg)
+        msg += f"Tree after insert: {print_pretty(new_tree)}\n" 
+        self.assertIs(new_tree, tree, msg)
 
-        dummies = self.get_dummies(tree)
+        dummies = self.get_dummies(new_tree)
         exp_keys = sorted(exp_keys + dummies)
-        self.validate_tree(tree,  exp_keys,  msg)
-        inserted_entry = tree.retrieve(insert_key).found_entry
+        self.validate_tree(new_tree,  exp_keys,  msg)
+        inserted_entry = new_tree.retrieve(insert_key).found_entry
         self.assertIs(inserted_entry, insert_entry,
                       f"Inserted entry should match the original entry: {insert_entry}")
         self.assertEqual(inserted_entry, insert_entry,
@@ -327,7 +327,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
     #     for dim1, dim2 in tqdm(
     #         product(dim1_choices, dim2_choices),
     #         total=total,
-    #         desc="Rank combinations",
+    #         desc="Insert with specific key-rank combinations",
     #         unit="combo",
     #     ):
     #         # pack into a single "rank_combo" of shape (3 dimensions × 3 keys)

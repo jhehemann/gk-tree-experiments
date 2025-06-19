@@ -223,7 +223,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         
         if tree.node.right_subtree is None:
             # If the tree is a leaf, return empty list
-            return [e.item.key for e in tree.node.set if e.item.key < 0]
+            return [e.item.key for e in tree if e.item.key < 0]
 
         dummy_keys = []
         for e in tree.node.set:
