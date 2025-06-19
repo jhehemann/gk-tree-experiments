@@ -28,12 +28,12 @@ from tests.utils import (
 )
 
 # Assume create_gtree(items) builds a GPlusTree from a list of (Item, rank) pairs.
-def create_gtree(items, K=16):
+def create_gtree(items, K=16, l_factor=1.0) -> GKPlusTreeBase:
     """
     Mimics the Rust create_gtree: build a tree by inserting each (item, rank) pair.
     Uses the factory pattern to create a tree with the specified capacity K.
     """
-    tree = create_gkplus_tree(K)
+    tree = create_gkplus_tree(K, l_factor=l_factor)
     tree_insert = tree.insert
     for (item, rank) in items:
         last = (item, rank)
@@ -45,7 +45,7 @@ def create_gtree(items, K=16):
     return tree
 
 # Create a random GPlusTree with n items and target node size (K) determining the rank distribution.
-def random_gtree_of_size(n: int, target_node_size: int) -> GKPlusTreeBase:
+def random_gkplus_tree_of_size(n: int, target_node_size: int, l_factor: float) -> GKPlusTreeBase:
     # cache globals
     # calc_rank = calculate_item_rank
     # group_size = calculate_group_size(target_node_size)
@@ -77,11 +77,11 @@ def random_gtree_of_size(n: int, target_node_size: int) -> GKPlusTreeBase:
         val = "val"
         items[i] = (make_item(key, val), int(ranks[i]))
 
-    return create_gtree(items, K=target_node_size)
+    return create_gtree(items, K=target_node_size, l_factor=l_factor)
 
 # The function random_klist_tree just wraps random_gtree_of_size with a given K.
-def random_klist_tree(n: int, K: int) -> GKPlusTreeBase:
-    return random_gtree_of_size(n, K)
+def random_klist_tree(n: int, K: int, l_factor: float) -> GKPlusTreeBase:
+    return random_gkplus_tree_of_size(n, K, l_factor=l_factor)
 
 def check_leaf_keys_and_values(
     tree: GKPlusTreeBase,
@@ -145,6 +145,7 @@ def repeated_experiment(
         size: int,
         repetitions: int,
         K: int,
+        l_factor: float
     ) -> None:
     """
     Repeatedly builds random GPlusTrees (with size items) using ranks drawn from a geometric distribution.
@@ -163,7 +164,7 @@ def repeated_experiment(
     for _ in range(repetitions):
         # Time tree construction
         t0 = time.perf_counter()
-        tree = random_klist_tree(size, K)
+        tree = random_klist_tree(size, K, l_factor=l_factor)
         times_build.append(time.perf_counter() - t0)
 
         # Time stats computation
@@ -333,6 +334,7 @@ if __name__ == "__main__":
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
     Ks = [4]
+    l_factor = 3.0
     repetitions = 1
 
     for n in sizes:
@@ -341,6 +343,6 @@ if __name__ == "__main__":
             logging.info("")
             logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, repetitions = {repetitions} ----------------")
             t0 = time.perf_counter()
-            repeated_experiment(size=n, repetitions=repetitions, K=K)
+            repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor)
             elapsed = time.perf_counter() - t0
             logging.info(f"Total experiment time: {elapsed:.3f} seconds")
