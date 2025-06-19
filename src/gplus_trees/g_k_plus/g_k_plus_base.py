@@ -367,10 +367,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         leaf_set = SetClass()
 
         # insert the dummy entry, pointing at an empty subtree
-        leaf_set = leaf_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
+        leaf_set, _ = leaf_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
 
         # now insert the real item, also pointing at an empty subtree
-        leaf_set = leaf_set.insert_entry(x_entry)
+        leaf_set, _ = leaf_set.insert_entry(x_entry)
 
         return leaf_set
 
@@ -385,13 +385,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # Build right leaf
         right_set = SetK()
-        right_set = right_set.insert_entry(x_entry)
+        right_set, _ = right_set.insert_entry(x_entry)
         right_node = NodeK(1, right_set, None)
         right_leaf = TreeK(right_node, self.l_factor)
 
         # Build left leaf with dummy entry
         left_set = SetK()
-        left_set = left_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
+        left_set, _ = left_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
         left_node = NodeK(1, left_set, None)
         left_leaf = TreeK(left_node, self.l_factor)
 
@@ -410,8 +410,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(x_entry)
-        root_set = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
-        root_set = root_set.insert_entry(Entry(_create_replica(x_entry.item.key), l_leaf_t))
+        root_set, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
+        root_set, _ = root_set.insert_entry(Entry(_create_replica(x_entry.item.key), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted
 
@@ -503,7 +503,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # create a new root node
             old_node = self.node
             dummy = get_dummy(dim=TreeClass.DIM)
-            root_set = self.SetClass().insert_entry(Entry(dummy, None))
+            root_set, _ = self.SetClass().insert_entry(Entry(dummy, None))
             self.node = self.NodeClass(
                 rank,
                 root_set,
@@ -514,7 +514,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         # Set replica of the current node set's pivot as first entry.
         pivot = cur.node.set.find_pivot().found_entry
         pivot_replica = _create_replica(pivot.item.key)
-        new_set = self.SetClass().insert_entry(Entry(pivot_replica, None))
+        new_set, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
         new_tree = TreeClass(l_factor=self.l_factor)
         new_tree.node = self.NodeClass(rank, new_set, cur)
 
@@ -577,7 +577,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 is_gkplus_type = isinstance(node.set, GKPlusTreeBase)
                 insert_entry = x_entry if is_leaf else Entry(replica, subtree)
                 if not is_gkplus_type:
-                    node.set = node.set.insert_entry(insert_entry)
+                    node.set, _ = node.set.insert_entry(insert_entry)
                     # only check convert if insertion is done into a KList
                     node.set = check_and_convert_set(node.set)
                 else:
@@ -619,7 +619,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if isinstance(right_split, GKPlusTreeBase):
                     right_split, _ = right_split.insert_entry(insert_entry, rank=cached_new_rank)
                 else:
-                    right_split = right_split.insert_entry(insert_entry)
+                    right_split, _ = right_split.insert_entry(insert_entry)
 
                 # Create new tree node
                 right_split = check_and_convert_set(right_split)
@@ -860,7 +860,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                     right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                 else:
-                    right_split = right_split.insert_entry(Entry(dummy, None))
+                    right_split, _ = right_split.insert_entry(Entry(dummy, None))
                     right_split = check_and_convert_set(right_split)
 
                 # Cache node references for performance
@@ -904,8 +904,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                         right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                     else:
-                        right_split = right_split.insert_entry(Entry(dummy, None))
-                        
+                        right_split, _ = right_split.insert_entry(Entry(dummy, None))
+
                     right_split = check_and_convert_set(right_split)
                     
 
@@ -1084,7 +1084,7 @@ def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
     for entry in tree:
         tree_dummy = get_dummy(tree.DIM)
         if entry.item.key > tree_dummy.key:
-            klist = klist.insert_entry(entry)
+            klist, _ = klist.insert_entry(entry)
     return klist
 
 

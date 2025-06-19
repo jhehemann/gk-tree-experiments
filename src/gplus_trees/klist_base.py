@@ -11,7 +11,8 @@ from gplus_trees.base import (
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
 
-from gplus_trees.base import logger
+from gplus_trees.logging_config import get_logger
+logger = get_logger("KList")
 
 class KListNodeBase:
     """
@@ -46,11 +47,13 @@ class KListNodeBase:
         Returns:
             Optional[Entry]: The last entry if the node overflows; otherwise, None.
         """
+        
         entries = self.entries
         keys = self.keys
         real_keys = self.real_keys
         x_key = entry.item.key
         is_dummy = x_key < 0
+
 
         # logger.debug(f"NODE INSERT {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
 
@@ -60,7 +63,7 @@ class KListNodeBase:
             keys.append(x_key)
             if not is_dummy:
                 real_keys.append(x_key)
-            return None
+            return None, True
 
         # Fast path: Append at end
         if x_key > entries[-1].item.key:
@@ -80,14 +83,20 @@ class KListNodeBase:
             if entries_len < 8:
                 # Linear search for very small lists
                 for i in range(entries_len):
-                    if x_key <= entries[i].item.key:
+                    if x_key < entries[i].item.key:
                         entries.insert(i, entry)
                         keys.insert(i, x_key)
                         break
+                    elif x_key == entries[i].item.key:
+                        # If we find an exact match, we can choose to replace or ignore
+                        # Here we choose to ignore the insertion if the key already exists
+                        return None, False
             else:
                 # Binary search for larger lists - more efficient with higher capacities
                 # i = bisect_left([e.item.key for e in entries], x_key)
                 i = bisect_left(keys, x_key)
+                if i < len(entries) and keys[i] == x_key:
+                    return None, False
                 entries.insert(i, entry)
                 keys.insert(i, x_key)
 
@@ -97,7 +106,7 @@ class KListNodeBase:
                 if real_keys_len < 8:
                     # Linear search for very small lists
                     for i in range(real_keys_len):
-                        if x_key <= real_keys[i]:
+                        if x_key < real_keys[i]:
                             real_keys.insert(i, x_key)
                             break
                 else:
@@ -114,9 +123,9 @@ class KListNodeBase:
             if pop_entry.item.key >= 0:
                 real_keys.pop()
             # logger.debug(f"REAL KEYS after POP: real_keys={real_keys}")
-            return pop_entry
+            return pop_entry, True
         # logger.debug(f"ENTRY INSERTED {x_key} (POP none): entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
-        return None
+        return None, True
      
     def retrieve_entry(
         self, key: int
@@ -340,31 +349,36 @@ class KListBase(AbstractSetDataStructure):
             else:
                 # linear search from the head
                 node = self.head
-                while node.next is not None and node.entries and key > node.entries[-1].item.key:
-                    node = node.next
+                # Using bisect_left to find the insertion node (key >= split key)
+                node_idx = bisect_left(self._bounds, key)
+                node = self._nodes[node_idx]
+                # while node.next is not None and node.entries and key > node.entries[-1].item.key:
+                #     node = node.next
+        
+        overflow, inserted = node.insert_entry(entry)
 
-        overflow = node.insert_entry(entry)
+        if inserted:
+            if node is self.tail and overflow is None:
+                self._rebuild_index()
+                return self, True
 
-        if node is self.tail and overflow is None:
+            MAX_OVERFLOW_DEPTH = 10000
+            depth = 0
+
+            # Propagate overflow if needed.
+            while overflow is not None:
+                if node.next is None:
+                    node.next = self.KListNodeClass()
+                    self.tail = node.next
+                node = node.next
+                overflow, inserted = node.insert_entry(overflow)
+                depth += 1
+                if depth > MAX_OVERFLOW_DEPTH:
+                    raise RuntimeError("KList insert_entry overflowed too deeply – likely infinite loop.")
             self._rebuild_index()
-            return self
-
-        MAX_OVERFLOW_DEPTH = 10000
-        depth = 0
-
-        # Propagate overflow if needed.
-        while overflow is not None:
-            if node.next is None:
-                node.next = self.KListNodeClass()
-                self.tail = node.next
-            node = node.next
-            overflow = node.insert_entry(overflow)
-            depth += 1
-            if depth > MAX_OVERFLOW_DEPTH:
-                raise RuntimeError("KList insert_entry overflowed too deeply – likely infinite loop.")
-        self._rebuild_index()
-
-        return self
+            return self, True
+        
+        return self, False
 
     def delete(self, key: int) -> "KListBase":
         node = self.head

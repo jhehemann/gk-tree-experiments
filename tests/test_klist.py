@@ -178,9 +178,12 @@ class TestKListInsert(TestKListBase):
 
     def test_duplicate_keys(self):
         # Insert duplicate keys – they all should appear in order
+        _, inserted = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
+        self.assertTrue(inserted, "First insert should succeed")
         for _ in range(3):
-            self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
-        self.assertEqual(self.extract_all_keys(), [7, 7, 7])
+            _, inserted = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
+            self.assertFalse(inserted, "Subsequent inserts should fail for duplicates")
+        self.assertEqual(self.extract_all_keys(), [7])
 
     def test_tail_fast_path(self):
         # Repeatedly append monotonic integer keys
@@ -196,18 +199,16 @@ class TestKListInsert(TestKListBase):
             so_far = self.extract_all_keys()
             self.assertEqual(so_far, sorted(so_far))
 
-    def test_complex_pattern(self):
-        # Insert a complex shuffled pattern repeatedly and verify final sort
+    def test_random_insert(self):
+        # Insert a shuffled pattern and verify final sort
         import random
-        keys = list(range(self.cap * 2))
-        for _ in range(5):
-            random.shuffle(keys)
-            for k in keys:
-                self.klist.insert_entry(Entry(Item(k, f"val_{k}"), None))
-
+        keys = list(range(self.cap * 5))
+        random.shuffle(keys)
+        for k in keys:
+            self.klist.insert_entry(Entry(Item(k, f"val_{k}"), None))
         all_keys = self.extract_all_keys()
         self.assertEqual(all_keys, sorted(all_keys))
-        self.assertEqual(len(all_keys), self.cap * 2 * 5)
+        self.assertEqual(len(all_keys), self.cap * 5)
 
 
 class TestKListDelete(TestKListBase):
@@ -305,18 +306,18 @@ class TestKListDelete(TestKListBase):
         # remaining should be [3,6]
         self.assertEqual(self.extract_all_keys(), [3, 6])
 
-    def test_repeated_delete_same_key(self):
-        # inserting duplicates—only first matching should be removed each time
-        dup_key = 7
-        self.insert_keys([dup_key, dup_key, dup_key])
-        self.klist.delete(dup_key)
-        # exactly two remain
-        self.assertEqual(self.extract_all_keys(), [dup_key, dup_key])
-        self.klist.delete(dup_key)
-        self.klist.delete(dup_key)
-        # now list is empty
-        self.assertIsNone(self.klist.head)
-        self.assertIsNone(self.klist.tail)
+    # def test_repeated_delete_same_key(self):
+    #     # inserting duplicates—only first matching should be removed each time
+    #     dup_key = 7
+    #     self.insert_keys([dup_key, dup_key, dup_key])
+    #     self.klist.delete(dup_key)
+    #     # exactly two remain
+    #     self.assertEqual(self.extract_all_keys(), [dup_key, dup_key])
+    #     self.klist.delete(dup_key)
+    #     self.klist.delete(dup_key)
+    #     # now list is empty
+    #     self.assertIsNone(self.klist.head)
+    #     self.assertIsNone(self.klist.tail)
 
     def test_delete_all_nodes(self):
         # insert enough to create 3+ nodes, then delete everything one by one

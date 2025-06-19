@@ -209,10 +209,10 @@ class GPlusTreeBase(AbstractSetDataStructure):
         leaf_set = SetClass()
         
         # insert the dummy entry, pointing at an empty subtree
-        leaf_set = leaf_set.insert_entry(Entry(DUMMY_ITEM, None))
+        leaf_set, _ = leaf_set.insert_entry(Entry(DUMMY_ITEM, None))
 
         # now insert the real item, also pointing at an empty subtree
-        leaf_set = leaf_set.insert_entry(x_entry)
+        leaf_set, _ = leaf_set.insert_entry(x_entry)
 
         return leaf_set
 
@@ -227,13 +227,13 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
         # Build right leaf
         right_set = SetK()
-        right_set = right_set.insert_entry(x_entry)
+        right_set, _ = right_set.insert_entry(x_entry)
         right_node = NodeK(1, right_set, None)
         right_leaf = TreeK(right_node)
 
         # Build left leaf with dummy entry
         left_set = SetK()
-        left_set = left_set.insert_entry(Entry(DUMMY_ITEM, None))
+        left_set, _ = left_set.insert_entry(Entry(DUMMY_ITEM, None))
         left_node = NodeK(1, left_set, None)
         left_leaf = TreeK(left_node)
 
@@ -252,8 +252,8 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(insert_entry)
-        root_set = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
-        root_set = root_set.insert_entry(Entry(_create_replica(insert_entry.item.key), l_leaf_t))
+        root_set, _ = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
+        root_set, _ = root_set.insert_entry(Entry(_create_replica(insert_entry.item.key), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted
 
@@ -333,7 +333,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         if parent is None:
             # create a new root node
             old_node = self.node
-            root_set = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
+            root_set, _ = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
             self.node = self.NodeClass(rank, root_set, TreeClass(old_node))
             return self
 
@@ -341,7 +341,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         # Set replica of the current node's min as first entry.
         min_entry = cur.node.set.get_min().found_entry
         min_replica = _create_replica(min_entry.item.key)
-        new_set = self.SetClass().insert_entry(Entry(min_replica, None))
+        new_set, _ = self.SetClass().insert_entry(Entry(min_replica, None))
         new_tree = TreeClass()
         new_tree.node = self.NodeClass(rank, new_set, cur)
         
@@ -414,12 +414,12 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
                 # Insert the item and return early if we're already at a leaf node
                 if is_leaf:
-                    node.set = node.set.insert_entry(x_entry)
+                    node.set, _ = node.set.insert_entry(x_entry)
                     return self, inserted
                 
                 # Insert a replica and assign parent tracking for next iteration
                 insert_entry = Entry(replica, subtree)
-                node.set = node.set.insert_entry(insert_entry)
+                node.set, _ = node.set.insert_entry(insert_entry)
                 right_parent = left_parent = cur
                 right_entry = next_entry if next_entry else None
                 
@@ -439,10 +439,10 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 if right_split.item_count() > 0 or is_leaf:
                     # Insert item into right split and create new tree
                     if is_leaf:
-                        right_split.insert_entry(x_entry)
+                        right_split, _ = right_split.insert_entry(x_entry)
                     else:
-                        right_split.insert_entry(Entry(replica, None))
-                    
+                        right_split, _ = right_split.insert_entry(Entry(replica, None))
+
                     new_tree = TreeClass()
                     new_tree.node = self.NodeClass(node.rank, right_split, node.right_subtree)
 
