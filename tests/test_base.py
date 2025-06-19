@@ -347,8 +347,9 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             logger.debug(f"  Rank          : {rank}")
             current_hash = hashlib.sha256(current_hash).digest()
 
-    def find_keys_for_rank_lists(self, rank_lists, k):
+    def find_keys_for_rank_lists(self, rank_lists, k, spacing=False):
         """Find keys whose repeated hashes match the rank lists at their positions."""
+        
         group_size = calculate_group_size(k)
         key_count = len(rank_lists[0])
         result_keys = []
@@ -357,9 +358,13 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
 
         for key_idx in range(key_count):
             key = next_candidate_key
-            while key < next_candidate_key + MAX_SEARCH_LIMIT:
+            search_limit = next_candidate_key + MAX_SEARCH_LIMIT
+            found_between_key = False
+            
+            while key < search_limit:  # Use fixed search_limit
                 current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
                 match = True
+                
                 for rank_list in rank_lists:
                     desired_rank = rank_list[key_idx]
                     calculated_rank = calc_rank_from_digest(current_hash, group_size)
@@ -367,14 +372,19 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
                         match = False
                         break
                     current_hash = hashlib.sha256(current_hash).digest()
+                
                 if match:
-                    result_keys.append(key)
-                    next_candidate_key = key + 1  # ensure next key is greater
-                    break
+                    if not spacing or found_between_key:
+                        result_keys.append(key)
+                        next_candidate_key = key + 1  # Update for next key_idx
+                        break
+                    else:
+                        found_between_key = True  # Continue searching
+                
                 key += 1
             else:
-                raise ValueError(f"No matching key found for rank_lists[{key_idx}] "
-                                 f"({rank_lists[key_idx]}) within {MAX_SEARCH_LIMIT} attempts")
+                raise ValueError(f"No matching key found for rank_lists[{key_idx}]")
+        logger.debug(f"Found keys matching rank lists (spacing={spacing}): {result_keys}")
         return result_keys
     
     def sort_and_calculate_rank_lists_from_keys(self, keys, k, dim_limit):

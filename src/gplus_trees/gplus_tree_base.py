@@ -967,6 +967,8 @@ def print_pretty(set: AbstractSetDataStructure):
     max_len     = 0
 
     def collect(tree, parent=None):
+        if tree.is_empty():
+            return
         nonlocal max_len
         dim = tree.DIM if hasattr(tree, 'DIM') else None
 
