@@ -1,7 +1,7 @@
 """GKPlusTree base implementation"""
 
 from __future__ import annotations
-from typing import Optional, Type, TypeVar, Tuple
+from typing import Optional, Type, TypeVar, Tuple, List
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
@@ -17,7 +17,7 @@ from gplus_trees.gplus_tree_base import (
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-from gplus_trees.g_k_plus.utils import calc_ranks, calc_rank_for_dim
+from gplus_trees.g_k_plus.utils import calc_ranks, calc_rank_for_dim, calculate_group_size
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
@@ -1097,26 +1097,175 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     if klist.is_empty():
         return create_gkplus_tree(K, DIM, l_factor)
 
-    entries = list(klist)
-    tree = create_gkplus_tree(K, DIM, l_factor)
-    ranks = [] 
-    for entry in entries:
-        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
+    return bulk_create_gkplus_tree(klist, DIM, l_factor)
+    
+    # entries = list(klist)
+    # tree = create_gkplus_tree(K, DIM, l_factor)
+    # ranks = [] 
+    # for entry in entries:
+    #     ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
 
-    # Insert entry instances with their ranks
-    tree_insert_entry = tree.insert_entry
-    for i, entry in enumerate(entries):
-        if i < len(ranks):
-            rank = int(ranks[i])
-            tree, _ = tree_insert_entry(entry, rank)
+    # # Insert entry instances with their ranks
+    # tree_insert_entry = tree.insert_entry
+    # for i, entry in enumerate(entries):
+    #     if i < len(ranks):
+    #         rank = int(ranks[i])
+    #         tree, _ = tree_insert_entry(entry, rank)
+    # return tree
+
+
+def _create_node_from_entries(
+    entries: List[Entry],
+    KListClass: type[KListBase],
+    NodeClass: type[GKPlusNodeBase],
+    DIM: int,
+    l_factor: float = 1.0,
+) -> GKPlusNodeBase:
+    """Create a GKPlusTreeBase node from a list of entries."""
+    k = KListClass.KListNodeClass.CAPACITY
+    threshold = int(k * l_factor)
+    if len(entries) <= threshold:
+        node_set = KListClass()
+        for entry in entries:
+            node_set, _ = node_set.insert_entry(entry)
+    else:
+        # Recursive case 'Dimension': create a GKPlusTree with the next higher dimension
+        # Instantiate node set with the resulting tree
+        group_size = calculate_group_size(k)
+        node_set = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM + 1, l_factor)
+    return NodeClass(1, node_set, None)
+
+
+def create_gkplus_tree_rec(
+    pairs: List[Tuple[Entry, int]],
+    KListClass: type[KListBase],
+    DIM: int,
+    l_factor: float = 1.0,
+) -> GKPlusTreeBase:
+    """ Create a GKPlusTree recursively from a list of (entry, rank) pairs.
+    Args:
+        pairs: A list of tuples (Entry, rank) - sorted by rank descending (1) and key ascending (2)
+        K: The capacity parameter for the tree
+        DIM: The dimension of the tree
+        l_factor: The threshold factor for conversion
+        add_dummy: Whether to add a dummy entry to the current pairs list
+    Returns:
+        A GKPlusTreeBase instance containing the entries
+    """
+    if not pairs:
+        return None
+
+    # Get the maximum rank from the pairs
+    # Ensure it is at least 1 for the case where the pivot entry is the only entry
+    max_rank = max(1, max(rank for _, rank in pairs))
+    k = KListClass.KListNodeClass.CAPACITY
+    node_set: Optional[AbstractSetDataStructure] = None
+    tree = _get_create_gkplus_tree()(k, DIM, l_factor)
+    NodeClass = tree.NodeClass
+
+    # set the pivot entry's rank to the maximum rank
+    entry0, _ = pairs[0]
+    pairs[0] = (entry0, max_rank)
+
+    # Base case: if the maximum rank is 1, create a leaf node
+    if max_rank == 1:
+        # Create a leaf node with the entries
+        entries = [entry for entry, _ in pairs]
+        node = _create_node_from_entries(entries, KListClass, NodeClass, DIM, l_factor)
+        tree.node = node
+        return tree
+
+    # Recursive case 'Subtree': create root, split pairs based on keys and create subtrees
+    max_rank_entries: List[Entry] = [] # will become the root entries
+    subtrees_pairs: List[List[Tuple[Entry, int]]] = [[]] # lower tree level subtree entries
+
+    # Prepare node entries
+    subtree_idx = 0
+    for pair in pairs:
+        entry, rank = pair
+        if rank < max_rank: # items in the left subtree of a higher rank item are strictly smaller
+            subtrees_pairs[subtree_idx].append(pair)
+        else:
+            # The item has maximum rank and will become a root entry
+            replica = _create_replica(entry.item.key) # Non-leaf nodes contain replicas
+            max_rank_entries.append(Entry(replica, None)) 
+            
+            # The item also becomes the pivot for the next subtree
+            entry0, _ = pairs[0] # Reset rank to 0 to be determined by the next subtrees max rank
+            pairs[0] = (entry0, 0)
+            subtrees_pairs.append([pair]) # start a new subtree list with the pivot entry
+            subtree_idx += 1
+    
+    # Attach subtrees to the max rank entries
+    for i, entry in enumerate(max_rank_entries):
+        if i < len(subtrees_pairs):
+            subtree_pairs = subtrees_pairs[i]
+            if subtree_pairs:
+                # Create a GKPlusTree for the subtree
+                subtree_tree = create_gkplus_tree_rec(
+                    subtree_pairs,
+                    KListClass,
+                    DIM + 1,
+                    l_factor
+                )
+                entry.left_subtree = subtree_tree
+    
+    # Create the root node with max rank entries
+    root_node = _create_node_from_entries(
+        max_rank_entries,
+        KListClass,
+        NodeClass,
+        DIM,
+        l_factor
+    )
+
+    # Create a new GKPlusTreeBase instance from the entries in the last subtrees_pairs list and assign it to the node's right subtree
+    r_subtree_entries = [entry for entry, _ in subtrees_pairs[-1]]
+    right_subtree_node = _create_node_from_entries(
+        r_subtree_entries,
+        KListClass,
+        NodeClass,
+        DIM,
+        l_factor
+    )
+    root_node.right_subtree = right_subtree_node
+    tree.node = root_node
+
     return tree
 
+def _create_gkplus_tree_from_entries(
+    entries: list[Entry],
+    group_size: int,
+    KListClass: type[KListBase],
+    DIM: int,
+    l_factor: float,
+) -> GKPlusTreeBase:
+    """
+    Create a GKPlusTree from a list of (entry, rank) pairs.
+    
+    Args:
+        pairs: A list of tuples (Entry, rank)
+        K: The capacity parameter for the tree
+        DIM: The dimension of the tree
+        l_factor: The threshold factor for conversion
+        
+    Returns:
+        A new GKPlusTreeBase instance containing the entries
+    """
+    ranks = calc_ranks(entries, group_size, DIM)
+    pairs = list(zip(entries, ranks))
+    
+    # TODO: Find a way to avoid O(len(pairs)) for dummy insertion 
+    # Prepend with pivot entry, which has always the lowest key and max rank and no left subtree
+    pivot = Entry(get_dummy(DIM), None)  # Set dummy as the pivot for a new tree
+    pairs.insert(0, (pivot, 0))  # Set the rank to default value 0 – will be determined later
+    
+    return create_gkplus_tree_rec(pairs, KListClass, DIM, l_factor)
 
 def bulk_create_gkplus_tree(
-    entries: list[Entry],
-    K: int,
+    klist: KListBase,
     DIM: int,
-    l_factor: float = 1.0
+    l_factor: float,
 ) -> GKPlusTreeBase:
     """
     Create a new GKPlusTree with the specified parameters.
@@ -1129,14 +1278,14 @@ def bulk_create_gkplus_tree(
     Returns:
         A new GKPlusTreeBase instance
     """
-    group_size = calc_group_size(K)
-
-    ranks = calc_ranks(entries, group_size, DIM)
-    tree = _get_create_gkplus_tree()(K, DIM, l_factor)
-    if not entries:
+    KListClass = type(klist)
+    k = KListClass.KListNodeClass.CAPACITY
+    if klist.is_empty():
+        tree = _get_create_gkplus_tree()(k, DIM, l_factor)
         return tree
 
-    for entry, rank in zip(entries, ranks):
-        tree, _ = tree.insert_entry(entry, rank)
-
+    group_size = calculate_group_size(k)
+    entries = list(klist)
+    tree = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM, l_factor)
+    
     return tree
