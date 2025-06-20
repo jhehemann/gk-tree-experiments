@@ -334,14 +334,14 @@ if __name__ == "__main__":
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
     Ks = [4]
-    l_factor = 3.0
+    l_factor = 1.0
     repetitions = 1
 
     for n in sizes:
         for K in Ks:
             logging.info("")
             logging.info("")
-            logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, repetitions = {repetitions} ----------------")
+            logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor} repetitions = {repetitions} ----------------")
             t0 = time.perf_counter()
             repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor)
             elapsed = time.perf_counter() - t0

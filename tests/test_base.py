@@ -7,11 +7,16 @@ from dataclasses import asdict
 from pprint import pformat
 
 
-from gplus_trees.base import Item, Entry, calculate_group_size, count_trailing_zero_bits
+from gplus_trees.base import Item, Entry
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calc_rank, calc_ranks_for_multiple_dimensions
+from gplus_trees.g_k_plus.utils import (
+    calc_rank_from_digest,
+    calc_ranks_multi_dims,
+    calculate_group_size,
+    count_trailing_zero_bits,
+)
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
@@ -202,7 +207,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         dummy_range = range(-1, -11, -1)
         self.dummy_map = {i: get_dummy(dim=abs(i)) for i in dummy_range}
         abs_dummies = [abs(self.dummy_map[i].key) for i in dummy_range]
-        self.dummy_ranks = calc_ranks_for_multiple_dimensions(abs_dummies, 2, dimensions=5)
+        self.dummy_ranks = calc_ranks_multi_dims(abs_dummies, 2, dimensions=5)
         logger.debug(f"Calculate ranks for dummies of dims: {abs_dummies}")
         for dim_idx, ranks in enumerate(self.dummy_ranks):
             logger.debug(f"Dim {dim_idx+1}: {ranks}")

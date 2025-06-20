@@ -3,7 +3,6 @@
 import hashlib
 import numpy as np
 from typing import List
-from gplus_trees.base import calculate_group_size, count_trailing_zero_bits
 
 
 def get_rand_rank(K: int) -> int:
@@ -20,15 +19,69 @@ def get_rand_rank(K: int) -> int:
     return np.random.geometric(p)
 
 
+def count_trailing_zero_bits(digest: bytes) -> int:
+    tz = 0
+    # look at each byte, starting from least-significant (rightmost)
+    for byte in reversed(digest):
+        if byte == 0:
+            tz += 8
+        else:
+            # (byte & -byte) isolates the lowest set bit, 
+            # bit_length()-1 gives its zero-based position within the byte
+            tz += (byte & -byte).bit_length() - 1
+            break
+    return tz
+
+
+def calculate_group_size(k: int) -> int:
+    """
+    Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).
+    
+    Parameters:
+        k (int): The expected gplus node size, must be a positive power of 2.
+    
+    Returns:
+        int: The group size, which is log2(k).
+    
+    Raises:
+        ValueError: If k is not a positive power of 2.
+    """
+    if k <= 0 or (k & (k - 1)) != 0:
+        raise ValueError("k must be a positive power of 2")
+    
+    return k.bit_length() - 1
+
+
+def calculate_rank(key, group_size: int) -> int:
+    """
+    Calculate the rank for an item by counting the number of complete groups of trailing zero-bits in the SHA-256 hash of its key.
+    
+    Parameters:
+        k (int): The desired g-node size, must be a positive power of 2.
+        group_size (int): The size of the groups to count (log2(k)).
+    
+    Returns:
+        int: The rank calculated for this item.
+    """
+
+    key_bytes = key.to_bytes(32, 'big')
+
+    digest = hashlib.sha256(key_bytes).digest()
+    
+    tz = count_trailing_zero_bits(digest)
+    
+    return (tz // group_size) + 1
+
+
 def calc_rank_from_digest(digest: bytes, group_size: int) -> int:
     """Calculate rank from a hash digest."""
     tz = count_trailing_zero_bits(digest)
     return (tz // group_size) + 1
 
 
-def calc_rank(key: int, k: int, dim: int) -> int:
+def calc_rank_for_dim(key: int, k: int, dim: int) -> int:
     """
-    Calculate rank for a key at a given dimension.
+    Calculate rank for a key at a given dimension. If a key is negative, its absolute value is used for hashing to make dummy keys hashable.
     
     Args:
         key: The key to calculate rank for
@@ -47,7 +100,23 @@ def calc_rank(key: int, k: int, dim: int) -> int:
     return calc_rank_from_digest(digest, group_size)
 
 
-def calc_ranks_for_multiple_dimensions(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
+def calc_ranks(entries: List[int], group_size: int, DIM: int) -> List[int]:
+    """
+    Calculate ranks for a list of keys based on hashing.
+    
+    Parameters:
+        keys (List[int]): List of integer keys to calculate ranks for.
+        k (int): Must be a power of 2, used to derive group size.
+
+    Returns:
+        List[int]: Ranks for each key.
+    """
+    
+
+    return [calc_rank_from_digest(hashlib.sha256(abs(key).to_bytes(32, 'big')).digest(), group_size) for key in entries]
+
+
+def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
     """
     Calculate ranks for a list of keys based on repeated hashing.
     

@@ -13,7 +13,7 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.klist_base import KListBase
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_to_klist, _klist_to_tree
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
-from gplus_trees.g_k_plus.utils import calc_rank
+from gplus_trees.g_k_plus.utils import calc_rank_for_dim
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
 
@@ -129,7 +129,7 @@ class TestGKPlusUtils(GKPlusTreeTestCase):
         #     # logger.debug(f"Calculating rank for key: {item.key}, K: {self.K}, DIM: 1")
         #     rank = calc_rank(item.key, self.K, 1)
         #     ranks.append(rank)
-        ranks = [calc_rank(key=key, k=2, dim=1) for key in keys]
+        ranks = [calc_rank_for_dim(key=key, k=2, dim=1) for key in keys]
         logger.debug(f"Keys: {[item.key for item in items]}")
         logger.debug(f"Ranks: {ranks}")
 

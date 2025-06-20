@@ -14,7 +14,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from gplus_trees.base import Item, Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
-from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from tests.logconfig import logger

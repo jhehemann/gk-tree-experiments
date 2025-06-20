@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
-from gplus_trees.g_k_plus.utils import calc_rank
+from gplus_trees.g_k_plus.utils import calc_rank_for_dim
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from tests.logconfig import logger
@@ -445,7 +445,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         tree = create_gkplus_tree(K=k)
         num_items = 50
         keys = random.sample(range(1, 1000), num_items)
-        ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
+        ranks = [calc_rank_for_dim(key=key, k=k, dim=1) for key in keys]
         for key, rank in zip(keys, ranks):
             tree, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
 
@@ -723,7 +723,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys  =  [851, 90, 775, 902, 973, 76, 754]
         ranks =  [1, 1, 1, 1, 1, 3, 1]
         k = 4
-        ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
+        ranks = [calc_rank_for_dim(key=key, k=k, dim=1) for key in keys]
         split_cases = [("split at smallest key", 76)]
         for case_name, split_key in split_cases:
             exp_left = [k for k in keys if k < split_key]
@@ -899,7 +899,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 
                 tree = create_gkplus_tree(K=k)
                 keys = random.sample(range(1, 1000), num_items)
-                ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
+                ranks = [calc_rank_for_dim(key=key, k=k, dim=1) for key in keys]
                 msg = f"Keys:  {keys}"
                 msg += f"\nRanks: {ranks}"
                 for key, rank in zip(keys, ranks):

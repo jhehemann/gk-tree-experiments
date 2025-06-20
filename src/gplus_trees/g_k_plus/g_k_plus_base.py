@@ -10,13 +10,14 @@ from gplus_trees.base import (
     _create_replica,
     RetrievalResult,
 )
+
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase, GPlusNodeBase, print_pretty, get_dummy
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-from gplus_trees.g_k_plus.utils import calc_rank
+from gplus_trees.g_k_plus.utils import calc_ranks, calc_rank_for_dim
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
@@ -571,7 +572,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         return self.update(cur, x_entry)
                     node.set = check_and_convert_set(node.set) # only KLists can be extended
                 else:
-                    new_rank = calc_rank(x_key, capacity, dim=self.DIM + 1)
+                    new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
                     node.set, inserted = node.set.insert_entry(insert_entry, rank=new_rank)
                     if not inserted:
                         return self.update(cur, x_entry)
@@ -615,7 +616,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if right_item_count > 0 or is_leaf:
                 insert_entry = x_entry if is_leaf else Entry(replica, None)
                 if isinstance(right_split, GKPlusTreeBase):
-                    new_rank = calc_rank(x_key, capacity, dim=self.DIM + 1)
+                    new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
                     right_split, _ = right_split.insert_entry(insert_entry, rank=new_rank)
                 else:
                     right_split, _ = right_split.insert_entry(insert_entry)
@@ -708,70 +709,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     #     return True
 
     # Extension methods to check threshold and perform conversions
-    def check_and_convert_set(self,
-                              set: AbstractSetDataStructure
-                              ) -> AbstractSetDataStructure:
-        if isinstance(set, KListBase):
-            return self.check_and_expand_klist(set)
-        elif isinstance(set, GKPlusTreeBase):
-            return self.check_and_collapse_tree(set)
-        else:
-            raise TypeError(f"Unsupported set type: {type(set).__name__}. "
-                            "Expected KListBase or GKPlusTreeBase.")
-
-    def check_and_expand_klist(self,
-                               klist: KListBase
-                               ) -> AbstractSetDataStructure:
-        """
-        Check if a KList exceeds the threshold and should be converted to a GKPlusTree.
-
-        Args:
-            klist: The KList to check
-
-        Returns:
-            Either the original KList or a new GKPlusTree based on the threshold
-        """
-        # Check if the item count exceeds l_factor * CAPACITY
-        k = klist.KListNodeClass.CAPACITY
-        threshold = int(k * self.l_factor)
-
-        if klist.item_count() > threshold:
-            # Convert to GKPlusTree with increased dimension
-            new_dim = type(self).DIM + 1
-
-            target_dim = new_dim
-            return _klist_to_tree(klist, k, target_dim, self.l_factor)
-
-        return klist
-
-    def check_and_collapse_tree(self,
-                                tree: 'GKPlusTreeBase'
-                                ) -> AbstractSetDataStructure:
-        """
-        Check if a GKPlusTree has few enough items to be collapsed into a KList.
-
-        Args:
-            tree: The GKPlusTree to check
-
-        Returns:
-            Either the original tree or a new KList based on the threshold
-        """
-        # Get the threshold based on the KList capacity
-        k = self.KListClass.KListNodeClass.CAPACITY
-        threshold = int(k * self.l_factor)
-
-        if tree.is_empty():
-            return tree
-
-        if tree.DIM == 1:
-            # We want to keep the GKPlusTree structure for dimension 1
-            return tree
-
-        if tree.real_item_count() <= threshold:
-            # Collapse into a KList
-            return _tree_to_klist(tree)
-
-        return tree
+    
 
     def split_inplace(self, key: int
                       ) -> Tuple['GKPlusTreeBase',
@@ -847,7 +785,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 
                 if is_gkplus_type:
                     # Calculate the new rank for the item in the next dimension - use cached values
-                    new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
+                    new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                     right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                 else:
                     right_split, _ = right_split.insert_entry(Entry(dummy, None))
@@ -891,14 +829,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Create a leaf with a single dummy item
                     if is_gkplus_type:
                         # Calculate new rank for item in the next dimension - use cached values
-                        new_rank = calc_rank(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
+                        new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                         right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                     else:
                         right_split, _ = right_split.insert_entry(Entry(dummy, None))
 
                     right_split = check_and_convert_set(right_split)
-                    
-
                     right_node = NodeClass(1, right_split, None)
                     new_tree = TreeClass(l_factor=cached_l_factor)
                     new_tree.node = right_node
@@ -956,7 +892,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if left_parent or seen_key_subtree:
                         # Prepare unlinking leaf nodes and determine left return if needed
                         if l_count == 0:
-                            # find the previous leaf node by traversing the left parent
+                            # find the preceeding leaf node
                             if left_parent:
                                 l_last_leaf = left_parent.get_max_leaf()
                             else:
@@ -999,17 +935,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             left_parent = next_left_parent
 
-            # Update leaf node 'next' pointers if at leaf level - early return
+            # Main return logic
             if is_leaf:
-                # Unlink leaf nodes
-                if l_last_leaf:
+                if l_last_leaf: # unlink leaf nodes
                     l_last_leaf.next = None
-
-                # prepare key entry subtree for return
                 return_subtree = key_subtree
-                # logger.debug(f"[DIM {self.DIM}] LEFT (SELF) after split: {print_pretty(left_return)}")
-                # logger.debug(f"[DIM {self.DIM}] RIGHT (NEW) after split: {print_pretty(right_return)}")
-                # logger.debug(f"[DIM {self.DIM}] KEY subtree after split: {print_pretty(return_subtree) if return_subtree else 'None'}")
                 return self, return_subtree, right_return
 
             if key_subtree:
@@ -1047,6 +977,71 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if node is last_leaf:
                 # Stop iteration after processing the last leaf node
                 break
+
+    def check_and_convert_set(self,
+                              set: AbstractSetDataStructure
+                              ) -> AbstractSetDataStructure:
+        if isinstance(set, KListBase):
+            return self.check_and_expand_klist(set)
+        elif isinstance(set, GKPlusTreeBase):
+            return self.check_and_collapse_tree(set)
+        else:
+            raise TypeError(f"Unsupported set type: {type(set).__name__}. "
+                            "Expected KListBase or GKPlusTreeBase.")
+
+    def check_and_expand_klist(self,
+                               klist: KListBase
+                               ) -> AbstractSetDataStructure:
+        """
+        Check if a KList exceeds the threshold and should be converted to a GKPlusTree.
+
+        Args:
+            klist: The KList to check
+
+        Returns:
+            Either the original KList or a new GKPlusTree based on the threshold
+        """
+        # Check if the item count exceeds l_factor * CAPACITY
+        k = klist.KListNodeClass.CAPACITY
+        threshold = int(k * self.l_factor)
+
+        if klist.item_count() > threshold:
+            # Convert to GKPlusTree with increased dimension
+            new_dim = type(self).DIM + 1
+
+            target_dim = new_dim
+            return _klist_to_tree(klist, k, target_dim, self.l_factor)
+
+        return klist
+
+    def check_and_collapse_tree(self,
+                                tree: 'GKPlusTreeBase'
+                                ) -> AbstractSetDataStructure:
+        """
+        Check if a GKPlusTree has few enough items to be collapsed into a KList.
+
+        Args:
+            tree: The GKPlusTree to check
+
+        Returns:
+            Either the original tree or a new KList based on the threshold
+        """
+        # Get the threshold based on the KList capacity
+        k = self.KListClass.KListNodeClass.CAPACITY
+        threshold = int(k * self.l_factor)
+
+        if tree.is_empty():
+            return tree
+
+        if tree.DIM == 1:
+            # We want to keep the GKPlusTree structure for dimension 1
+            return tree
+
+        if tree.real_item_count() <= threshold:
+            # Collapse into a KList
+            return _tree_to_klist(tree)
+
+        return tree
 
 
 def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
@@ -1106,7 +1101,7 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     tree = create_gkplus_tree(K, DIM, l_factor)
     ranks = [] 
     for entry in entries:
-        ranks.append(calc_rank(entry.item.key, K, DIM))
+        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
 
     # Insert entry instances with their ranks
     tree_insert_entry = tree.insert_entry
@@ -1114,4 +1109,34 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
         if i < len(ranks):
             rank = int(ranks[i])
             tree, _ = tree_insert_entry(entry, rank)
+    return tree
+
+
+def bulk_create_gkplus_tree(
+    entries: list[Entry],
+    K: int,
+    DIM: int,
+    l_factor: float = 1.0
+) -> GKPlusTreeBase:
+    """
+    Create a new GKPlusTree with the specified parameters.
+    
+    Args:
+        K: The capacity parameter for the tree
+        DIM: The dimension of the tree
+        l_factor: The threshold factor for conversion
+        
+    Returns:
+        A new GKPlusTreeBase instance
+    """
+    group_size = calc_group_size(K)
+
+    ranks = calc_ranks(entries, group_size, DIM)
+    tree = _get_create_gkplus_tree()(K, DIM, l_factor)
+    if not entries:
+        return tree
+
+    for entry, rank in zip(entries, ranks):
+        tree, _ = tree.insert_entry(entry, rank)
+
     return tree
