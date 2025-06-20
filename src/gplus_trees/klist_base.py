@@ -321,7 +321,7 @@ class KListBase(AbstractSetDataStructure):
 
         # return self
 
-    def insert_entry(self, entry: Entry) -> 'KListBase':
+    def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
         """
         Inserts an existing Entry object into the k-list, preserving the Entry object's identity.
 
@@ -330,6 +330,7 @@ class KListBase(AbstractSetDataStructure):
 
         Parameters:
             entry (Entry): The Entry object to insert (containing item and left_subtree).
+            rank (Optional[int]): The rank of the entry, if applicable. Not used in this implementation. Only for compatibility with the G+-tree interface.
             
         Returns:
             KListBase: The updated k-list.
