@@ -100,6 +100,26 @@ def calc_rank_for_dim(key: int, k: int, dim: int) -> int:
     return calc_rank_from_digest(digest, group_size)
 
 
+def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
+    """
+    Calculate the rank for a key using its group size.
+
+    Args:
+        key: The key to calculate rank for
+        group_size: The size of the group (log2(k))
+        dim: The dimension level
+
+    Returns:
+        The calculated rank
+    """
+    # Use keys' absolute value to hash to account for dummy keys (in testing)
+    digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
+    for _ in range(dim - 1):
+        # Rehash the digest for each dimension
+        digest = hashlib.sha256(digest).digest()
+    return calc_rank_from_digest(digest, group_size)
+
+
 def calc_ranks(entries: List[int], group_size: int, DIM: int) -> List[int]:
     """
     Calculate ranks for a list of keys based on hashing.
@@ -111,9 +131,10 @@ def calc_ranks(entries: List[int], group_size: int, DIM: int) -> List[int]:
     Returns:
         List[int]: Ranks for each key.
     """
-    
-
-    return [calc_rank_from_digest(hashlib.sha256(abs(key).to_bytes(32, 'big')).digest(), group_size) for key in entries]
+    ranks = []
+    for entry in entries:
+        ranks.append(calc_rank_from_group_size(entry.item.key, group_size, DIM))
+    return ranks
 
 
 def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
