@@ -754,7 +754,7 @@ class KListBase(AbstractSetDataStructure):
         Verifies that:
           1) Each KListNode.entries is internally sorted by item.key.
           2) For each consecutive pair of nodes, 
-             last_key(node_i) <= first_key(node_{i+1}).
+             last_key(node_i) < first_key(node_{i+1}).
           3) self.tail.next is always None (tail really is the last node).
           4) All nodes except the last one must be at full capacity (have k items).
 
@@ -790,9 +790,9 @@ class KListBase(AbstractSetDataStructure):
             # 2b) Boundary with the previous node
             if previous_last_key is not None and node.entries:
                 first_key = node.entries[0].item.key
-                assert previous_last_key <= first_key, (
+                assert previous_last_key < first_key, (
                     f"Inter-node invariant violated between nodes: "
-                    f"{previous_last_key} > {first_key}"
+                    f"{previous_last_key} >= {first_key}"
                 )
                 
             # 2c) All non-tail nodes must be at full capacity

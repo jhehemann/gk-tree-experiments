@@ -989,7 +989,7 @@ def print_pretty(set: AbstractSetDataStructure):
             layers_raw[fill_rank].append("")
             fill_rank -= 1
         
-        # text     = SEP.join(str(e.item.key) for e in node.set)
+        # text = SEP.join(str(e.item.key) for e in node.set)
         text = ""
         for e in node.set:
             if parent is not None and other_dim:

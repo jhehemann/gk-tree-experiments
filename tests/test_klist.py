@@ -7,6 +7,7 @@ import random
 # Import factory function instead of concrete classes
 from gplus_trees.base import Item, Entry
 from gplus_trees.factory import make_gplustree_classes
+from tests.test_base import BaseTestCase
 import logging
 
 # Configure logging for test
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Test with different capacities to ensure factory works correctly
 TEST_CAPACITIES = [4, 8, 16]
 
-class TestKListFactory(unittest.TestCase):
+class TestKListFactory(BaseTestCase):
     """Test the factory pattern itself with various capacities"""
     
     def test_factory_creates_different_classes(self):
@@ -47,7 +48,7 @@ class TestKListFactory(unittest.TestCase):
                                        f"KList classes for K={k1} and K={k2} should be different")
 
 
-class TestKListBase(unittest.TestCase):
+class TestKListBase(BaseTestCase):
     """Base class for all KList factory tests"""
     
     def setUp(self):
@@ -61,7 +62,7 @@ class TestKListBase(unittest.TestCase):
     
     def tearDown(self):
         # Verify invariants after each test
-        self.klist.check_invariant()
+        self.validate_klist(self.klist)
 
     def _count_nodes(self, klist):
         count = 0
@@ -124,18 +125,23 @@ class TestKListInsert(TestKListBase):
         self.assertIsNotNone(self.klist.head)
         self.assertIs(self.klist.head, self.klist.tail)
         self.assertEqual(self.extract_all_keys(), [1])
+        self.assertEqual(self.klist.item_count(), 1)
 
     def test_insert_in_order(self):
         # Insert keys in sorted order one by one
-        for key in [1, 2, 3, 4, 5]:
+        keys = [1, 2, 3, 4, 5]
+        for key in keys:
             self.klist.insert_entry(Entry(Item(key, f"val_{key}"), None))
-        self.assertEqual(self.extract_all_keys(), [1, 2, 3, 4, 5])
+        self.assertEqual(self.extract_all_keys(), keys)
+        self.assertEqual(self.klist.item_count(), len(keys))
 
     def test_insert_out_of_order(self):
         # Insert keys in random order, final list must be sorted
-        for key in [4, 1, 5, 2, 3]:
+        keys = [4, 1, 5, 2, 3]
+        for key in keys:
             self.klist.insert_entry(Entry(Item(key, f"val_{key}"), None))
-        self.assertEqual(self.extract_all_keys(), [1, 2, 3, 4, 5])
+        self.assertEqual(self.extract_all_keys(), sorted(keys))
+        self.assertEqual(self.klist.item_count(), len(keys))
 
     def test_single_node_overflow(self):
         # Fill exactly one node to capacity, then insert one more
@@ -145,9 +151,9 @@ class TestKListInsert(TestKListBase):
         # one more causes a second node
         extra = self.cap
         self.klist.insert_entry(Entry(Item(extra, f"val_{extra}"), None))
-
         all_keys = self.extract_all_keys()
         self.assertEqual(len(all_keys), self.cap + 1)
+        self.assertEqual(self.klist.item_count(), len(all_keys))
 
         # First node must have cap entries, second node the overflow
         node = self.klist.head

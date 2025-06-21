@@ -18,6 +18,7 @@ from gplus_trees.g_k_plus.utils import (
     count_trailing_zero_bits,
 )
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
+from gplus_trees.klist_base import KListBase
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
 # from gplus_trees.base import logger
@@ -29,8 +30,47 @@ from gplus_trees.logging_config import get_test_logger
 
 logger = get_test_logger("TestBase")
 
+class BaseTestCase(unittest.TestCase):
+    """Base class for all tests with common functionality."""
+    
+    def validate_klist(
+        self,
+        klist: KListBase,
+        exp_entries: Optional[List[Entry]] = None,
+        err_msg: Optional[str] = "",
+    ):
+        """Validate tree invariants and structure."""
+        # Check tree invariants
+        self.assertIsNotNone(klist, "KList should not be None")
+        self.assertIsInstance(klist, KListBase, "KList should be a KListBase instance")
+        klist.check_invariant()
 
-class BaseTreeTestCase(unittest.TestCase):
+        # Verify expected entries if provided
+        if exp_entries is not None:
+            actual_entries = list(klist)
+            self.assertEqual(
+                len(exp_entries), len(actual_entries),
+                f"Expected {len(exp_entries)} entries, got {len(actual_entries)}\n{err_msg}"
+            )
+            self.assertEqual(klist.item_count(), len(exp_entries),
+                             f"Expected {len(exp_entries)} items in klist, got {klist.item_count()}\n{err_msg}")
+            for i, entry in enumerate(actual_entries):
+                self.assertIs(entry.item, exp_entries[i].item)
+                self.assertEqual(entry.item.key, exp_entries[i].item.key,
+                                 f"Entry #{i} key mismatch: "
+                                 f"expected {exp_entries[i].item.key}, got {entry.item.key}")
+                self.assertEqual(entry.item.value, exp_entries[i].item.value,
+                                 f"Entry #{i} value mismatch: "
+                                 f"expected {exp_entries[i].item.value}, got {entry.item.value}")
+                self.assertIs(entry.left_subtree, exp_entries[i].left_subtree,
+                                 f"Entry #{i} left subtree mismatch: "
+                                 f"expected {exp_entries[i].left_subtree}, got {entry.left_subtree}")
+                self.assertIs(entry, exp_entries[i],
+                                 f"Entry #{i} mismatch: expected {exp_entries[i]}, got {entry}")
+            
+
+
+class BaseTreeTestCase(BaseTestCase):
     """Base class for all tree tests with common functionality."""
     
     def create_item(self, key: int, value: str = "val") -> Item:
@@ -88,7 +128,7 @@ class BaseTreeTestCase(unittest.TestCase):
                 presence_ok,
                 f"Leaf keys {keys} do not match expected {expected_keys}"
             )
-
+        
 
 # Legacy alias for backward compatibility - will inherit all BaseTreeTestCase methods
 class TreeTestCase(BaseTreeTestCase):
@@ -210,8 +250,12 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         # Create a dummy item map for dummy keys and their ranks in different dimensions
         dummy_range = range(-1, -11, -1)
         self.dummy_map = {i: get_dummy(dim=abs(i)) for i in dummy_range}
-        abs_dummies = [abs(self.dummy_map[i].key) for i in dummy_range]
-        self.dummy_ranks = calc_ranks_multi_dims(abs_dummies, 2, dimensions=5)
+        # abs_dummies = [abs(self.dummy_map[i].key) for i in dummy_range]
+        # self.dummy_ranks_k2 = calc_ranks_multi_dims(abs_dummies, 2, dimensions=10)
+        # # log dummy ranks pretty for debugging
+        # logger.debug(f"Dummy ranks for dummies: {list(dummy_range)}")
+        # for dim, ranks in enumerate(self.dummy_ranks):
+        #     logger.debug(f"Dimension {dim + 1}: {ranks}")
 
     def get_dummy_count(self, tree: 'GKPlusTreeBase') -> int:
         """Count the number of dummy items in the tree."""
@@ -402,7 +446,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
                 key += 1
             else:
                 raise ValueError(f"No matching key found for rank_lists[{key_idx}]")
-        logger.debug(f"Found keys matching rank lists (spacing={spacing}): {result_keys}")
+        # logger.debug(f"Found keys matching rank lists (spacing={spacing}): {result_keys}")
         return result_keys
     
     def sort_and_calculate_rank_lists_from_keys(self, keys, k, dim_limit):

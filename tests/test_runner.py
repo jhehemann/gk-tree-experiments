@@ -24,8 +24,12 @@ TEST_FILES = [
     # 'gk_plus/test_insert_dimensions.py',
     # 'gk_plus/test_split_inplace.py',
     # 'gk_plus/test_set_conversion.py',
-    # 'gk_plus/test_set_conversion::TestKListToTree'
-    'gk_plus/test_set_conversion::TestKListToTree::test_klist_to_tree_no_expansion_rank_gt_1',
+    # 'gk_plus/test_set_conversion::TestTreeToKList',
+    'gk_plus/test_set_conversion::TestTreeToKList::test_problematic_v2',
+    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_problematic',
+    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_old',
+    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_new',
+    # 'gk_plus/test_set_conversion::TestKListToTree',
 
     # 'test_gp_mkl_tree.py',
     # 'test_klist.py',
