@@ -3,6 +3,9 @@
 from typing import List, Tuple, Optional
 from gplus_trees.g_k_plus.g_k_plus_base import Item, Entry
 from tests.test_base import GKPlusTreeTestCase
+from gplus_trees.logging_config import get_test_logger
+
+logger = get_test_logger("GKPlusTree")
 
 # Inherit from the unified base class but keep backward compatibility
 class TreeTestCase(GKPlusTreeTestCase):

@@ -15,18 +15,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Test files to run - Add or remove files as needed
 TEST_FILES = [
-    'gplus/test_insert.py',
-    'gplus/test_retrieve.py',
-    'gk_plus/test_insert.py',
-    'gk_plus/test_counts_and_sizes.py',
-    'gk_plus/test_get_max_dim.py',
+    # 'gplus/test_insert.py',
+    # 'gplus/test_retrieve.py',
+    # 'gk_plus/test_insert.py',
+    # 'gk_plus/test_counts_and_sizes.py',
+    # 'gk_plus/test_get_max_dim.py',
     
-    'gk_plus/test_insert_dimensions.py',
-    'gk_plus/test_split_inplace.py',
-    'gk_plus/test_set_conversion.py',
+    # 'gk_plus/test_insert_dimensions.py',
+    # 'gk_plus/test_split_inplace.py',
+    # 'gk_plus/test_set_conversion.py',
+    # 'gk_plus/test_set_conversion::TestKListToTree'
+    'gk_plus/test_set_conversion::TestKListToTree::test_klist_to_tree_no_expansion_rank_gt_1',
 
-    'test_gp_mkl_tree.py',
-    'test_klist.py',
+    # 'test_gp_mkl_tree.py',
+    # 'test_klist.py',
     # 'test_stats_gpltree.py',
     
 
@@ -39,7 +41,7 @@ def run_tests(test_files=None, test_classes=None, verbosity=0):
     Run specified test files and optionally specific test classes.
     
     Args:
-        test_files: List of test files to run (without the directory path)
+        test_files: List of test files to run (can include :: syntax for specific tests)
         test_classes: Optional dict mapping test files to specific test classes to run
         verbosity: Verbosity level for test output
     
@@ -57,17 +59,39 @@ def run_tests(test_files=None, test_classes=None, verbosity=0):
     # Base test directory
     base_dir = os.path.dirname(__file__)
     
-    for file in test_files:
-        # Handle files in subdirectories
-        if '/' in file:
-            parts = file.split('/')
-            module_name = f"tests.{'.'.join(parts)}".replace('.py', '')
+    for test_spec in test_files:
+        # Parse the test specification
+        if '::' in test_spec:
+            # Handle specific test method syntax: file.py::TestClass::test_method
+            parts = test_spec.split('::')
+            file_path = parts[0]
+            test_class = parts[1] if len(parts) > 1 else None
+            test_method = parts[2] if len(parts) > 2 else None
         else:
-            module_name = f"tests.{file}".replace('.py', '')
+            # Regular file path
+            file_path = test_spec
+            test_class = None
+            test_method = None
         
-        # If specific classes are specified for this file
-        if file in test_classes:
-            for class_name in test_classes[file]:
+        # Build module name from file path
+        if '/' in file_path:
+            path_parts = file_path.split('/')
+            module_name = f"tests.{'.'.join(path_parts)}".replace('.py', '')
+        else:
+            module_name = f"tests.{file_path}".replace('.py', '')
+        
+        # Load the appropriate tests
+        if test_method and test_class:
+            # Load specific test method
+            test_name = f"{module_name}.{test_class}.{test_method}"
+            suite.addTest(unittest.TestLoader().loadTestsFromName(test_name))
+        elif test_class:
+            # Load specific test class
+            test_name = f"{module_name}.{test_class}"
+            suite.addTest(unittest.TestLoader().loadTestsFromName(test_name))
+        elif file_path in test_classes:
+            # Load specific classes specified in test_classes parameter
+            for class_name in test_classes[file_path]:
                 suite.addTest(unittest.TestLoader().loadTestsFromName(f"{module_name}.{class_name}"))
         else:
             # Load all tests from the file

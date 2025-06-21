@@ -7,6 +7,9 @@ from gplus_trees.base import (
     Entry,
     RetrievalResult
 )
+from gplus_trees.logging_config import get_logger
+
+logger = get_logger("GKPlusTree")
 
 T = TypeVar("T", bound="GKTreeSetDataStructure")
 

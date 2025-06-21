@@ -8,7 +8,7 @@ from gplus_trees.logging_config import get_logger
 import numpy as np
 
 # Get logger for this module
-logger = get_logger(__name__)
+logger = get_logger("GPlusTree")
 
 
 class Item:

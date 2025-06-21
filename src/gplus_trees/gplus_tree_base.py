@@ -513,7 +513,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
     def iter_leaf_nodes(self):
         """
         Iterates over all leaf-level GPlusNodes in the tree,
-        starting from the leftmost leaf node and following `next` pointers.
+        starting from the leftmost leaf node and following `next` pointers or recursive .
 
         Yields:
             GPlusNode: Each leaf-level node in left-to-right order.
