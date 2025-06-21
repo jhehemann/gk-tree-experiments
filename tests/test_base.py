@@ -20,10 +20,14 @@ from gplus_trees.g_k_plus.utils import (
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
-from gplus_trees.base import logger
+# from gplus_trees.base import logger
 
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
+
+from gplus_trees.logging_config import get_test_logger
+
+logger = get_test_logger("TestBase")
 
 
 class BaseTreeTestCase(unittest.TestCase):
@@ -208,9 +212,6 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         self.dummy_map = {i: get_dummy(dim=abs(i)) for i in dummy_range}
         abs_dummies = [abs(self.dummy_map[i].key) for i in dummy_range]
         self.dummy_ranks = calc_ranks_multi_dims(abs_dummies, 2, dimensions=5)
-        logger.debug(f"Calculate ranks for dummies of dims: {abs_dummies}")
-        for dim_idx, ranks in enumerate(self.dummy_ranks):
-            logger.debug(f"Dim {dim_idx+1}: {ranks}")
 
     def get_dummy_count(self, tree: 'GKPlusTreeBase') -> int:
         """Count the number of dummy items in the tree."""
@@ -247,6 +248,18 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         """Validate tree invariants and structure."""
         # Check tree invariants
         self.assertIsNotNone(tree, "Tree should not be None")
+        if not tree.is_empty():
+            self.assertTrue(tree.node.set, "Root node set should not be empty")
+            for entry in tree.node.set:
+                self.assertIsInstance(entry, Entry, "Tree node set should contain Entry instances")
+                self.assertIsNotNone(entry.item, "Root node item should not be None")
+                if entry.left_subtree is not None:
+                    self.assertIsInstance(entry.left_subtree, GKPlusTreeBase,
+                                          "Left subtree should be a GKPlusTreeBase instance")
+            if tree.node.right_subtree is not None:
+                self.assertIsInstance(tree.node.right_subtree, GKPlusTreeBase,
+                                  "Right subtree should be a GKPlusTreeBase instance")
+            
         stats = gtree_stats_(tree, {})
         # add stats to the error message if provided
         err_msg += str(asdict(stats))
