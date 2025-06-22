@@ -18,6 +18,7 @@ TEST_FILES = [
     # 'gplus/test_insert.py',
     # 'gplus/test_retrieve.py',
     # 'gk_plus/test_insert.py',
+    'gk_plus/test_insert::TestInternalMethodsWithEntryInsert::test_insert_non_empty_no_extension',
     # 'gk_plus/test_counts_and_sizes.py',
     # 'gk_plus/test_get_max_dim.py',
     
@@ -25,7 +26,7 @@ TEST_FILES = [
     # 'gk_plus/test_split_inplace.py',
     # 'gk_plus/test_set_conversion.py',
     # 'gk_plus/test_set_conversion::TestTreeToKList',
-    'gk_plus/test_set_conversion::TestTreeToKList::test_problematic_v2',
+    # 'gk_plus/test_set_conversion::TestTreeToKList::test_problematic_v2',
     # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_problematic',
     # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_old',
     # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_new',

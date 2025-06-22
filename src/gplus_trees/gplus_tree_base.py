@@ -642,6 +642,7 @@ class Stats:
     is_search_tree: bool
     internal_has_replicas: bool
     internal_packed: bool
+    set_thresholds_met: bool
     linked_leaf_nodes: bool
     all_leaf_values_present: bool
     leaf_keys_in_order: bool
@@ -673,10 +674,17 @@ def gtree_stats_(t: GPlusTreeBase,
                      greatest_item       = None,
                      is_search_tree      = True,
                      internal_has_replicas = True,
+                     set_thresholds_met = True,
                      internal_packed     = True,
                      linked_leaf_nodes   = True,
                      all_leaf_values_present = True,
                      leaf_keys_in_order  = True,)
+
+    # K = t.SetClass.KListNodeClass.CAPACITY
+    # if hasattr(t, 'l_factor'):
+    #     threshold = t.l_factor * K
+    # else:
+    #     threshold = K
 
     node       = t.node
     node_set   = node.set
@@ -710,6 +718,7 @@ def gtree_stats_(t: GPlusTreeBase,
         is_search_tree=True,
         internal_has_replicas=True,
         internal_packed=(node_rank <= 1 or node_item_count > 1),
+        set_thresholds_met=True,
         linked_leaf_nodes=True,
         all_leaf_values_present=True,
         leaf_keys_in_order=True,
@@ -761,6 +770,15 @@ def gtree_stats_(t: GPlusTreeBase,
             # Update boolean flags
             if stats.is_heap and not ((node_rank > cs.rank) and cs.is_heap):
                 stats.is_heap = False
+
+            # if stats.set_thresholds_met:
+                
+            #     if isinstance(node_set, KListBase):
+            #         if cs.set_thresholds_met and node_set.item_count() > threshold:
+            #             stats.set_thresholds_met = False
+            #     else:
+            #         if cs.set_thresholds_met and node_set.item_count() <= threshold:
+            #             stats.set_thresholds_met = False
                 
             stats.internal_has_replicas &= cs.internal_has_replicas
             stats.internal_packed &= cs.internal_packed

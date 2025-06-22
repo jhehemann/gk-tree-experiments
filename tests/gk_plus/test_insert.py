@@ -273,6 +273,25 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                         "Inserted entry's left subtree should not be None")
                 self.assertIs(inserted_entry.left_subtree, left_subtree)
 
+    def test_insert_non_empty_no_extension(self):
+        k = 4
+        col_dim = 1
+        rank_lists = [
+            [1, 1, 1, 1, 2], # Dimension 1
+            [1, 1, 1, 1, 2], # Dimension 2
+            [1, 1, 1, 1, 2], # Dimension 3
+            [1, 2, 1, 2, 1], # Dimension 4
+            [1, 2, 1, 5, 1], # Dimension 5
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+        tree = create_gkplus_tree(K=k, dimension=col_dim)
+        for i, k in enumerate(keys):
+            rank = rank_lists[i]
+            tree.insert(Item(k, f"val_{k}"), rank=rank_lists[col_dim][i])
+        logger.debug(f" tree: {print_pretty(tree)}")
+
+        
+
     def test_insert_entry_non_empty_with_leaf_extension(self):
         k = 2
         l_factor = 1.0
