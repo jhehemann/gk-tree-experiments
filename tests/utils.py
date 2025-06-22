@@ -6,6 +6,7 @@ from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,
     Stats
 )
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
 TREE_FLAGS = (
     "is_heap",
@@ -54,6 +55,12 @@ def assert_tree_invariants_tc(tc, t: GPlusTreeBase, stats: Stats, err_msg: Optio
             stats.greatest_item,
             f"Invariant failed: greatest_item is None for non-empty tree\n\n{err_msg}"
         )
+        if isinstance(t, GKPlusTreeBase):
+            tc.assertTrue(
+                stats.set_thresholds_met,
+                f"Invariant failed: set_thresholds_met is False for non-empty tree\n\n{err_msg}"
+            )
+        
         # if t has a method get_size, the result must be equal to stats.real_item_count
         if hasattr(t, 'get_size'):
             if not t.is_empty():

@@ -14,6 +14,7 @@ from gplus_trees.base import (
     RetrievalResult,
 )
 from gplus_trees.klist_base import KListBase
+import logging
 from gplus_trees.base import logger
 
 t = Type["GPlusTreeBase"]
@@ -680,11 +681,11 @@ def gtree_stats_(t: GPlusTreeBase,
                      all_leaf_values_present = True,
                      leaf_keys_in_order  = True,)
 
-    # K = t.SetClass.KListNodeClass.CAPACITY
-    # if hasattr(t, 'l_factor'):
-    #     threshold = t.l_factor * K
-    # else:
-    #     threshold = K
+    K = t.SetClass.KListNodeClass.CAPACITY
+    if hasattr(t, 'l_factor'):
+        threshold = t.l_factor * K
+    else:
+        threshold = K
 
     node       = t.node
     node_set   = node.set
@@ -771,14 +772,22 @@ def gtree_stats_(t: GPlusTreeBase,
             if stats.is_heap and not ((node_rank > cs.rank) and cs.is_heap):
                 stats.is_heap = False
 
-            # if stats.set_thresholds_met:
-                
-            #     if isinstance(node_set, KListBase):
-            #         if cs.set_thresholds_met and node_set.item_count() > threshold:
-            #             stats.set_thresholds_met = False
-            #     else:
-            #         if cs.set_thresholds_met and node_set.item_count() <= threshold:
-            #             stats.set_thresholds_met = False
+            # Inherit child violations first
+            if not cs.set_thresholds_met:
+                stats.set_thresholds_met = False
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"  Child violation inherited: cs.set_thresholds_met={cs.set_thresholds_met}")
+            
+            # Check current node violations (only if no child violations yet)
+            if stats.set_thresholds_met:
+                if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
+                    stats.set_thresholds_met = False
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"  Current node KList violation: item_count()={node_set.item_count()}, threshold={threshold}")
+                elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
+                    stats.set_thresholds_met = False
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"  Current node GPlusTree violation: item_count()={node_set.item_count()}, threshold={threshold}")
                 
             stats.internal_has_replicas &= cs.internal_has_replicas
             stats.internal_packed &= cs.internal_packed
@@ -810,6 +819,24 @@ def gtree_stats_(t: GPlusTreeBase,
     # Fold in right subtree flags
     if stats.is_heap and not right_stats.is_heap:
         stats.is_heap = False
+
+    # Check right subtree first
+    if not right_stats.set_thresholds_met:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Right subtree <set_thresholds_met>: {right_stats.set_thresholds_met}")
+        stats.set_thresholds_met = False
+    
+    # Check current node violations (always check, regardless of current state)
+    if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Node set is KList and item_count > threshold: {node_set.item_count()} > {threshold}, KList: {print_pretty(node_set)}")
+        stats.set_thresholds_met = False
+    elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Node set is {type(node_set)} and item_count <= threshold: {node_set.item_count()} <= {threshold}, GPlusTree: {print_pretty(node_set)}")
+        stats.set_thresholds_met = False
+
+
     
     if stats.is_search_tree:
         if not right_stats.is_search_tree:
