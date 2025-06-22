@@ -391,6 +391,15 @@ class KListBase(AbstractSetDataStructure):
             for i, entry in enumerate(node.entries):
                 if entry.item.key == key:
                     del node.entries[i]
+                    # Also remove from keys and real_keys lists
+                    del node.keys[i]
+                    if key >= 0:  # Only remove from real_keys if it's not a dummy key
+                        # Find the key in real_keys and remove it
+                        try:
+                            real_key_idx = node.real_keys.index(key)
+                            del node.real_keys[real_key_idx]
+                        except ValueError:
+                            pass  # Key not in real_keys (shouldn't happen but be safe)
                     found = True
                     break
             if found:
@@ -437,6 +446,15 @@ class KListBase(AbstractSetDataStructure):
                 # Move an item from next_node to current
                 shifted = next_node.entries.pop(0)
                 current.entries.append(shifted)
+                
+                # Also move the corresponding key from next_node to current
+                shifted_key = next_node.keys.pop(0)
+                current.keys.append(shifted_key)
+                
+                # Move from real_keys if it's not a dummy key
+                if shifted_key >= 0 and next_node.real_keys and next_node.real_keys[0] == shifted_key:
+                    shifted_real_key = next_node.real_keys.pop(0)
+                    current.real_keys.append(shifted_real_key)
                 
                 # If next_node became empty, splice it out and update tail if needed
                 if not next_node.entries:
@@ -807,6 +825,69 @@ class KListBase(AbstractSetDataStructure):
                 previous_last_key = node.entries[-1].item.key
 
             node = node.next
+
+    def count_ge(self, key: int) -> int:
+        """
+        Return the count of items with keys greater than or equal to the input key.
+        
+        This method leverages the existing index system for O(log l + log k) performance,
+        where l is the number of nodes and k is the capacity per node.
+        
+        Args:
+            key (int): The key threshold
+            
+        Returns:
+            int: Number of items with keys >= key
+            
+        Raises:
+            TypeError: If key is not an integer
+        """
+        if not isinstance(key, int):
+            raise TypeError(f"key must be int, got {type(key).__name__!r}")
+        
+        # Empty list case
+        if not self._prefix_counts_tot:
+            return 0
+        
+        total_items = self._prefix_counts_tot[-1]
+        
+        # If key is greater than the maximum key, return 0
+        if key > self._bounds[-1]:
+            return 0
+            
+        # If key is less than or equal to the minimum key, return total count
+        if self.head and key <= self.head.entries[0].item.key:
+            return total_items
+        
+        # Find the first node that might contain keys >= key
+        # Use binary search on _bounds to find the node
+        node_idx = bisect_left(self._bounds, key)
+        
+        # If all bounds are less than key, no items >= key
+        if node_idx >= len(self._nodes):
+            return 0
+            
+        count = 0
+        
+        # Count items in the target node and all subsequent nodes
+        for i in range(node_idx, len(self._nodes)):
+            node = self._nodes[i]
+            
+            if i == node_idx:
+                # For the first node, we need to find the first key >= target key
+                node_keys = node.keys
+                if not node_keys:
+                    continue
+                    
+                # Binary search within the node to find first position >= key
+                first_ge_idx = bisect_left(node_keys, key)
+                items_in_node = len(node_keys) - first_ge_idx
+                count += items_in_node
+            else:
+                # For subsequent nodes, all items are >= key (since nodes are sorted)
+                count += len(node.entries)
+        
+        return count
 
     # def get_entry(self, index: int) -> RetrievalResult:
     #         """

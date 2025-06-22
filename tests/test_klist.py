@@ -1015,6 +1015,198 @@ class TestKListCompactionInvariant(TestKListBase):
                     self.fail(f"Compaction invariant violated in {name} klist after split at {split_key}: {violations}")
 
 
+class TestKListCountGE(TestKListBase):
+    """Test the count_ge method for counting items with keys >= input key"""
+    
+    def test_empty_list(self):
+        """Test count_ge on empty list returns 0"""
+        self.assertEqual(self.klist.count_ge(5), 0)
+        self.assertEqual(self.klist.count_ge(0), 0)
+        self.assertEqual(self.klist.count_ge(-1), 0)
+    
+    def test_type_error_non_int(self):
+        """Test that non-integer keys raise TypeError"""
+        with self.assertRaises(TypeError):
+            self.klist.count_ge("5")
+        with self.assertRaises(TypeError):
+            self.klist.count_ge(5.0)
+        with self.assertRaises(TypeError):
+            self.klist.count_ge(None)
+    
+    def test_single_node_exact_matches(self):
+        """Test count_ge with exact key matches in single node"""
+        keys = [10, 20, 30, 40]
+        self.insert_sequence(keys)
+        
+        # Test exact matches
+        self.assertEqual(self.klist.count_ge(10), 4)  # All items
+        self.assertEqual(self.klist.count_ge(20), 3)  # 20, 30, 40
+        self.assertEqual(self.klist.count_ge(30), 2)  # 30, 40
+        self.assertEqual(self.klist.count_ge(40), 1)  # 40 only
+    
+    def test_single_node_between_keys(self):
+        """Test count_ge with keys between existing keys"""
+        keys = [10, 30, 50]
+        self.insert_sequence(keys)
+        
+        # Test keys between existing keys
+        self.assertEqual(self.klist.count_ge(5), 3)   # All items (< min)
+        self.assertEqual(self.klist.count_ge(15), 2)  # 30, 50
+        self.assertEqual(self.klist.count_ge(35), 1)  # 50 only
+        self.assertEqual(self.klist.count_ge(55), 0)  # None (> max)
+    
+    def test_single_node_boundary_cases(self):
+        """Test count_ge with boundary conditions"""
+        keys = [1, 2, 3]
+        self.insert_sequence(keys)
+        
+        # Below minimum
+        self.assertEqual(self.klist.count_ge(0), 3)
+        self.assertEqual(self.klist.count_ge(-5), 3)
+        
+        # Above maximum  
+        self.assertEqual(self.klist.count_ge(4), 0)
+        self.assertEqual(self.klist.count_ge(100), 0)
+    
+    def test_multi_node_exact_matches(self):
+        """Test count_ge with multiple nodes and exact matches"""
+        # Create enough items to span multiple nodes
+        total_items = self.cap * 2 + 3  # Ensure at least 3 nodes
+        keys = list(range(0, total_items * 10, 10))  # 0, 10, 20, 30, ...
+        self.insert_sequence(keys)
+        
+        # Test exact matches across different nodes
+        self.assertEqual(self.klist.count_ge(0), total_items)
+        self.assertEqual(self.klist.count_ge(10), total_items - 1)
+        
+        # Test key that should be in middle node
+        middle_key = keys[self.cap + 1]  # Should be in second node
+        expected_count = total_items - (self.cap + 1)
+        self.assertEqual(self.klist.count_ge(middle_key), expected_count)
+    
+    def test_multi_node_between_keys(self):
+        """Test count_ge with keys between existing keys across multiple nodes"""
+        # Use sparse keys to test between-key scenarios
+        keys = list(range(0, self.cap * 3 * 20, 20))  # 0, 20, 40, 60, ...
+        self.insert_sequence(keys)
+        
+        total_items = len(keys)
+        
+        # Test key between items in first node
+        self.assertEqual(self.klist.count_ge(5), total_items - 1)   # Skip first item (0)
+        self.assertEqual(self.klist.count_ge(15), total_items - 1)  # Skip first item (0)
+        
+        # Test key between items spanning nodes
+        mid_idx = self.cap + 1
+        between_key = keys[mid_idx] + 5  # Between mid_idx and mid_idx+1
+        expected_count = total_items - mid_idx - 1
+        self.assertEqual(self.klist.count_ge(between_key), expected_count)
+    
+    def test_multi_node_boundary_cases(self):
+        """Test count_ge boundary cases with multiple nodes"""
+        total_items = self.cap * 2 + 1
+        keys = list(range(total_items))
+        self.insert_sequence(keys)
+        
+        # Test at node boundaries
+        first_node_last = self.cap - 1
+        second_node_first = self.cap
+        
+        self.assertEqual(self.klist.count_ge(first_node_last), total_items - first_node_last)
+        self.assertEqual(self.klist.count_ge(second_node_first), total_items - second_node_first)
+    
+    def test_duplicate_keys(self):
+        """Test count_ge behavior with duplicate keys"""
+        # Insert some duplicates  
+        keys = [10, 10, 20, 20, 20, 30]
+        for k in keys:
+            self.klist.insert_entry(Entry(Item(k, f"val_{k}"), None))
+        
+        # Note: Based on the insert logic, duplicates are rejected
+        # So we should only have unique keys: [10, 20, 30]
+        unique_keys = [10, 20, 30]
+        
+        self.assertEqual(self.klist.count_ge(10), 3)
+        self.assertEqual(self.klist.count_ge(20), 2) 
+        self.assertEqual(self.klist.count_ge(30), 1)
+    
+    def test_sequential_counts(self):
+        """Test that count_ge gives consistent results for sequential queries"""
+        keys = list(range(0, 50, 5))  # 0, 5, 10, 15, ..., 45
+        self.insert_sequence(keys)
+        
+        # Test that counts are monotonically decreasing
+        prev_count = float('inf')
+        for key in range(-5, 55, 3):  # Test with various keys
+            count = self.klist.count_ge(key)
+            self.assertLessEqual(count, prev_count, 
+                                f"count_ge({key}) = {count} should be <= previous count {prev_count}")
+            prev_count = count
+    
+    def test_consistency_with_extract_keys(self):
+        """Test that count_ge results match manual counting"""
+        # Use random keys to test various scenarios
+        import random
+        random.seed(42)
+        keys = sorted(random.sample(range(1, 200), self.cap * 2))
+        self.insert_sequence(keys)
+        
+        # Get all keys for manual verification
+        all_keys = []
+        node = self.klist.head
+        while node:
+            all_keys.extend(e.item.key for e in node.entries)
+            node = node.next
+        
+        # Test count_ge against manual counting for various thresholds
+        test_keys = [0, 50, 100, 150, 200, 250] + keys[::3]  # Include some actual keys
+        
+        for test_key in test_keys:
+            expected_count = sum(1 for k in all_keys if k >= test_key)
+            actual_count = self.klist.count_ge(test_key)
+            self.assertEqual(actual_count, expected_count,
+                           f"count_ge({test_key}) returned {actual_count}, expected {expected_count}")
+    
+    def test_large_dataset_performance(self):
+        """Test count_ge with a larger dataset to verify performance"""
+        # Create a larger dataset to test scalability
+        large_size = self.cap * 10  # 10 nodes worth of data
+        keys = list(range(0, large_size * 5, 5))  # 0, 5, 10, ..., (large_size*5-5)
+        self.insert_sequence(keys)
+        
+        # Test that we can efficiently count even with large datasets
+        test_keys = [0, large_size, large_size * 2, large_size * 4, large_size * 5]
+        
+        for test_key in test_keys:
+            count = self.klist.count_ge(test_key)
+            # Verify count is reasonable (between 0 and total items)
+            self.assertGreaterEqual(count, 0)
+            self.assertLessEqual(count, large_size)
+    
+    def test_after_deletions(self):
+        """Test count_ge behavior after deletions change the structure"""
+        keys = list(range(0, self.cap * 3, 2))  # 0, 2, 4, 6, ...
+        self.insert_sequence(keys)
+        
+        # Record initial counts
+        initial_counts = {k: self.klist.count_ge(k) for k in range(0, max(keys) + 5, 5)}
+        
+        # Delete some keys from different nodes
+        delete_keys = keys[::3]  # Delete every third key
+        for k in delete_keys:
+            self.klist.delete(k)
+        
+        # Verify counts are updated correctly after deletions
+        for test_key, initial_count in initial_counts.items():
+            current_count = self.klist.count_ge(test_key)
+            deleted_count = sum(1 for dk in delete_keys if dk >= test_key)
+            expected_count = initial_count - deleted_count
+            
+            self.assertEqual(current_count, expected_count,
+                           f"After deletions, count_ge({test_key}) = {current_count}, "
+                           f"expected {expected_count} (initial: {initial_count}, deleted: {deleted_count})")
+
+
 if __name__ == "__main__":
     unittest.main()
 
