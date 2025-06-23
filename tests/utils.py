@@ -13,6 +13,7 @@ TREE_FLAGS = (
     "is_search_tree",
     "internal_has_replicas",
     "internal_packed",
+    "set_thresholds_met",
     "linked_leaf_nodes",
     "all_leaf_values_present",
     "leaf_keys_in_order",
@@ -103,3 +104,12 @@ def assert_tree_invariants_raise(t: GPlusTreeBase, stats: Stats) -> None:
         if stats.greatest_item is None:
             logging.error("Invariant failed: greatest_item is None for non-empty tree")
             return
+        
+        # if t has a method get_size, the result must be equal to stats.real_item_count
+        if hasattr(t, 'get_size'):
+            if not t.is_empty():
+                size = t.get_size()
+                if not size == stats.real_item_count:
+                    logging.error(
+                        f"Invariant failed: get_size()={size} ≠ stats.real_item_count={stats.real_item_count}"
+                    )
