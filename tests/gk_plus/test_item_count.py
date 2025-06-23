@@ -246,20 +246,23 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         tree = self.tree_k4
         
         # Use subtests to track individual insertions
-        for i in range(4, 11):
-            with self.subTest(f"Insert item with key {i * 500}"):
-                tree, inserted = tree.insert(Item(i * 500, "val"), rank=1)
-                self.assertTrue(inserted, f"Item with key {i * 500} should be inserted successfully")
-                
+        # r = range(4, 11)  # Range of keys to insert
+        for i, key in enumerate(range(4, 11), start=1):
+            
+            with self.subTest(f"Insert item with key {key * 500}"):
+                tree, inserted = tree.insert(Item(key * 500, "val"), rank=1)
+                self.assertTrue(inserted, f"Item with key {key * 500} should be inserted successfully")
+
                 max_dim = tree.get_max_dim()
                 expanded_leafs = tree.get_expanded_leaf_count()
                 expected_keys = [entry.item.key for entry in tree]
                 logger.debug(f"Tree after inserting {i} items: {print_pretty(tree)}")
                 logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+                
                 self.assertEqual(i + expanded_leafs + 1, tree.item_count(), f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
                 # Verify structure at each step
-                expected_real_keys = [j * 500 for j in range(1, i+1)]
+                expected_real_keys = [j * 500 for j in range(4, key+1)]
                 real_keys = [entry.item.key for entry in tree.iter_real_entries()]
                 self.assertEqual(expected_real_keys, real_keys, 
                                 f"Tree should contain keys {expected_real_keys} after {i} insertions")
