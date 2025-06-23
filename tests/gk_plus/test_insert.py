@@ -289,6 +289,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
             rank = rank_lists[i]
             tree.insert(Item(k, f"val_{k}"), rank=rank_lists[col_dim][i])
         logger.debug(f" tree: {print_pretty(tree)}")
+        self.validate_tree(tree)
 
         
 
