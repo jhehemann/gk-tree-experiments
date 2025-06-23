@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 from gplus_trees.logging_config import get_test_logger
 
+import logging
 logger = get_test_logger("TestBase")
 
 class BaseTestCase(unittest.TestCase):
@@ -144,7 +145,8 @@ class GPlusTreeTestCase(BaseTreeTestCase):
         self.K = 4  # Default capacity for tests
         self.TreeClass, self.NodeClass, _, _ = make_gplustree_classes(self.K)
         self.tree = self.TreeClass()
-        logger.debug(f"Created GPlusTree test with K={self.K}, using class {self.TreeClass.__name__}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Created GPlusTree test with K={self.K}, using class {self.TreeClass.__name__}")
 
     def _assert_internal_node_properties(
         self, node, items: List[Item], rank: int
@@ -263,7 +265,8 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         # 1 dummy per tree instance + 1 for the initial tree
         expanded_leaf_count = tree.get_expanded_leaf_count()
         dummy_count = expanded_leaf_count + 1
-        logger.debug(f"Expanded leaf count for tree {print_pretty(tree)}: {expanded_leaf_count}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Expanded leaf count for tree {print_pretty(tree)}: {expanded_leaf_count}")
         return dummy_count
 
     def get_dummies(self, tree: 'GKPlusTreeBase') -> List[int]:
@@ -340,15 +343,18 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             return True
         
         if tree.is_empty():
-            logger.debug("Empty tree: Use None instead of empty tree")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Empty tree: Use None instead of empty tree")
             
         # For leaf nodes, size should be the count of all items (incl. dummies)
         node = tree.node
         if node.right_subtree is None:
             calculated_size = sum(1 for entry in node.set)
-            logger.debug(f"Leaf node at rank {node.rank} has {calculated_size} items; node set (print_pretty): {print_pretty(node.set)}\n node set (print_structure): {node.set.print_structure()}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Leaf node at rank {node.rank} has {calculated_size} items; node set (print_pretty): {print_pretty(node.set)}\n node set (print_structure): {node.set.print_structure()}")
             if calculated_size != tree.item_cnt:
-                logger.debug(f"Leaf node has size {tree.item_cnt} but contains {calculated_size} items, node set: {print_pretty(node.set)}")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Leaf node has size {tree.item_cnt} but contains {calculated_size} items, node set: {print_pretty(node.set)}")
                 return False
             return True
             
@@ -380,7 +386,8 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         
         # Check if the stored size matches calculated size
         if calculated_size != tree.item_cnt:
-            logger.debug(f"Node at rank {node.rank} has size {tree.item_cnt} but calculated size is {calculated_size}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Node at rank {node.rank} has size {tree.item_cnt} but calculated size is {calculated_size}")
             return False
             
         return True
@@ -397,16 +404,18 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         group_size = calculate_group_size(k)
         current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
 
-        logger.debug(f"Key: {key}")
-        logger.debug(f"Group Size: {group_size}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Key: {key}")
+            logger.debug(f"Group Size: {group_size}")
         for level in range(num_levels):
             binary_hash = bin(int.from_bytes(current_hash, 'big'))[2:].zfill(256)
             trailing_zeros = count_trailing_zero_bits(current_hash)
             rank = calc_rank_from_digest(current_hash, group_size)
-            logger.debug(f"Level {level + 1}:")
-            logger.debug(f"  Binary Hash   : {binary_hash}")
-            logger.debug(f"  Trailing Zeros: {trailing_zeros}")
-            logger.debug(f"  Rank          : {rank}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Level {level + 1}:")
+                logger.debug(f"  Binary Hash   : {binary_hash}")
+                logger.debug(f"  Trailing Zeros: {trailing_zeros}")
+                logger.debug(f"  Rank          : {rank}")
             current_hash = hashlib.sha256(current_hash).digest()
 
     def find_keys_for_rank_lists(self, rank_lists, k, spacing=False):

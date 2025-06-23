@@ -10,6 +10,7 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
+import logging
 
 logger = get_test_logger(__name__)
 
@@ -198,7 +199,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
 
     def test_large_tree_size(self):
         """Test size is correctly maintained in a larger tree with random insertions"""
-        tree = self.tree_k2
+        tree = self.tree_k4
         # self.print_hash_info(key=15, k=2, num_levels=3)
         # exit()
         # Generate 1000 unique random keys between 1 and 1000000
@@ -222,12 +223,14 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             # expanded_leafs = tree.get_expanded_leaf_count()
             # expected_keys = [entry.item.key for entry in tree]
 
-            logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-            # logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
+                # logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
             if inserted_count == 6:
-                logger.debug(f"tree: {print_pretty(tree.node.set.node.right_subtree)}")
-                logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"tree: {print_pretty(tree.node.set.node.right_subtree)}")
+                    logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
 
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
@@ -256,8 +259,9 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                 max_dim = tree.get_max_dim()
                 expanded_leafs = tree.get_expanded_leaf_count()
                 expected_keys = [entry.item.key for entry in tree]
-                logger.debug(f"Tree after inserting {i} items: {print_pretty(tree)}")
-                logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Tree after inserting {i} items: {print_pretty(tree)}")
+                    logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
                 
                 self.assertEqual(i + expanded_leafs + 1, tree.item_count(), f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
@@ -266,8 +270,10 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                 real_keys = [entry.item.key for entry in tree.iter_real_entries()]
                 self.assertEqual(expected_real_keys, real_keys, 
                                 f"Tree should contain keys {expected_real_keys} after {i} insertions")
-            logger.debug(f"Tree after all insertions evaluated after individual subtest: {print_pretty(tree)}")
-        logger.debug(f"Tree after all insertions evaluated after for loop: {print_pretty(tree)}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Tree after all insertions evaluated after individual subtest: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after all insertions evaluated after for loop: {print_pretty(tree)}")
 
         # print(f"Tree structure after all insertions: {tree.print_structure()}")
 
@@ -314,7 +320,8 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             rank = rank_lists[0][idx]
             tree, _ = tree.insert(item, rank=rank)
 
-        logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
         with self.subTest("First split at 80"):
             left1, _, right1 = tree.split_inplace(80)
             self.assertIsNone(left1.item_cnt, 

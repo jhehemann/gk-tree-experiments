@@ -424,7 +424,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if self.is_empty():
             return RetrievalResult(None, None)
 
-        dummy_pivot = get_dummy(self.DIM - 1).key
+        dummy_pivot = get_dummy(self.DIM).key
 
         pivot = None
         current = None
@@ -640,6 +640,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """Optimized version for inserting into a non-empty tree."""
         x_item = x_entry.item
         x_key = x_item.key
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+            f"[DIM {self.DIM}] [INSERTING {x_key} with rank {rank}] into tree: {print_pretty(self)}"
+        )
         
         cur = self
         parent = None
@@ -707,7 +711,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             return self
         # Unfold intermediate node between parent and current
         # Set replica of the current node set's pivot as first entry.
-        pivot = cur.node.set.find_pivot().found_entry
+        res = cur.node.set.find_pivot()
+        if isinstance(cur.node.set, KListBase):
+            pivot = res.found_entry
+        elif isinstance(cur.node.set, GKPlusTreeBase):
+            pivot = res.next_entry
+        else:
+            logger.warning(
+                f"[DIM {self.DIM} INSERT handle rank mismatch] Expected instance of KListBase or GKPlusTreeBase, got {type(cur.node.set).__name__}"
+            )
+
         pivot_replica = _create_replica(pivot.item.key)
         new_set, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
         new_tree = TreeClass(l_factor=self.l_factor)
@@ -753,10 +766,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_entry = None
         left_parent = None
         left_x_entry = None
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                f"[DIM {self.DIM}] [INSERTING {x_key} into tree: {print_pretty(self)}]"
-            )
+        # if logger.isEnabledFor(logging.DEBUG):
+            # logger.debug(
+            #     f"[DIM {self.DIM}] [INSERTING {x_key} with rank into tree: {print_pretty(self)}]"
+            # )
 
         while True:
             # Cache node reference and minimize repeated attribute access
@@ -1057,7 +1070,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                 else:
                     right_split, _ = right_split.insert_entry(Entry(dummy, None))
-                    right_split = check_and_convert_set(right_split)
+                
+                right_split = check_and_convert_set(right_split)
 
                 # Cache node references for performance
                 node_rank = node.rank
@@ -1307,14 +1321,23 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # We want to keep the GKPlusTree structure for dimension 1
             return tree
         
-        expected_klist_size = tree.real_item_count()
-        pivot = tree.find_pivot().found_entry
-        if pivot is not None and pivot.item.key < 0:
-            expected_klist_size += 1
+        expanded_count = tree.expanded_count()
+        expected_klist_size = tree.item_count() - expanded_count
+        res = tree.find_pivot()
+        pivot = res.found_entry
+        next_pivot = res.next_entry
+        dummy = get_dummy(tree.DIM)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"[COLLAPSE] Pivot found: {pivot.item.key if pivot else None}, Next pivot: {next_pivot.item.key if next_pivot else None}, Dummy key: {dummy.key}")
+        if pivot is not None and pivot.item == dummy:
+            expected_klist_size -= 1  # Exclude dummy item from count
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"[COLLAPSE] Checking tree {print_pretty(tree)} for collapsing to KList. Expanded count: {expanded_count}, Item count: {tree.item_count()}, Expected size: {expected_klist_size}, threshold: {threshold}")
 
         if expected_klist_size <= threshold:
             # Collapse into a KList
-            logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {expected_klist_size} real items, which is <= {threshold}, collapsing to KList")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {expected_klist_size} real items, which is <= {threshold}, collapsing to KList")
             return _tree_to_klist(tree)
 
         # if tree.real_item_count() <= threshold:
@@ -1382,21 +1405,7 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     if klist.is_empty():
         return create_gkplus_tree(K, DIM, l_factor)
 
-    # return bulk_create_gkplus_tree(klist, DIM, l_factor)
-    
-    entries = list(klist)
-    tree = create_gkplus_tree(K, DIM, l_factor)
-    ranks = [] 
-    for entry in entries:
-        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
-
-    # Insert entry instances with their ranks
-    tree_insert_entry = tree.insert_entry
-    for i, entry in enumerate(entries):
-        if i < len(ranks):
-            rank = int(ranks[i])
-            tree, _ = tree_insert_entry(entry, rank)
-    return tree
+    return bulk_create_gkplus_tree(klist, DIM, l_factor)
 
 
 def _create_node_from_entries(

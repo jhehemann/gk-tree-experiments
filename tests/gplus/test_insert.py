@@ -1894,7 +1894,8 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         for i, k in enumerate(keys):
             rank = ranks[i]
             base_tree.insert(Item(k, f"val_{k}"), rank=rank)
-        logger.debug(f"Base tree: {print_pretty(base_tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Base tree: {print_pretty(base_tree)}")
 
         insert_key = 4
         test_ranks = [1, 2, 3, 4]

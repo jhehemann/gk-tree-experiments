@@ -12,6 +12,7 @@ from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase as TreeTestCase
 
 from tests.logconfig import logger
+import logging
 
 class TestInsertMultipleDimensions(TreeTestCase):
     ASSERTION_MESSAGE_TEMPLATE = (
@@ -35,8 +36,9 @@ class TestInsertMultipleDimensions(TreeTestCase):
         for key, rank in zip(keys, rank_combo):
             base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
 
-        logger.debug(f"Tree after initial insertions: {print_pretty(base_tree)}")
-        logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after initial insertions: {print_pretty(base_tree)}")
+            logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
@@ -49,7 +51,8 @@ class TestInsertMultipleDimensions(TreeTestCase):
         tree_copy = copy.deepcopy(base_tree)
         tree, _ = tree_copy.insert(self.ITEMS[insert_pair[0]], rank=insert_pair[1])
 
-        logger.debug(f"Tree after inserting {insert_pair[0]} with rank {insert_pair[1]}: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after inserting {insert_pair[0]} with rank {insert_pair[1]}: {print_pretty(tree)}")
 
         msg = f"\n\nInsert {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
@@ -93,24 +96,29 @@ class TestInsertMultipleDimensions(TreeTestCase):
             expanded_leafs = tree.get_expanded_leaf_count()
             expected_keys = [entry.item.key for entry in tree]
             expected_item_count = inserted_count + dummy_cnt
-            logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-            logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
+                logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
-        logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _ = tree.insert(insert_item, rank=rank_lists[0][insert_key_idx])
-        logger.debug(f"Tree after initial insertions + {insert_item.key}: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after initial insertions + {insert_item.key}: {print_pretty(tree)}")
 
         max_dim = tree.get_max_dim()
         expanded_leafs = tree.get_expanded_leaf_count()
         dummy_cnt = self.get_dummy_count(tree)
         inserted_count += 1
         expected_keys = [entry.item.key for entry in tree]
-        logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-        logger.debug(f"Tree structure: {tree.print_structure()}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
+            logger.debug(f"Tree structure: {tree.print_structure()}")
         expected_item_count = inserted_count + dummy_cnt
-        logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
         self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
@@ -118,7 +126,8 @@ class TestInsertMultipleDimensions(TreeTestCase):
         logger.debug(f"Root set keys after all inserts: {text}")
 
         for e in tree:
-            logger.debug(f"Entry: {e.item.key}, value: {e.item.value}, left_subtree: {e.left_subtree}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Entry: {e.item.key}, value: {e.item.value}, left_subtree: {e.left_subtree}")
 
         self.assertTrue(self.verify_subtree_sizes(tree))
 
@@ -136,12 +145,15 @@ class TestInsertMultipleDimensions(TreeTestCase):
             tree, _ = tree.insert(item, rank=rank)        
 
         dum_keys = self.get_dummies(tree)
-        logger.debug(f"Keys ({len(keys)}): {keys}")
-        logger.debug(f"Dummies ({len(dum_keys)}): {dum_keys}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Keys ({len(keys)}): {keys}")
+            logger.debug(f"Dummies ({len(dum_keys)}): {dum_keys}")
         exp_keys = sorted(dum_keys + keys)
-        logger.debug(f"Expected keys after insertions ({len(exp_keys)}): {exp_keys}")
-        logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
-        logger.debug(f"Root node: {print_pretty(tree.node.set)}")
+        
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Expected keys after insertions ({len(exp_keys)}): {exp_keys}")
+            logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
+            logger.debug(f"Root node: {print_pretty(tree.node.set)}")
 
         self.validate_tree(tree, exp_keys)
 

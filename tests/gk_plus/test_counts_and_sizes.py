@@ -12,7 +12,7 @@ from gplus_trees.gplus_tree_base import print_pretty
 from gplus_trees.base import (
     _create_replica
 )
-
+import logging
 from tests.logconfig import logger
 
 class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):        
@@ -49,8 +49,9 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             
         with self.subTest("Dim 1 single node"):
             self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
-            logger.debug(f"Tree after insertions: {print_pretty(tree)}")
-            logger.debug(f"Node set: {print_pretty(tree.node.set)}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Tree after insertions: {print_pretty(tree)}")
+                logger.debug(f"Node set: {print_pretty(tree.node.set)}")
             
             node_size = tree.node.get_node_item_count()
             self.assertEqual(node_size, 4,
@@ -137,8 +138,9 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             item = item_map[key]
             tree, _ = tree.insert(item, rank=rank)
 
-        logger.debug(f"Tree after insertions: {print_pretty(tree)}")
-        logger.debug(f"Node set: {print_pretty(tree.node.set)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after insertions: {print_pretty(tree)}")
+            logger.debug(f"Node set: {print_pretty(tree.node.set)}")
 
         self.assertFalse(tree.is_empty(), 
                          f"Tree should not be empty after inserting items for keys {keys}")
@@ -270,10 +272,12 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             item = item_map[key]
             tree, _ = tree.insert(item, rank=rank)
 
-        logger.debug(f"Tree after insertions: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after insertions: {print_pretty(tree)}")
         self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
-        logger.debug(f"Root set: {print_pretty(tree.node.set)}")
-        
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Root set: {print_pretty(tree.node.set)}")
+
         with self.subTest("Dim 1 root"):
             # Insert one more item to trigger expansion in the root
             root_d1 = tree.node
@@ -388,11 +392,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             [3, 3],  # Dimension 2
             [1, 2],  # Dimension 3
         ]
-
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        logger.debug(f"Keys: {keys}")
-
-        # Create items
         item_map = { k: self.create_item(k) for k in keys}
         
         for i in range(2):
@@ -401,18 +401,12 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             item = item_map[key]
             tree, _ = tree.insert(item, rank=rank)
 
-        logger.debug(f"Tree after insertions: {print_pretty(tree)}")
         self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
-        # logger.debug(f"Tree structure: {tree.print_structure()}")
-        logger.debug(f"Root set: {print_pretty(tree.node.set)}")
         
-
         with self.subTest("Dim 1 root"):
             # Insert one more item to trigger expansion in the root
             root_d1 = tree.node
-            logger.debug(f"Root set in dim 1: {print_pretty(root_d1.set)}")
             root_d1_entries = list(root_d1.set)
-            # logger.debug(f"Root entries in root set dim 1: {root_d1_entries}")
             root_d1_size = root_d1.get_node_item_count()
             self.assertEqual(root_d1_size, 4,
                             "Root size should be 4, got: "

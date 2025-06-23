@@ -10,6 +10,7 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
+import logging
 
 logger = get_test_logger(__name__)
 
@@ -87,7 +88,8 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         for i, item in enumerate(items):
             tree, _ = tree.insert(item, rank=rank_lists[0][i])
-        logger.debug(f"Tree after insertions: {print_pretty(tree)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree after insertions: {print_pretty(tree)}")
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 3,

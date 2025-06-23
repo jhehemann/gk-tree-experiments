@@ -15,28 +15,25 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Test files to run - Add or remove files as needed
 TEST_FILES = [
-    # 'gplus/test_insert.py',
-    # 'gplus/test_retrieve.py',
-    # 'gk_plus/test_insert.py',
-    'gk_plus/test_insert::TestInternalMethodsWithEntryInsert::test_insert_non_empty_no_extension',
-    # 'gk_plus/test_counts_and_sizes.py',
-    # 'gk_plus/test_get_max_dim.py',
+    'gplus/test_insert.py',
+    'gplus/test_retrieve.py',
+    'gk_plus/test_counts_and_sizes.py',
     
-    # 'gk_plus/test_insert_dimensions.py',
-    # 'gk_plus/test_split_inplace.py',
-    # 'gk_plus/test_set_conversion.py',
-    # 'gk_plus/test_set_conversion::TestTreeToKList',
-    # 'gk_plus/test_set_conversion::TestTreeToKList::test_problematic_v2',
-    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_problematic',
-    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_old',
-    # 'gk_plus/test_set_conversion::TestTreeToKList::test_roundtrip_tree_to_klist_to_tree_dim_5_new',
-    # 'gk_plus/test_set_conversion::TestKListToTree',
+    'gk_plus/test_get_max_dim.py',
+    'gk_plus/test_insert_dimensions.py',
+    'gk_plus/test_insert.py',
+    'gk_plus/test_item_count.py',
+    
+    'gk_plus/test_split_inplace.py',
+    'gk_plus.test_item_count.TestGKPlusTreeItemCountTracking.test_large_tree_size',
 
-    # 'test_gp_mkl_tree.py',
-    # 'test_klist.py',
+    'test_gp_mkl_tree.py',
+    'test_klist.py',
+    'test_klist::TestKListCountGE',
+    'gk_plus/test_expanded_count.py',
+
+    'gk_plus/test_set_conversion.py',
     # 'test_stats_gpltree.py',
-    
-
     # 'test_gk_plus_tree.py',
 ]
 

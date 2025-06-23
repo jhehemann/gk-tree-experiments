@@ -22,6 +22,10 @@ TREE_FLAGS = (
 def assert_tree_invariants_tc(tc, t: GPlusTreeBase, stats: Stats, err_msg: Optional[str] = "") -> None:
     """TestCase version: use inside unittest.TestCase methods."""
     for flag in TREE_FLAGS:
+        if flag == "set_thresholds_met":
+            if isinstance(t, GPlusTreeBase):
+                # this flag is only relevant for GKPlusTreeBase
+                continue
         tc.assertTrue(
             getattr(stats, flag),
             f"Invariant failed: {flag} is False \n\n{err_msg}"

@@ -921,13 +921,6 @@ def gtree_stats_(t: GPlusTreeBase,
 
         # Check leaf_count and real_item_count consistency
         if leaf_count != stats.leaf_count or item_count != stats.real_item_count:
-            if leaf_count != stats.leaf_count:
-                logger.debug(f"  leaf_count: {leaf_count}, stats.leaf_count: {stats.leaf_count}")
-                # for idx, leaf in enumerate(t.iter_leaf_nodes()):
-                #     logger.debug(f"    Leaf {idx} (item_count={len(list(leaf.set))}): {[e.item.key for e in leaf.set]}")
-                #     logger.debug(f"    Leaf {idx} (item_count={len(list(leaf.set))}): {print_pretty(leaf.set)}")
-            else:
-                logger.debug(f"  item_count: {item_count}, stats.real_item_count: {stats.real_item_count}")
             stats.linked_leaf_nodes = False
             stats.leaf_count = max(leaf_count, stats.leaf_count)
             
