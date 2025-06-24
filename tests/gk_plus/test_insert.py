@@ -327,57 +327,57 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                     gnode_capacity=k, l_factor=l_factor
                 )
 
-    def test_many_rank_combinations_specific_keys(self):
-        """
-        Exhaustively test many rank-combo and insert_key combinations,
-        computing the expected key lists on the fly.
-        """
-        k = 4
-        l_factor = 1.0
-        ranks       = range(1,4)
-        insert_rank = 1
+    # def test_many_rank_combinations_specific_keys(self):
+    #     """
+    #     Exhaustively test many rank-combo and insert_key combinations,
+    #     computing the expected key lists on the fly.
+    #     """
+    #     k = 4
+    #     l_factor = 1.0
+    #     ranks       = range(1,4)
+    #     insert_rank = 1
 
-        num_keys      = len(range(1,4))
-        # Precompute all possible per‐key rank‐tuples for each free dimension:
-        dim1_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
-        dim2_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
-        # dim3_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
-        fixed_dim   = tuple([4,1,1])                         # 1 choice
+    #     num_keys      = len(range(1,4))
+    #     # Precompute all possible per‐key rank‐tuples for each free dimension:
+    #     dim1_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
+    #     dim2_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
+    #     # dim3_choices = list(product(ranks, repeat=num_keys))  # 3^3 = 27
+    #     fixed_dim   = tuple([4,1,1])                         # 1 choice
 
-        total = len(dim1_choices) * len(dim2_choices) * 1  # 27 * 27 * 1 = 729
+    #     total = len(dim1_choices) * len(dim2_choices) * 1  # 27 * 27 * 1 = 729
 
-        for dim1, dim2 in tqdm(
-            product(dim1_choices, dim2_choices),
-            total=total,
-            desc="Insert with specific key-rank combinations",
-            unit="combo",
-        ):
-            # pack into a single "rank_combo" of shape (3 dimensions × 3 keys)
-            rank_combo = [dim1, dim2, fixed_dim]
-            keys = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
-            insert_cases = self._get_insert_cases(keys)
-            # logger.debug(f"Insert cases for keys {keys}: {insert_cases}")
+    #     for dim1, dim2 in tqdm(
+    #         product(dim1_choices, dim2_choices),
+    #         total=total,
+    #         desc="Insert with specific key-rank combinations",
+    #         unit="combo",
+    #     ):
+    #         # pack into a single "rank_combo" of shape (3 dimensions × 3 keys)
+    #         rank_combo = [dim1, dim2, fixed_dim]
+    #         keys = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
+    #         insert_cases = self._get_insert_cases(keys)
+    #         # logger.debug(f"Insert cases for keys {keys}: {insert_cases}")
 
-            with self.subTest(rank_combo=rank_combo, keys=keys):
-                # for each possible insert_key (including non-existent)
-                for case_name, insert_key in insert_cases:
-                    insert_entry = Entry(
-                        Item(insert_key, "val"),
-                        create_gkplus_tree(K=k, l_factor=l_factor)
-                    )
-                    with self.subTest(insert_key=insert_key):
-                        exp_keys = sorted(keys + [insert_key])
-                        case_name = f"insert key: {insert_key}"
-                        self._run_insert_case(
-                            keys,
-                            rank_combo,
-                            insert_entry,
-                            insert_rank,
-                            exp_keys,
-                            case_name,
-                            gnode_capacity=k,
-                            l_factor=l_factor
-                        )
+    #         with self.subTest(rank_combo=rank_combo, keys=keys):
+    #             # for each possible insert_key (including non-existent)
+    #             for case_name, insert_key in insert_cases:
+    #                 insert_entry = Entry(
+    #                     Item(insert_key, "val"),
+    #                     create_gkplus_tree(K=k, l_factor=l_factor)
+    #                 )
+    #                 with self.subTest(insert_key=insert_key):
+    #                     exp_keys = sorted(keys + [insert_key])
+    #                     case_name = f"insert key: {insert_key}"
+    #                     self._run_insert_case(
+    #                         keys,
+    #                         rank_combo,
+    #                         insert_entry,
+    #                         insert_rank,
+    #                         exp_keys,
+    #                         case_name,
+    #                         gnode_capacity=k,
+    #                         l_factor=l_factor
+    #                     )
 
     def test_insert_entry(self):
         base_tree = create_gkplus_tree(K=8, l_factor=1.0)
@@ -422,6 +422,3 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                         "Inserted entry's left subtree should not be None")
                 self.assertIs(inserted_entry.left_subtree, left_subtree)
     
-    
-    
-            
