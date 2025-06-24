@@ -1311,9 +1311,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if tree.is_empty():
             return tree
 
-        # fast path: no dummy items in the subtree
+        # fast path: no dummy items in the tree
         tree_item_count = tree.item_count()
         if tree_item_count == tree.real_item_count():
+            # logger.info(f"Item count {tree_item_count} is equal to real item count in tree {print_pretty(tree)}")
             if tree_item_count <= threshold:
                 # Collapse into a KList
                 if logger.isEnabledFor(logging.DEBUG):
@@ -1321,31 +1322,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 return _tree_to_klist(tree)
             return tree
         
-        # expanded_count = tree.expanded_count()
-        expected_klist_size = tree.real_item_count()
-        pivot = tree.find_pivot().found_entry
-        # pivot = res.found_entry
-        # next_pivot = res.next_entry
-        # dummy = get_dummy(tree.DIM)
-        # if logger.isEnabledFor(logging.DEBUG):
-        #     logger.debug(f"[COLLAPSE] Pivot found: {pivot.item.key if pivot else None}, Next pivot: {next_pivot.item.key if next_pivot else None}, Dummy key: {dummy.key}")
-        
-        if pivot is not None and pivot.item.key < 0:
-            expected_klist_size -= 1  # Exclude dummy item from count
-        # if logger.isEnabledFor(logging.DEBUG):
-        #     logger.debug(f"[COLLAPSE] Checking tree {print_pretty(tree)} for collapsing to KList. Expanded count: {expanded_count}, Item count: {tree.item_count()}, Expected size: {expected_klist_size}, threshold: {threshold}")
+        # The dummy item from the tree and from all expanded leafs are removed when collapsed
+        expanded_leafs_count = tree.expanded_count()
+        expected_klist_size = tree_item_count - expanded_leafs_count - 1
 
         if expected_klist_size <= threshold:
             # Collapse into a KList
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {expected_klist_size} real items, which is <= {threshold}, collapsing to KList")
             return _tree_to_klist(tree)
-
-        # if tree.real_item_count() <= threshold:
-        #     # Collapse into a KList
-        #     if logger.isEnabledFor(logging.DEBUG):
-        #         logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {tree.item_count()} items, which is <= {threshold}, collapsing to KList")
-        #     return _tree_to_klist(tree)
 
         return tree
 

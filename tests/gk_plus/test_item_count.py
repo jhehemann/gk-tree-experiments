@@ -185,7 +185,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         item = Item(1, "val")
         tree, inserted = tree.insert(item, rank=1)
         self.assertTrue(inserted)
-        self.assertEqual(2, tree.node.get_node_item_count())
+        self.assertEqual(2, tree.node.set.item_count())
         
         # Duplicate insertion
         item_duplicate = Item(1, "new_val")

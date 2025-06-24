@@ -266,6 +266,19 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                         "Inserted entry's left subtree should not be None")
                 self.assertIs(inserted_entry.left_subtree, left_subtree)
 
+    def test_insert_no_order(self):
+        tree = create_gkplus_tree(K=4)
+        keys = [1519, 3337, 7882, 9415, 9604]
+        ranks = [1, 1, 1, 1, 2]
+        for i, k in enumerate(keys):
+            rank = ranks[i]
+            tree.insert(Item(k, f"val_{k}"), rank=rank)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Base tree: {print_pretty(tree)}")
+
+        expected_keys = [-2, -1] + keys
+        self.validate_tree(tree, expected_keys)
+
     def test_insert_non_empty_no_extension(self):
         k = 2
         col_dim = 1
@@ -337,80 +350,80 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 tree, _ = tree.insert(self.ITEMS[key], rank=rank)
         self.validate_tree(tree)
        
-    # def test_many_rank_combinations_specific_keys(self):
-    #     """
-    #     Exhaustively test many rank-combo and insert_key combinations,
-    #     computing the expected key lists on the fly.
-    #     """
-    #     k = 2
-    #     l_factor = 1.0
-    #     ranks = range(1, 4)
-    #     insert_rank = 2
+    def test_many_rank_combinations_specific_keys(self):
+        """
+        Exhaustively test many rank-combo and insert_key combinations,
+        computing the expected key lists on the fly.
+        """
+        k = 2
+        l_factor = 1.0
+        ranks = range(1, 4)
+        insert_rank = 2
 
-    #     num_keys = len(range(1, 4))
-    #     # Precompute all possible per‐key rank‐tuples for each free dimension:
+        num_keys = len(range(1, 4))
+        # Precompute all possible per‐key rank‐tuples for each free dimension:
         
-    #     dim1_choices = list(product(ranks, repeat=num_keys))
-    #     dim2_choices = list(product(ranks, repeat=num_keys))
-    #     fixed_dim = tuple([3, 1, 1, 2, 1, 1, 3, 1])
+        dim1_choices = list(product(ranks, repeat=num_keys))
+        dim2_choices = list(product(ranks, repeat=num_keys))
+        fixed_dim = tuple([3, 1, 1, 2, 1, 1, 3, 1])
 
-    #     total = len(dim1_choices) * len(dim2_choices) * 1
+        total = len(dim1_choices) * len(dim2_choices) * 1
 
-    #     # Cache computations to avoid redundant calculations
-    #     insert_cases_cache = {}
-    #     keys_cache = {}
-    #     empty_subtree = create_gkplus_tree(K=k, l_factor=l_factor)
-    #     entry_cache = {}
+        # Cache computations to avoid redundant calculations
+        insert_cases_cache = {}
+        keys_cache = {}
+        empty_subtree = create_gkplus_tree(K=k, l_factor=l_factor)
+        entry_cache = {}
 
-    #     for dim1, dim2 in tqdm(
-    #         product(dim1_choices, dim2_choices),
-    #         total=total,
-    #         desc="Insert with specific key-rank combinations",
-    #         unit="combo",
-    #     ):
-    #         rank_combo = [dim1, dim2, fixed_dim]
+        for dim1, dim2 in tqdm(
+            product(dim1_choices, dim2_choices),
+            total=total,
+            desc="Insert with specific key-rank combinations",
+            unit="combo",
+        ):
+            rank_combo = [dim1, dim2, fixed_dim]
 
-    #         # Cache keys computation
-    #         rank_combo_tuple = tuple(tuple(dim) for dim in rank_combo)
-    #         if rank_combo_tuple not in keys_cache:
-    #             keys_cache[rank_combo_tuple] = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
-    #         keys = keys_cache[rank_combo_tuple]
+            # Cache keys computation
+            rank_combo_tuple = tuple(tuple(dim) for dim in rank_combo)
+            if rank_combo_tuple not in keys_cache:
+                keys_cache[rank_combo_tuple] = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
+            keys = keys_cache[rank_combo_tuple]
             
-    #         # Cache insert cases for this key set
-    #         keys_tuple = tuple(keys)
-    #         if keys_tuple not in insert_cases_cache:
-    #             insert_cases_cache[keys_tuple] = self._get_insert_cases(keys)
-    #         insert_cases = insert_cases_cache[keys_tuple]
+            # Cache insert cases for this key set
+            keys_tuple = tuple(keys)
+            if keys_tuple not in insert_cases_cache:
+                insert_cases_cache[keys_tuple] = self._get_insert_cases(keys)
+            insert_cases = insert_cases_cache[keys_tuple]
 
-    #         with self.subTest(rank_combo=rank_combo, keys=keys):
-    #             # logger.info(f"Testing rank combo: {rank_combo} with keys: {keys}")
-    #             # for each possible insert_key (including non-existent)
-    #             for case_name, insert_key in insert_cases:
-    #                 # Cache Entry objects to avoid repeated creation
-    #                 if insert_key not in entry_cache:
-    #                     if insert_key in self.ITEMS:
-    #                         item = self.ITEMS[insert_key]
-    #                     else:
-    #                         item = Item(insert_key, "val")
-    #                         self.ITEMS[insert_key] = item
+            with self.subTest(rank_combo=rank_combo, keys=keys):
+                # logger.info(f"Testing rank combo: {rank_combo} with keys: {keys}")
+                # for each possible insert_key (including non-existent)
+                for case_name, insert_key in insert_cases:
+                    # Cache Entry objects to avoid repeated creation
+                    if insert_key not in entry_cache:
+                        if insert_key in self.ITEMS:
+                            item = self.ITEMS[insert_key]
+                        else:
+                            item = Item(insert_key, "val")
+                            self.ITEMS[insert_key] = item
                             
-    #                     entry_cache[insert_key] = Entry(item, empty_subtree)
-    #                 insert_entry = entry_cache[insert_key]
+                        entry_cache[insert_key] = Entry(item, empty_subtree)
+                    insert_entry = entry_cache[insert_key]
                     
-    #                 with self.subTest(insert_key=insert_key):
-    #                     # Pre-compute expected keys once
-    #                     exp_keys = keys + [insert_key]
-    #                     case_name_str = f"insert key {insert_key} {case_name}"
-    #                     self._run_insert_case(
-    #                         keys,
-    #                         rank_combo,
-    #                         insert_entry,
-    #                         insert_rank,
-    #                         exp_keys,
-    #                         case_name_str,
-    #                         gnode_capacity=k,
-    #                         l_factor=l_factor
-    #                     )
+                    with self.subTest(insert_key=insert_key):
+                        # Pre-compute expected keys once
+                        exp_keys = keys + [insert_key]
+                        case_name_str = f"insert key {insert_key} {case_name}"
+                        self._run_insert_case(
+                            keys,
+                            rank_combo,
+                            insert_entry,
+                            insert_rank,
+                            exp_keys,
+                            case_name_str,
+                            gnode_capacity=k,
+                            l_factor=l_factor
+                        )
 
     def test_insert_entry(self):
         base_tree = create_gkplus_tree(K=8, l_factor=1.0)
