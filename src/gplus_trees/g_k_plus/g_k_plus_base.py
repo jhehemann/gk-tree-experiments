@@ -649,18 +649,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         parent = None
         p_next_entry = None
 
-        # path cache
-        path = []
-
         # Loop until we find where to insert
         while True:
-            path.append(cur)
+            cur._invalidate_tree_size()
             node = cur.node
             node_rank = node.rank  # Cache attribute access
 
             # Case 1: Found node with matching rank - ready to insert
             if node_rank == rank:
-                return self._insert_new_item(cur, x_entry, path)
+                return self._insert_new_item(cur, x_entry)
 
             # Case 2: Current rank too small - handle rank mismatch
             if node_rank < rank:
@@ -738,7 +735,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         self,
         cur: GKPlusTreeBase,
         x_entry: Entry,
-        path: list[GPlusNodeBase],
     ) -> GKPlusTreeBase:
         """
         Insert a new item key. For internal nodes, we only store the key.
@@ -814,17 +810,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         logger.debug(
                             f"[DIM {self.DIM} INSERT {x_key}] Node after insertion (no conversion check for tree inserts): {print_pretty(node.set)}"
                     )
-                
-                # Item will be inserted, add 1 to each node's size so far
-                for tree in path:
-                    if tree.size is not None:
-                        tree.size += 1
 
                 # Fastest path for leaf nodes - direct return
                 if is_leaf:                    
                     self._invalidate_tree_size()
-                    check_and_update_expanded_count(node, is_gkplus_type, path)
-
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug(
                             f"[DIM {self.DIM} INSERTED {x_key}] into tree (now at leaf -> return): {print_pretty(self)}"
