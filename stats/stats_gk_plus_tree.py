@@ -58,7 +58,7 @@ def random_gkplus_tree_of_size(n: int, target_node_size: int, l_factor: float) -
     if space <= n:
         raise ValueError(f"Key-space too small! Required: {n + 1}, Available: {space}")
 
-    indices = random.sample(range(1, space), k=n) # Exclude dummy key 0
+    indices = random.sample(range(1, space), k=n)
 
     # Pre-allocate items list
     items = [(None, None)] * n

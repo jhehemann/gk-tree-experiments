@@ -199,6 +199,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
 
     def test_large_tree_size(self):
         """Test size is correctly maintained in a larger tree with random insertions"""
+        # TODO: Test with k=2 when all other tests are passing (Currently k=2 is not working due to recursion depth issues)
         tree = self.tree_k4
         # self.print_hash_info(key=15, k=2, num_levels=3)
         # exit()
@@ -219,13 +220,8 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             expected_keys = [entry.item.key for entry in tree]
             expected_item_count = inserted_count + dummy_cnt
 
-            # max_dim = tree.get_max_dim()
-            # expanded_leafs = tree.get_expanded_leaf_count()
-            # expected_keys = [entry.item.key for entry in tree]
-
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-                # logger.debug(f"Tree size should be {i + expanded_leafs + 1} after inserting {i} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
             if inserted_count == 6:
                 if logger.isEnabledFor(logging.DEBUG):
@@ -234,15 +230,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
 
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
 
-            # self.assertEqual(i + 1, tree.item_count(), f"Tree should have size {i + 1} after inserting {key}")
-
-
-        # # Verify size after all insertions
-        # self.assertEqual(len(keys), tree.item_count())
-
-        # Verify subtree sizes
-        # self.assertTrue(self.verify_subtree_sizes(tree))
-    
+        self.validate_tree(tree)
     
     def test_size_consistency_with_calculate_size(self):
         """Test that node.size matches the result of calculate_size()"""
@@ -274,25 +262,6 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                 logger.debug(f"Tree after all insertions evaluated after individual subtest: {print_pretty(tree)}")
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after all insertions evaluated after for loop: {print_pretty(tree)}")
-
-        # print(f"Tree structure after all insertions: {tree.print_structure()}")
-
-        # print(f"Tree after all insertions: {tree.print_structure()}")
-        # print(f"Tree after all insertions: {print_pretty(tree)}")
-
-        # node_size = tree.node.size
-        # # self.assertIsNone(node_size, "Expected node size to be invalidated (none) after insert calculation")
-        # calculated_size = tree.node.calculate_tree_size()
-        
-        # # Check if the calculated size has been set
-        # node_size = tree.node.size
-        # self.assertEqual(node_size, calculated_size, f"Expected tree size to be set to {calculated_size} after calculate_tree_size(); got {node_size}")
-        
-        # # Check size consistency for the root node
-        # self.assertEqual(node_size, calculated_size, f"Expected size {node_size} to match calculated size {calculated_size}")
-        
-        # Verify size consistency throughout the tree
-        # self.verify_calculated_sizes_match(tree)
     
     def test_rank_mismatch_size_handling(self):
         """Test that size is correctly maintained when handling rank mismatches"""

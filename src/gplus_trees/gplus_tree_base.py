@@ -775,19 +775,19 @@ def gtree_stats_(t: GPlusTreeBase,
             # Inherit child violations first
             if not cs.set_thresholds_met:
                 stats.set_thresholds_met = False
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"  Child violation inherited: cs.set_thresholds_met={cs.set_thresholds_met}")
+                # if logger.isEnabledFor(logging.DEBUG):
+                    # logger.debug(f"  Child violation inherited: cs.set_thresholds_met={cs.set_thresholds_met}")
             
             # Check current node violations (only if no child violations yet)
             if stats.set_thresholds_met:
                 if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
                     stats.set_thresholds_met = False
                     if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"  Current node KList violation: item_count()={node_set.item_count()}, threshold={threshold}")
+                        logger.warning(f"  Current node KList violation: item_count()={node_set.item_count()}, threshold={threshold}")
                 elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
                     stats.set_thresholds_met = False
                     if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"  Current node GPlusTree violation: item_count()={node_set.item_count()}, threshold={threshold}")
+                        logger.warning(f"  Current node GPlusTree violation: item_count()={node_set.item_count()}, threshold={threshold}")
                 
             stats.internal_has_replicas &= cs.internal_has_replicas
             stats.internal_packed &= cs.internal_packed
