@@ -161,6 +161,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         # Pair up keys with ranks
         pairs = list(zip(keys, rank_combo[0]))
 
+        random.seed(42)  # For reproducibility in tests
         # Shuffle in place
         random.shuffle(pairs)
 

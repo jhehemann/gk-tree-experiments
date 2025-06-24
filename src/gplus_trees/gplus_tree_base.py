@@ -648,6 +648,8 @@ class Stats:
     all_leaf_values_present: bool
     leaf_keys_in_order: bool
 
+
+# TODO: Add correct checks for GKPlusTreeBase nodes set thresholds met
 def gtree_stats_(t: GPlusTreeBase,
                  rank_hist: Optional[Dict[int, int]] = None,
                  _is_root: bool = True,

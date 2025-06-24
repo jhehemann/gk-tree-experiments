@@ -336,3 +336,56 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                                 "Item count should be 2 after inserting two items (1 dummy + 1 item)")
             self.assertEqual(right3.item_cnt, 2,
                             "item_cnt should be 2 after item_count() is called")
+            
+
+    
+    # This test caused item_counts of the right split to be 0 during insertion
+    # Fixed by invalidating item_count after right split insertion again, as for the control flow item_count() was called and the tree was not updated
+    def test_insert_specific_rank_combo(self):
+        """Test that size is correctly maintained after splitting a tree"""
+        k = 2
+        tree = create_gkplus_tree(K=k)
+        rank_lists = [
+            [3, 2, 2],  # Dimension 1
+            [2, 1, 1],  # Dimension 2
+            [3, 1, 1],  # Dimension 3
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+        item_map = { k: self.create_item(k) for k in keys}
+        
+        # (insert_key=614, rank_combo=[(3, 2, 2), (2, 1, 1), (3, 1, 1, 2, 1, 1, 3, 1)], keys=[613, 624, 642])
+
+
+        pairs = list(zip(keys, rank_lists[0]))
+
+        random.seed(42)  # For reproducibility in tests
+        # Shuffle in place
+        random.shuffle(pairs)
+        logger.debug(f"Shuffled pairs: {pairs}")
+
+        for idx, item in enumerate(item_map.values()):
+            rank = rank_lists[0][idx]
+            tree, _ = tree.insert(item, rank=rank)
+
+
+        tree, _ = tree.insert(self.create_item(614), rank=2)
+
+        # if logger.isEnabledFor(logging.DEBUG):
+        #     logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
+        # with self.subTest("First split at 391"):
+        #     left1, _, right1 = tree.split_inplace(391)
+        #     logger.debug(f"Left split after first split: {print_pretty(left1)}")
+        #     logger.debug(f"Right split after first split: {print_pretty(right1)}")
+        #     self.assertIsNone(left1.item_cnt, 
+        #                 "Left split item_cnt attr should be None before triggering item_count()")
+        #     self.assertEqual(left1.item_count(), 5,
+        #                         "Left split item count should be 5")
+        #     self.assertEqual(left1.item_cnt, 5,
+        #                     "Left split item_cnt should be 5 after item_count() is called")
+
+        #     self.assertIsNone(right1.item_cnt, 
+        #                 "Right split item_cnt attr should be None before triggering item_count()")
+        #     self.assertEqual(right1.item_count(), 2,
+        #                         "Right split item count should be 2")
+        #     self.assertEqual(right1.item_cnt, 2,
+        #                     "Right split item_cnt should be 2 after item_count() is called")

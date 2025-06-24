@@ -224,11 +224,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         else:
             count = 0
             for entry in self.node.set:
-                # TODO: Check if we can call entry.left_subtree.item_count() instead of get_tree_item_count()
-                count += (entry.left_subtree.get_tree_item_count()
+                count += (entry.left_subtree.item_count()
                          if entry.left_subtree is not None else 0)
 
-            count += (self.node.right_subtree.get_tree_item_count()
+            count += (self.node.right_subtree.item_count()
                      if self.node.right_subtree is not None else 0)
             self.item_cnt = count
             return self.item_cnt
@@ -851,7 +850,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # right_split = check_and_convert_set(right_split)
             
             # Cache item counts early to avoid repeated method calls in conditionals
-            right_item_count = right_split.item_count()
+            right_item_count = right_split.item_count() # invalidate size after insertion
             left_item_count = left_split.item_count()
             
             # Handle right side creation - inline optimization for performance
@@ -861,6 +860,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if isinstance(right_split, GKPlusTreeBase):
                     new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
                     right_split, _ = right_split.insert_entry(insert_entry, rank=new_rank)
+                    right_split._invalidate_tree_size()
+                    
                 else:
                     right_split, _ = right_split.insert_entry(insert_entry)
 
@@ -1058,6 +1059,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Calculate the new rank for the item in the next dimension - use cached values
                     new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                     right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
+                    right_split._invalidate_tree_size()
+                    # TODO: Check why we need to invalidate size and why it is not done in insert_entry. Check it also for insert_entry()
                 else:
                     right_split, _ = right_split.insert_entry(Entry(dummy, None))
                 
@@ -1103,6 +1106,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         # Calculate new rank for item in the next dimension - use cached values
                         new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
                         right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
+                        right_split._invalidate_tree_size()
                     else:
                         right_split, _ = right_split.insert_entry(Entry(dummy, None))
 
@@ -1313,23 +1317,38 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # fast path: no dummy items in the tree
         tree_item_count = tree.item_count()
-        if tree_item_count == tree.real_item_count():
-            # logger.info(f"Item count {tree_item_count} is equal to real item count in tree {print_pretty(tree)}")
-            if tree_item_count <= threshold:
+        expected_klist_size = tree_item_count - 1  # Exclude the dummy item
+        real_item_count = tree.real_item_count()
+        if expected_klist_size == real_item_count:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Item count {tree_item_count} - 1 is equal to real item count {real_item_count} in tree {print_pretty(tree)}")
+            # raise ValueError(
+            #     f"Item count {tree_item_count} is equal to real item count in tree {print_pretty(tree)}. "
+            #     "This should not happen, as it indicates that the tree does not contain any dummy items."
+            # )
+            if expected_klist_size <= threshold:
                 # Collapse into a KList
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {tree_item_count} items, which is <= {threshold}, collapsing to KList")
+                    logger.debug(f"[COLLAPSE] KList will have {expected_klist_size} items, which is <= {threshold}, collapsing to KList")
                 return _tree_to_klist(tree)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[RETURN] KList would have {expected_klist_size} items, which is > {threshold}, keeping as GKPlusTree")
             return tree
         
         # The dummy item from the tree and from all expanded leafs are removed when collapsed
         expanded_leafs_count = tree.expanded_count()
-        expected_klist_size = tree_item_count - expanded_leafs_count - 1
-
+        expected_klist_size -= expanded_leafs_count
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("")
+            logger.debug(f"[CHECK] Tree {print_pretty(tree)}")
+            logger.debug(f"Tree has {tree_item_count} items, "
+                        f"expanded leafs {expanded_leafs_count}, "
+                        f"expected KList size {expected_klist_size} (item count - expanded leafs - 1), "
+                        f"threshold {threshold}")
         if expected_klist_size <= threshold:
             # Collapse into a KList
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"[COLLAPSE] Tree {print_pretty(tree)} has {expected_klist_size} real items, which is <= {threshold}, collapsing to KList")
+                logger.debug(f"[COLLAPSE] KList will have {expected_klist_size} items, which is <= {threshold}, collapsing to KList")
             return _tree_to_klist(tree)
 
         return tree
@@ -1609,6 +1628,11 @@ def _create_gkplus_tree_from_entries(
 
     return create_gkplus_tree_rec(pairs, KListClass, DIM, l_factor)
 
+# TODO: Check if creating from leaf to root is faster than from root to leaf
+# 1. Segment all rank 1 groupings separated by higher rank items
+#   - Create duplicates for the higher rank items and cache them in a separate list
+#   - Recurse on the higher rank items list to create the higher rank nodes
+# 2. Recurse on the rank 1 groupings that have entries count > threshold
 def bulk_create_gkplus_tree(
     klist: KListBase,
     DIM: int,
