@@ -30,6 +30,7 @@ DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
 DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conversion
 
 from gplus_trees.g_k_plus.base import logger
+IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
 
 # Cached import for performance - initialized on first use
 _create_gkplus_tree = None
@@ -590,7 +591,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """Optimized version for inserting into a non-empty tree."""
         x_item = x_entry.item
         x_key = x_item.key
-        if logger.isEnabledFor(logging.DEBUG):
+        if IS_DEBUG:
             logger.debug(
             f"[DIM {self.DIM}] [INSERTING {x_key} with rank {rank}] into tree: {print_pretty(self)}"
         )
@@ -704,7 +705,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_entry = None
         left_parent = None
         left_x_entry = None
-        # if logger.isEnabledFor(logging.DEBUG):
+        # if IS_DEBUG:
             # logger.debug(
             #     f"[DIM {self.DIM}] [INSERTING {x_key} with rank into tree: {print_pretty(self)}]"
             # )
@@ -724,7 +725,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 is_gkplus_type = isinstance(node.set, GKPlusTreeBase)
                 insert_entry = x_entry if is_leaf else Entry(replica, subtree)
-                if logger.isEnabledFor(logging.DEBUG):
+                if IS_DEBUG:
                     logger.debug(
                         f"[DIM {self.DIM}] [INSERTING {x_key}] into node: {print_pretty(node.set)}"
                     )
@@ -733,12 +734,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     node.set, inserted = node.set.insert_entry(insert_entry)
                     if not inserted:
                         return self.update(cur, x_entry)
-                    if logger.isEnabledFor(logging.DEBUG):
+                    if IS_DEBUG:
                         logger.debug(
                             f"[DIM {self.DIM} INSERT {x_key}] Node before conversion check: {print_pretty(node.set)}"
                     )
                     node.set = check_and_convert_set(node.set) # only KLists can be extended
-                    if logger.isEnabledFor(logging.DEBUG):
+                    if IS_DEBUG:
                         logger.debug(
                             f"[DIM {self.DIM} INSERT {x_key}] Node after conversion check: {print_pretty(node.set)}"
                         )
@@ -747,7 +748,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     node.set, inserted = node.set.insert_entry(insert_entry, rank=new_rank)
                     if not inserted:
                         return self.update(cur, x_entry)
-                    if logger.isEnabledFor(logging.DEBUG):
+                    if IS_DEBUG:
                         logger.debug(
                             f"[DIM {self.DIM} INSERT {x_key}] Node after insertion (no conversion check for tree inserts): {print_pretty(node.set)}"
                     )
@@ -755,7 +756,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 # Fastest path for leaf nodes - direct return
                 if is_leaf:                    
                     self._invalidate_tree_size()
-                    if logger.isEnabledFor(logging.DEBUG):
+                    if IS_DEBUG:
                         logger.debug(
                             f"[DIM {self.DIM} INSERTED {x_key}] into tree (now at leaf -> return): {print_pretty(self)}"
                         )
@@ -776,16 +777,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Perform split operation and immediately cache converted results
             left_split, _, right_split = node.set.split_inplace(x_key)
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(
                     f"[DIM {self.DIM}] [INSERT SUBS {x_key}] Left split before conversion: {print_pretty(left_split)}"
                 )
             left_split = check_and_convert_set(left_split)
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(
                     f"[DIM {self.DIM}] [INSERT SUBS {x_key}] Left split after conversion: {print_pretty(left_split)}"
                 )
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(
                     f"[DIM {self.DIM}] [INSERT SUBS {x_key}] Right split before insertion (if any): {print_pretty(right_split)}"
                 )
@@ -807,14 +808,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 else:
                     right_split, _ = right_split.insert_entry(insert_entry)
 
-                if logger.isEnabledFor(logging.DEBUG):
+                if IS_DEBUG:
                     logger.debug(
                         f"[DIM {self.DIM}] [INSERT SUBS {x_key}] Right split after inserting before conversion: {print_pretty(right_split)}"
                     )
 
                 # Create new tree node
                 right_split = check_and_convert_set(right_split)
-                if logger.isEnabledFor(logging.DEBUG):
+                if IS_DEBUG:
                     logger.debug(
                         f"[DIM {self.DIM}] [INSERT SUBS {x_key}] Right split after conversion: {print_pretty(right_split)}"
                     )
@@ -882,7 +883,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Do it here to maintain search tree structure across dimensions.
                     cur.node.right_subtree = None  # No right subtree at leaf level
                 self._invalidate_tree_size()
-                if logger.isEnabledFor(logging.DEBUG):
+                if IS_DEBUG:
                     logger.debug(
                         f"[DIM {self.DIM}] [INSERTED {x_key} into tree: {print_pretty(self)}]"
                     )
@@ -976,12 +977,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Split node at key - cache results immediately
             # logger.debug(f"[DIM {self.DIM}] [SPLIT (INIT) {key}] Node set BEFORE split: {print_pretty(node.set)}")
             left_split, key_subtree, right_split = node.set.split_inplace(key)
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(
                     f"[DIM {self.DIM}] [SPLIT {key}] Left before conversion: {print_pretty(left_split)}"
                 )
             left_split = check_and_convert_set(left_split)
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(
                     f"[DIM {self.DIM}] [SPLIT {key}] Left after conversion: {print_pretty(left_split)}"
                 )
@@ -1226,7 +1227,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         threshold = int(k * self.l_factor)
 
         if klist.item_count() > threshold:
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(f"[EXPAND] KList {print_pretty(klist)} has {klist.item_count()} items, which is > {threshold}, converting to GKPlusTree")
             # Convert to GKPlusTree with increased dimension
             new_dim = type(self).DIM + 1
@@ -1265,21 +1266,21 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         
         # Fast path: no dummy items in the tree
         if expected_klist_size == real_item_count:
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(f"Item count {tree_item_count} - 1 is equal to real item count {real_item_count} in tree {print_pretty(tree)}")
             if expected_klist_size <= threshold:
                 # Collapse into a KList
-                if logger.isEnabledFor(logging.DEBUG):
+                if IS_DEBUG:
                     logger.debug(f"[COLLAPSE] KList will have {expected_klist_size} items, which is <= {threshold}, collapsing to KList")
                 return _tree_to_klist(tree)
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(f"[RETURN] KList would have {expected_klist_size} items, which is > {threshold}, keeping as GKPlusTree")
             return tree
         
         # The dummy item from the tree and from all expanded leafs are removed when collapsed
         expanded_leafs_count = tree.expanded_count()
         expected_klist_size -= expanded_leafs_count
-        if logger.isEnabledFor(logging.DEBUG):
+        if IS_DEBUG:
             logger.debug("")
             logger.debug(f"[CHECK] Tree {print_pretty(tree)}")
             logger.debug(f"Tree has {tree_item_count} items, "
@@ -1288,7 +1289,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         f"threshold {threshold}")
         if expected_klist_size <= threshold:
             # Collapse into a KList
-            if logger.isEnabledFor(logging.DEBUG):
+            if IS_DEBUG:
                 logger.debug(f"[COLLAPSE] KList will have {expected_klist_size} items, which is <= {threshold}, collapsing to KList")
             return _tree_to_klist(tree)
 
@@ -1393,7 +1394,7 @@ def _create_node_from_entries(
         # Recursive case 'Dimension': create a GKPlusTree with the next higher dimension
         group_size = calculate_group_size(k)
         node_set, _ = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM + 1, l_factor)
-        if logger.isEnabledFor(logging.DEBUG):
+        if IS_DEBUG:
             logger.debug(f"[CREATE NODE] Created node set from {entries_len} entries")
     
     return NodeClass(rank, node_set, None)
@@ -1423,7 +1424,6 @@ def create_gkplus_tree_rec(
     pairs_len = len(pairs)
     k = KListClass.KListNodeClass.CAPACITY
     create_gkplus_tree_fn = _get_create_gkplus_tree()
-    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
     
     max_rank = 1
     for _, rank in pairs:
@@ -1438,7 +1438,7 @@ def create_gkplus_tree_rec(
     entry0, _ = pairs[0]
     pairs[0] = (entry0, max_rank)
     
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE NEW] Creating tree with {pairs_len} pairs, max_rank={max_rank}")
 
     # Base case: if the maximum rank is 1, create a leaf node
@@ -1450,7 +1450,7 @@ def create_gkplus_tree_rec(
         
         if prev_leaf is not None:
             prev_leaf.node.next = tree
-            if is_debug_enabled:
+            if IS_DEBUG:
                 logger.debug(f"[REC CREATE] Linking previous leaf to new leaf")
         
         tree.node = node
@@ -1461,7 +1461,7 @@ def create_gkplus_tree_rec(
     max_rank_entries.append(None)  # Reserve space for optimization
     subtrees_pairs = [[]]
     
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Preparing subtree pairs")
     
     # Single pass optimization: process pairs and build structures simultaneously
@@ -1486,7 +1486,7 @@ def create_gkplus_tree_rec(
     # Remove the initial None placeholder
     max_rank_entries.pop(0)
 
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Created {len(max_rank_entries)} max rank entries")
 
     # Optimized subtree creation - avoid redundant checks
@@ -1497,7 +1497,7 @@ def create_gkplus_tree_rec(
     for i in range(min(max_entries_count, subtrees_count - 1)):
         subtree_pairs = subtrees_pairs[i]
         if subtree_pairs:  # Only process non-empty subtrees
-            if is_debug_enabled:
+            if IS_DEBUG:
                 logger.debug(f"[REC CREATE] Creating subtree {i}")
             
             subtree_tree, prev_leaf = create_gkplus_tree_rec(
@@ -1510,7 +1510,7 @@ def create_gkplus_tree_rec(
             max_rank_entries[i].left_subtree = subtree_tree
     
     # Create the root node with max rank entries
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Creating root node with {len(max_rank_entries)} entries")
     
     root_node = _create_node_from_entries(
@@ -1529,7 +1529,7 @@ def create_gkplus_tree_rec(
         entry0, _ = r_subtree_pairs[0] 
         r_subtree_pairs[0] = (entry0, 0)
 
-        if is_debug_enabled:
+        if IS_DEBUG:
             logger.debug(f"[REC CREATE] Creating right subtree")
         
         right_subtree, prev_leaf = create_gkplus_tree_rec(
@@ -1542,7 +1542,7 @@ def create_gkplus_tree_rec(
         root_node.right_subtree = right_subtree
 
     tree.node = root_node
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE FINISHED] Created tree")
     return tree, prev_leaf
 
@@ -1568,10 +1568,8 @@ def _create_gkplus_tree_from_entries(
     """
     # Calculate ranks efficiently
     ranks = calc_ranks(entries, group_size, DIM)
-    
-    # Cache logging check
-    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
-    if is_debug_enabled:
+
+    if IS_DEBUG:
         logger.debug(f"[CREATE] Creating GKPlusTree with {len(entries)} entries for dim {DIM}")
     
     # Create pairs efficiently using zip
@@ -1579,7 +1577,7 @@ def _create_gkplus_tree_from_entries(
     
     # Prepend pivot entry - avoid O(n) insert operation by building new list
     pivot = Entry(get_dummy(DIM), None)
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[PIVOT] Set dummy as pivot for dim {DIM}: {pivot.item.key}")
     
     # More efficient than insert(0, ...)
