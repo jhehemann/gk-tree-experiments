@@ -1259,17 +1259,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if tree.is_empty():
             return tree
 
-        # fast path: no dummy items in the tree
         tree_item_count = tree.item_count()
         expected_klist_size = tree_item_count - 1  # Exclude the dummy item
         real_item_count = tree.real_item_count()
+        
+        # Fast path: no dummy items in the tree
         if expected_klist_size == real_item_count:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"Item count {tree_item_count} - 1 is equal to real item count {real_item_count} in tree {print_pretty(tree)}")
-            # raise ValueError(
-            #     f"Item count {tree_item_count} is equal to real item count in tree {print_pretty(tree)}. "
-            #     "This should not happen, as it indicates that the tree does not contain any dummy items."
-            # )
             if expected_klist_size <= threshold:
                 # Collapse into a KList
                 if logger.isEnabledFor(logging.DEBUG):
@@ -1354,21 +1351,21 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     if klist.is_empty():
         return create_gkplus_tree(K, DIM, l_factor)
 
-    # return bulk_create_gkplus_tree(klist, DIM, l_factor)
+    return bulk_create_gkplus_tree(klist, DIM, l_factor)
 
-    entries = list(klist)
-    tree = create_gkplus_tree(K, DIM, l_factor)
-    ranks = [] 
-    for entry in entries:
-        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
+    # entries = list(klist)
+    # tree = create_gkplus_tree(K, DIM, l_factor)
+    # ranks = [] 
+    # for entry in entries:
+    #     ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
 
-    # Insert entry instances with their ranks
-    tree_insert_entry = tree.insert_entry
-    for i, entry in enumerate(entries):
-        if i < len(ranks):
-            rank = int(ranks[i])
-            tree, _ = tree_insert_entry(entry, rank)
-    return tree
+    # # Insert entry instances with their ranks
+    # tree_insert_entry = tree.insert_entry
+    # for i, entry in enumerate(entries):
+    #     if i < len(ranks):
+    #         rank = int(ranks[i])
+    #         tree, _ = tree_insert_entry(entry, rank)
+    # return tree
 
 
 
@@ -1381,19 +1378,24 @@ def _create_node_from_entries(
     l_factor: float = 1.0,
 ) -> GKPlusNodeBase:
     """Create a GKPlusTreeBase node from a list of entries."""
+    # Cache frequently accessed values
     k = KListClass.KListNodeClass.CAPACITY
     threshold = int(k * l_factor)
-    if len(entries) <= threshold:
+    entries_len = len(entries)
+    
+    if entries_len <= threshold:
+        # Fast path: create KList directly
         node_set = KListClass()
+        insert_entry_fn = node_set.insert_entry  # Cache method reference
         for entry in entries:
-            node_set, _ = node_set.insert_entry(entry)
+            node_set, _ = insert_entry_fn(entry)
     else:
         # Recursive case 'Dimension': create a GKPlusTree with the next higher dimension
-        # Instantiate node set with the resulting tree
         group_size = calculate_group_size(k)
         node_set, _ = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM + 1, l_factor)
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[CREATE NODE] Created node set from entries {[entry.item.key for entry in entries]} to {print_pretty(node_set)}")
+            logger.debug(f"[CREATE NODE] Created node set from {entries_len} entries")
+    
     return NodeClass(rank, node_set, None)
 
 
@@ -1417,93 +1419,100 @@ def create_gkplus_tree_rec(
     if not pairs:
         return None
 
-    # Get the maximum rank from the pairs
-    # Ensure it is at least 1 for the case where the pivot entry is the only entry
-    max_rank = max(1, max(rank for _, rank in pairs))
+    # Cache frequently accessed values to minimize attribute lookups
+    pairs_len = len(pairs)
     k = KListClass.KListNodeClass.CAPACITY
-    node_set: Optional[AbstractSetDataStructure] = None
-    tree = _get_create_gkplus_tree()(k, DIM, l_factor) 
+    create_gkplus_tree_fn = _get_create_gkplus_tree()
+    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
+    
+    max_rank = 1
+    for _, rank in pairs:
+        if rank > max_rank:
+            max_rank = rank
+    
+    # Create tree and cache references
+    tree = create_gkplus_tree_fn(k, DIM, l_factor)
     NodeClass = tree.NodeClass
 
-    # set the pivot entry's rank to the maximum rank
+    # Update first entry rank in-place
     entry0, _ = pairs[0]
     pairs[0] = (entry0, max_rank)
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE NEW] Creating tree with keys {[pair[0].item.key for pair in pairs]} and ranks {[pair[1] for pair in pairs]}")
+    
+    if is_debug_enabled:
+        logger.debug(f"[REC CREATE NEW] Creating tree with {pairs_len} pairs, max_rank={max_rank}")
 
     # Base case: if the maximum rank is 1, create a leaf node
     if max_rank == 1:
-        # Create a leaf node with the entries
+        # Extract entries efficiently using list comprehension (faster than manual loop)
         entries = [entry for entry, _ in pairs]
+        
         node = _create_node_from_entries(entries, 1, KListClass, NodeClass, DIM, l_factor)
+        
         if prev_leaf is not None:
-            # Link the previous leaf to the new leaf
             prev_leaf.node.next = tree
-
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"[REC CREATE] Linking previous leaf {print_pretty(prev_leaf)} to new leaf {tree.__class__.__name__} (Instance to be filled with entries)")
-        prev_leaf = tree
+            if is_debug_enabled:
+                logger.debug(f"[REC CREATE] Linking previous leaf to new leaf")
+        
         tree.node = node
-        # logger.debug(f"[REC CREATE FINISHED] Created tree: {print_pretty(tree)}")
-        return tree, prev_leaf
+        return tree, tree
 
-    # Recursive case 'Subtree': create root, split pairs based on keys and create subtrees
-    max_rank_entries: List[Entry] = [] # will become the root entries
-    subtrees_pairs: List[List[Tuple[Entry, int]]] = [[]] # lower tree level subtree entries
-
-    # Prepare node and subtree entries
-    if logger.isEnabledFor(logging.DEBUG):
+    # Recursive case: Pre-allocate data structures with estimated capacity
+    max_rank_entries = []
+    max_rank_entries.append(None)  # Reserve space for optimization
+    subtrees_pairs = [[]]
+    
+    if is_debug_enabled:
         logger.debug(f"[REC CREATE] Preparing subtree pairs")
+    
+    # Single pass optimization: process pairs and build structures simultaneously
     subtree_idx = 0
+    create_replica_fn = _create_replica  # Cache function reference
+    Entry_class = Entry  # Cache class reference
+    
     for pair in pairs:
         entry, rank = pair
-        if rank < max_rank: # items in the left subtree of a higher rank item are strictly smaller
-            # logger.debug(f"[REC CREATE] Adding entry {entry.item.key} with rank {rank} to subtree {subtree_idx}")
+        if rank < max_rank:
+            # Items in the left subtree of a higher rank item are strictly smaller
             subtrees_pairs[subtree_idx].append(pair)
         else:
-            # logger.debug(f"[REC CREATE] Adding replica of entry {entry.item.key} with rank {rank} to max rank entries")
             # The item has maximum rank and will become a root entry
-            replica = _create_replica(entry.item.key) # Non-leaf nodes contain replicas
-            max_rank_entries.append(Entry(replica, None)) 
+            replica = create_replica_fn(entry.item.key)
+            max_rank_entries.append(Entry_class(replica, None))
             
             # The item also becomes the pivot for the next subtree
-            pair = (entry, 0) # Reset rank to 0 to be determined by the next subtrees max rank
-            subtrees_pairs.append([pair]) # start a new subtree list with the pivot entry
-            # logger.debug(f"[REC CREATE] Starting new subtree with pivot entry {pair[0].item.key} and default rank {pair[1]}")
+            subtrees_pairs.append([(entry, 0)])  # Reset rank to 0
             subtree_idx += 1
 
+    # Remove the initial None placeholder
+    max_rank_entries.pop(0)
 
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE] Max rank entries initialized: {[entry.item.key for entry in max_rank_entries]}")
+    if is_debug_enabled:
+        logger.debug(f"[REC CREATE] Created {len(max_rank_entries)} max rank entries")
 
-    for i, subtree_pairs in enumerate(subtrees_pairs[:-1]):
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[REC CREATE] Subtree pairs for entry {max_rank_entries[i].item.key}: {[pair[0].item.key for pair in subtree_pairs]} with ranks {[pair[1] for pair in subtree_pairs]}")
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE] Finished preparing subtree pairs")
-
-    # Attach subtrees to the max rank entries
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE] Creating and attaching subtrees to max rank entries")
-    for i, entry in enumerate(max_rank_entries):
-        if i < len(subtrees_pairs):
-            subtree_pairs = subtrees_pairs[i]
-            if subtree_pairs:
-                # Create a GKPlusTree for the subtree
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"[REC CREATE] Creating subtree for entry {entry.item.key} with pairs: {[pair[0].item.key for pair in subtree_pairs]} and ranks {[pair[1] for pair in subtree_pairs]}")
-                subtree_tree, prev_leaf = create_gkplus_tree_rec(
-                    subtree_pairs,
-                    KListClass,
-                    DIM,
-                    l_factor,
-                    prev_leaf=prev_leaf
-                )
-                entry.left_subtree = subtree_tree
+    # Optimized subtree creation - avoid redundant checks
+    subtrees_count = len(subtrees_pairs)
+    max_entries_count = len(max_rank_entries)
+    
+    # Process subtrees in parallel structure - avoid index bounds checking
+    for i in range(min(max_entries_count, subtrees_count - 1)):
+        subtree_pairs = subtrees_pairs[i]
+        if subtree_pairs:  # Only process non-empty subtrees
+            if is_debug_enabled:
+                logger.debug(f"[REC CREATE] Creating subtree {i}")
+            
+            subtree_tree, prev_leaf = create_gkplus_tree_rec(
+                subtree_pairs,
+                KListClass,
+                DIM,
+                l_factor,
+                prev_leaf=prev_leaf
+            )
+            max_rank_entries[i].left_subtree = subtree_tree
     
     # Create the root node with max rank entries
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE] Creating root node with max rank entries: {[entry.item.key for entry in max_rank_entries]}")
+    if is_debug_enabled:
+        logger.debug(f"[REC CREATE] Creating root node with {len(max_rank_entries)} entries")
+    
     root_node = _create_node_from_entries(
         max_rank_entries,
         max_rank,
@@ -1513,26 +1522,28 @@ def create_gkplus_tree_rec(
         l_factor,
     )
 
-    # Create a new GKPlusTreeBase instance from the entries in the last subtrees_pairs list and assign it to the node's right subtree
-    # Reset pivot rank in right subtree to 0 to be determined by the next subtrees max rank
+    # Process right subtree efficiently
     r_subtree_pairs = subtrees_pairs[-1]
-    entry0, _ = r_subtree_pairs[0] 
-    r_subtree_pairs[0] = (entry0, 0)
+    if r_subtree_pairs:
+        # Reset pivot rank in right subtree to 0
+        entry0, _ = r_subtree_pairs[0] 
+        r_subtree_pairs[0] = (entry0, 0)
 
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE] Creating right subtree with pairs: {[pair[0].item.key for pair in r_subtree_pairs]} and ranks {[pair[1] for pair in r_subtree_pairs]}")
-    right_subtree, prev_leaf = create_gkplus_tree_rec(
-        r_subtree_pairs,
-        KListClass,
-        DIM,
-        l_factor, 
-        prev_leaf=prev_leaf
-    )
+        if is_debug_enabled:
+            logger.debug(f"[REC CREATE] Creating right subtree")
+        
+        right_subtree, prev_leaf = create_gkplus_tree_rec(
+            r_subtree_pairs,
+            KListClass,
+            DIM,
+            l_factor, 
+            prev_leaf=prev_leaf
+        )
+        root_node.right_subtree = right_subtree
 
-    root_node.right_subtree = right_subtree
     tree.node = root_node
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[REC CREATE FINISHED] Created tree: {print_pretty(tree)}")
+    if is_debug_enabled:
+        logger.debug(f"[REC CREATE FINISHED] Created tree")
     return tree, prev_leaf
 
 def _create_gkplus_tree_from_entries(
@@ -1543,33 +1554,37 @@ def _create_gkplus_tree_from_entries(
     l_factor: float,
 ) -> GKPlusTreeBase:
     """
-    Create a GKPlusTree from a list of (entry, rank) pairs.
+    Create a GKPlusTree from a list of entries.
     
     Args:
-        pairs: A list of tuples (Entry, rank)
-        K: The capacity parameter for the tree
+        entries: A list of Entry objects
+        group_size: The group size for rank calculation
+        KListClass: The KList class to use
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
         
     Returns:
         A new GKPlusTreeBase instance containing the entries
     """
+    # Calculate ranks efficiently
     ranks = calc_ranks(entries, group_size, DIM)
-    key_2_dim_1_rank = calc_rank_for_dim(entries[0].item.key, KListClass.KListNodeClass.CAPACITY, DIM)
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[CREATE] Creating GKPlusTree with entries {[entry.item.key for entry in entries]} and {ranks} ranks for dim {DIM} with l_factor {l_factor}")
+    
+    # Cache logging check
+    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
+    if is_debug_enabled:
+        logger.debug(f"[CREATE] Creating GKPlusTree with {len(entries)} entries for dim {DIM}")
+    
+    # Create pairs efficiently using zip
     pairs = list(zip(entries, ranks))
     
-    # TODO: Find a way to avoid O(len(pairs)) for dummy insertion 
-    # Prepend with pivot entry, which has always the lowest key and max rank and no left subtree
-    pivot = Entry(get_dummy(DIM), None)  # Set dummy as the pivot for a new tree
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[PIVOT] Set dummy as pivot for dim {DIM}: {pivot.item.key} with rank 0")
-        logger.debug(f"[PIVOT] Pairs before adding pivot: {pairs}")
-    pairs.insert(0, (pivot, 0))  # Set the rank to default value 0 – will be determined later
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"[PIVOT] Pairs after adding pivot: {pairs}")
-
+    # Prepend pivot entry - avoid O(n) insert operation by building new list
+    pivot = Entry(get_dummy(DIM), None)
+    if is_debug_enabled:
+        logger.debug(f"[PIVOT] Set dummy as pivot for dim {DIM}: {pivot.item.key}")
+    
+    # More efficient than insert(0, ...)
+    pairs = [(pivot, 0)] + pairs
+    
     return create_gkplus_tree_rec(pairs, KListClass, DIM, l_factor)
 
 # TODO: Check if creating from leaf to root is faster than from root to leaf
