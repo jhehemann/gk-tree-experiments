@@ -332,37 +332,21 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         return max_dim
 
-    def get_expanded_leaf_count(self) -> int:
-        """
-        Count leaf nodes whose set is recursively instantiated by another
-        GKPlusTree, having an extra dummy item for that dimension.
-
-        Returns:
-            int: The number of leaf nodes in the tree.
-        """
-        if self.is_empty():
-            return 0
-
-        count = 0
-        for leaf in self.iter_leaf_nodes():
-            if isinstance(leaf.set, GKPlusTreeBase):
-                # For GKPlusTreeBase, directly count its expanded leaves
-                count += 1  # Count the leaf itself
-                count += leaf.set.get_expanded_leaf_count()
-        return count
-    
     def expanded_count(self) -> int:
         if self.expanded_cnt is None:
-            return self.get_expanded_leaf_count_new()
+            return self.get_expanded_leaf_count()
         return self.expanded_cnt
-    
-    def get_expanded_leaf_count_new(self) -> int:
+
+    def get_expanded_leaf_count(self) -> int:
         """
-        Count leaf nodes whose set is recursively instantiated with another
-        GKPlusTree, having an extra dummy item for that dimension.
+        Count all leaf nodes whose set is recursively instantiated with another
+        GKPlusTree, having an extra dummy item for each expansion.
 
         Returns:
             int: The number of leaf nodes in the tree.
+
+        Complexity:
+            time & memory: best O(1), average O(log(n)), worst O(log(n)^2)
         """
         if self.is_empty():
             self.expanded_cnt = 0
@@ -370,13 +354,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         count = 0
         node = self.node
+        
+        # Base case: The node is a leaf node (rank 1)
         if node.rank == 1:
             if isinstance(node.set, GKPlusTreeBase):
-                count += 1  # Count the leaf itself
-                count += node.set.expanded_count()
+                count += 1
+                count += node.set.expanded_count()  # recurse
             self.expanded_cnt = count
             return count
         
+        # Recursive case: The node is not a leaf (rank > 1)
         for entry in node.set:
             if entry.left_subtree is not None:
                 count += entry.left_subtree.expanded_count()
@@ -408,8 +395,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def find_pivot(self) -> RetrievalResult:
         """
-        Returns the pivot entry for a node of the next higher dimension to be
-        unfolded.
+        Returns the pivot entry of a node in the next lower dimension.
 
         This method is always called from a node of the next lower dimension.
         The pivot entry is the first entry that is either the dummy entry of
@@ -439,7 +425,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         return RetrievalResult(pivot, current)
 
-    
     # def get_index(self, key: int) -> Tuple[Optional[int], Optional[int], RetrievalResult]:
     #     """
     #     Get the index of the entry with the given key in the tree.
@@ -476,45 +461,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     #             return self.node.set.get_index(key)
     #         elif isinstance(self.node.set, GKPlusTreeBase):
     #             return self.node.set.get_index(key)
-        
 
-    def find_pivot_new(self) -> RetrievalResult:
-        """
-        Returns the pivot entry for a node of the next higher dimension to be
-        unfolded.
-
-        This method is always called from a node of the next lower dimension.
-        The pivot entry is the first entry that is either the dummy entry of
-        the lower dimension itself or the next larger entry in the current tree.
-
-        Returns:
-            RetrievalResult: The pivot entry and the next entry in the tree.
-        """
-
-        if self.is_empty():
-            return RetrievalResult(None, None)
-
-        dummy_pivot = get_dummy(self.DIM - 1).key
-
-        pivot = None
-        cur = None
-
-        for entry in self:
-            current = entry
-            if pivot is not None:
-                break
-            else:
-                if entry.item.key == dummy_pivot or entry.item.key > dummy_pivot:
-                    pivot = entry
-
-        if pivot is None:
-            raise ValueError(f"No pivot entry in tree {print_pretty(self)}")
-
-        return RetrievalResult(pivot, current)
-
+    # TODO: Check indifference: This may return an entry with dummy key y, although a subsequent 
+    # leaf may have been expanded to a higher dimension with a dummy key x < y.
+    # However, y is the first entry yielded when iterating over the tree.
     def get_min(self) -> RetrievalResult:
         """
-        Get the minimum entry in the tree.
+        Get the minimum entry in the tree. This corresponds to the entry with the dummy item of the maximum dimension in successive first leaf nodes.
         Returns:
             RetrievalResult: The minimum entry and the next entry (if any).
         """
@@ -538,7 +491,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def get_max_leaf(self) -> GKPlusNodeBase:
         """
-        Get the maximum node in the tree.
+        Get the maximum node in the tree in the current dimension.
         Returns:
             GKPlusNodeBase: The maximum node in the tree.
         """
@@ -703,19 +656,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 TreeClass(old_node, self.l_factor)
             )
             return self
+        
         # Unfold intermediate node between parent and current
-        # Set replica of the current node set's pivot as first entry.
+        # Locate the current node’s pivot and place its replica first in the intermediate node.
         pivot = cur.node.set.find_pivot().found_entry
-        # res = cur.node.set.find_pivot()
-        # if isinstance(cur.node.set, KListBase):
-        #     pivot = res.found_entry
-        # elif isinstance(cur.node.set, GKPlusTreeBase):
-        #     pivot = res.next_entry
-        # else:
-        #     logger.warning(
-        #         f"[DIM {self.DIM} INSERT handle rank mismatch] Expected instance of KListBase or GKPlusTreeBase, got {type(cur.node.set).__name__}"
-        #     )
-
         pivot_replica = _create_replica(pivot.item.key)
         new_set, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
         new_tree = TreeClass(l_factor=self.l_factor)
@@ -1149,6 +1093,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if is_leaf:
                     # Prepare for updating 'next' pointers
                     # do not rearrange subtrees at leaf level
+                    # TODO: check if the right subtree can be set to None here, so we don't need to 
+                    # do this later
                     l_last_leaf = node
                 elif key_subtree:
                     # Highest node containing split key found
@@ -1238,7 +1184,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 yield entry
 
     def __iter__(self):
-        """Yields each entry of the gk-plus-tree in order."""
+        """Yields each entry of the gk-plus-tree in order. including all dummy entries."""
         if self.is_empty():
             return
 
