@@ -1435,16 +1435,20 @@ def _bulk_create_bottom_up(
     l_factor: float,
 ) -> GKPlusTreeBase:
     """
-    Optimized bottom-up bulk creation of GK+-tree following correct B+-tree like structure.
+    Bottom-up bulk creation of GK+-tree.
     
     Key insights:
-    1. All entries exist in leaf nodes (B+-tree property)
+    1. All entries exist in leaf nodes
     2. Rank determines node boundaries: higher rank = start of new node
     3. Higher rank entries are replicated upward to their rank level
     4. Threshold determines KList vs GKPlusTree for node implementation
     5. Entries are already sorted from KList iteration
     
-    Performance: O(n) time, much faster than recursive approach
+    Args:
+        klist: The sorted KList to convert
+        k: The capacity parameter for the tree
+        DIM: The dimension of the tree
+        l_factor: The threshold factor for conversion
     """
     # Get required classes and functions
     create_gkplus_tree_fn = _get_create_gkplus_tree()
@@ -1458,24 +1462,86 @@ def _bulk_create_bottom_up(
     
     # Cache threshold calculation
     threshold = int(k * l_factor)
+    dummy = Entry(get_dummy(DIM), None)
+    create_replica_fn = _create_replica
+
+    # rank_node_lists maps:
+    #   rank → (list_of_node_lists, next_higher_rank)
+    ranks_lists: dict[int, tuple[list[list[Entry]], Optional[int]]] = {}
     
-    # Extract entries and calculate ranks in single pass
-    entries = []
-    ranks = []
-    
+    current_max_rank = 0
+    prev_rank = 0
     for entry in klist:
-        entries.append(entry)
         rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
-        ranks.append(rank)
-    
-    if not entries:
+        lists = ranks_lists.get(rank)
+        
+        # Leaf insertion only
+        if rank == 1:
+            if lists:
+                lists[-1].append(entry)
+            else:
+                ranks_lists[1] = [[dummy, entry]] # create list of node lists for rank 1
+            prev_rank = rank
+            if current_max_rank == 0:
+                current_max_rank = 1
+            continue
+        
+        # Internal insertion of replicas and leaf node creation
+        replica = Entry(create_replica_fn(entry.item.key), None)
+        if rank == prev_rank:
+            # Simply append to the last current rank list
+            lists[-1].append(replica)
+            ranks_lists[1].append([entry]) # create leaf with original entry
+        elif rank < prev_rank:
+            # 'Unfold' intermediate node using previous entry's replica as pivot.
+            pivot = ranks_lists[1][-1][-1]
+            pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
+            lists[-1].append([pivot_replica, replica])
+            ranks_lists[1].append([entry]) # create leaf with original entry
+        else:
+            # Check if we need to create a new node list for this rank
+            # Create a new node if the last entry in next higher rank > last entry in the current rank (indicating a new node boundary)
+            # Create new node list using the first entry of the last node of the previous rank as pivot
+            if not lists:
+                pivot = ranks_lists[prev_rank][-1][0]
+                pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
+                lists[-1].append([pivot_replica, replica])
+            else:
+                # Find the maximum entry in the next higher existing rank
+                lists[-1][-1].item.key <= ranks_lists[rank+1][-1][-1].item.key
+
+            if current_max_rank <= rank:
+                # Create new list for this rank
+                    ranks_lists[rank] = [[dummy, entry]]
+                else:
+                    # Append to existing list
+                    ranks_lists[rank][-1].append(entry)
+                current_max_rank = rank
+            
+            # Create a new list for this rank if it doesn't exist
+            if rank not in ranks_lists:
+                ranks_lists[rank] = [[]]
+            
+            # Append the entry to the new rank's list
+            replica = Entry(create_replica_fn(entry.item.key), None)
+            ranks_lists[rank][-1].append(replica)
+            ranks_lists[1].append([entry])
+
+        elif rank not in ranks_lists:
+            ranks_lists[rank] = [[]]
+        ranks_lists[rank].append(entry)
+
+        
+
+    if not ranks_lists:
         return sample_tree
+    
     
     # Add dummy entry at the beginning (always rank 1 for leaves)
     dummy_entry = Entry(get_dummy(DIM), None)
-    entries.insert(0, dummy_entry)
-    ranks.insert(0, 1)  # Dummy always starts at leaf level
-    
+    ranks_lists[1] = [dummy_entry]
+    # Dummy always starts at leaf level
+
     # Build tree using correct node boundary logic
     return _build_correct_tree_structure(entries, ranks, TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
 
