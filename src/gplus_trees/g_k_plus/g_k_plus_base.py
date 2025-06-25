@@ -1225,7 +1225,6 @@ def create_gkplus_tree_rec(
     pairs_len = len(pairs)
     k = KListClass.KListNodeClass.CAPACITY
     create_gkplus_tree_fn = _get_create_gkplus_tree()
-    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
     
     max_rank = 1
     for _, rank in pairs:
@@ -1251,7 +1250,7 @@ def create_gkplus_tree_rec(
         
         if prev_leaf is not None:
             prev_leaf.node.next = tree
-            if is_debug_enabled:
+            if IS_DEBUG:
                 logger.debug(f"[REC CREATE] Linking previous leaf to new leaf")
         
         tree.node = node
@@ -1262,7 +1261,7 @@ def create_gkplus_tree_rec(
     max_rank_entries.append(None)  # Reserve space for optimization
     subtrees_pairs = [[]]
     
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Preparing subtree pairs")
     
     # Single pass optimization: process pairs and build structures simultaneously
@@ -1287,7 +1286,7 @@ def create_gkplus_tree_rec(
     # Remove the initial None placeholder
     max_rank_entries.pop(0)
 
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Created {len(max_rank_entries)} max rank entries")
 
     # Optimized subtree creation - avoid redundant checks
@@ -1298,7 +1297,7 @@ def create_gkplus_tree_rec(
     for i in range(min(max_entries_count, subtrees_count - 1)):
         subtree_pairs = subtrees_pairs[i]
         if subtree_pairs:  # Only process non-empty subtrees
-            if is_debug_enabled:
+            if IS_DEBUG:
                 logger.debug(f"[REC CREATE] Creating subtree {i}")
             
             subtree_tree, prev_leaf = create_gkplus_tree_rec(
@@ -1311,7 +1310,7 @@ def create_gkplus_tree_rec(
             max_rank_entries[i].left_subtree = subtree_tree
     
     # Create the root node with max rank entries
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE] Creating root node with {len(max_rank_entries)} entries")
     
     root_node = _create_node_from_entries(
@@ -1330,7 +1329,7 @@ def create_gkplus_tree_rec(
         entry0, _ = r_subtree_pairs[0] 
         r_subtree_pairs[0] = (entry0, 0)
 
-        if is_debug_enabled:
+        if IS_DEBUG:
             logger.debug(f"[REC CREATE] Creating right subtree")
         
         right_subtree, prev_leaf = create_gkplus_tree_rec(
@@ -1343,7 +1342,7 @@ def create_gkplus_tree_rec(
         root_node.right_subtree = right_subtree
 
     tree.node = root_node
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[REC CREATE FINISHED] Created tree")
     return tree, prev_leaf
 
@@ -1370,9 +1369,7 @@ def _create_gkplus_tree_from_entries(
     # Calculate ranks efficiently
     ranks = calc_ranks(entries, group_size, DIM)
     
-    # Cache logging check
-    is_debug_enabled = logger.isEnabledFor(logging.DEBUG)
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[CREATE] Creating GKPlusTree with {len(entries)} entries for dim {DIM}")
     
     # Create pairs efficiently using zip
@@ -1380,7 +1377,7 @@ def _create_gkplus_tree_from_entries(
     
     # Prepend pivot entry - avoid O(n) insert operation by building new list
     pivot = Entry(get_dummy(DIM), None)
-    if is_debug_enabled:
+    if IS_DEBUG:
         logger.debug(f"[PIVOT] Set dummy as pivot for dim {DIM}: {pivot.item.key}")
     
     # More efficient than insert(0, ...)
@@ -1423,13 +1420,13 @@ def bulk_create_gkplus_tree(
         tree = _get_create_gkplus_tree()(k, DIM, l_factor)
         return tree
     
-    # Use top-down construction
-    entries = list(klist)
-    tree, _ = _create_gkplus_tree_from_entries(entries, KListClass, DIM, l_factor)
-    return tree
+    # # Use top-down construction
+    # entries = list(klist)
+    # tree, _ = _create_gkplus_tree_from_entries(entries, KListClass, DIM, l_factor)
+    # return tree
 
-    # # Use optimized bottom-up construction - Not working yet
-    # return _bulk_create_bottom_up(klist, k, DIM, l_factor)
+    # Use optimized bottom-up construction - Not working yet
+    return _bulk_create_bottom_up(klist, k, DIM, l_factor)
 
 def _bulk_create_bottom_up(
     klist: KListBase,
