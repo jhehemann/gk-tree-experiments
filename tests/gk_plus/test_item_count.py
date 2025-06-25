@@ -177,24 +177,25 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
 
         self.assertTrue(self.verify_subtree_sizes(tree))
 
-    def test_duplicate_insertion_size(self):
-        """Test size doesn't change when inserting duplicates"""
-        tree = self.tree_k2
+    # UNCOMMENT if the tree accepts updates to existing items
+    # def test_duplicate_insertion_size(self):
+    #     """Test size doesn't change when inserting duplicates"""
+    #     tree = self.tree_k2
         
-        # First insertion
-        item = Item(1, "val")
-        tree, inserted = tree.insert(item, rank=1)
-        self.assertTrue(inserted)
-        self.assertEqual(2, tree.node.set.item_count())
+    #     # First insertion
+    #     item = Item(1, "val")
+    #     tree, inserted = tree.insert(item, rank=1)
+    #     self.assertTrue(inserted)
+    #     self.assertEqual(2, tree.node.set.item_count())
         
-        # Duplicate insertion
-        item_duplicate = Item(1, "new_val")
-        tree, inserted = tree.insert(item_duplicate, rank=1)
-        self.assertIsNone(tree.item_cnt,
-                          "item_cnt should be None before triggering item_count()")
-        self.assertEqual(2, tree.item_count(), 
-                         "item_cnt should remain 2 after duplicate insertion")
-        self.assertEqual(tree.item_cnt, 2)
+    #     # Duplicate insertion
+    #     item_duplicate = Item(1, "new_val")
+    #     tree, inserted = tree.insert(item_duplicate, rank=1)
+    #     self.assertIsNone(tree.item_cnt,
+    #                       "item_cnt should be None before triggering item_count()")
+    #     self.assertEqual(2, tree.item_count(), 
+    #                      "item_cnt should remain 2 after duplicate insertion")
+    #     self.assertEqual(tree.item_cnt, 2)
     
 
     def test_large_tree_size(self):
