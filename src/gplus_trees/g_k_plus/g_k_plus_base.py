@@ -67,7 +67,7 @@ class GKPlusNodeBase(GPlusNodeBase):
 
     def _update_left_subtree(self, key: int, new_left: GKPlusTreeBase) -> GKPlusNodeBase:
         """
-        Update the left subtree of the current node.
+        Update the left subtree for the entry with the given key.
         """
         entry = self.set.retrieve(key).found_entry
 
@@ -386,7 +386,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         self.expanded_cnt = count
         return count
 
-    
     def item_slot_count(self):
         """Count the number of item slots in the tree."""
         if self.is_empty():
@@ -478,9 +477,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     #         elif isinstance(self.node.set, GKPlusTreeBase):
     #             return self.node.set.get_index(key)
         
-        
-
-        return None
 
     def find_pivot_new(self) -> RetrievalResult:
         """
@@ -563,19 +559,21 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             Tuple[GKPlusTreeBase, bool]: The updated tree and a boolean indicating success.
         """
-        return self, False
-        # raise ValueError(
-        #     f"Entry with key {x_entry.item.key} already exists in the "
-        #     "tree. Cannot be updated at this point."
-        #     )
+        
+        raise ValueError(
+            f"Entry with key {x_entry.item.key} already exists in the "
+            "tree. No updates allowed during insert implementation phase."
+            )
+        # UNCOMMENT when updates should be allowed
         # if x_entry.left_subtree is not None:
         #     raise ValueError(
-        #         f"Entry with key {x_entry.item.key} already exists in the "
-        #         "tree. Cannot be inserted with a subtree again."
+        #         f"Entry with key {x_entry.item.key} already exists in the tree."
+        #         "Can't be inserted with a subtree again."
+        #         "Use GKPlusNodeBase._update_left_subtree(key) instead."
         #     )
-        # # Direct update for leaf nodes (common case)
         # if rank == 1:
-        #     existing_x_entry.item.value = x_entry.item.value
+        #   # Fast path: Direct update for leaf nodes    
+        #   existing_x_entry.item.value = x_entry.item.value
         #     return self, False
         # return self._update_existing_item(cur, x_entry.item)
 
