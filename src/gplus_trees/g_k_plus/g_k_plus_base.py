@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Optional, Type, TypeVar, Tuple, List
+from itertools import islice, chain
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
@@ -11,6 +12,7 @@ from gplus_trees.base import (
     RetrievalResult,
 )
 import logging
+import pprint
 
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
@@ -1428,6 +1430,168 @@ def bulk_create_gkplus_tree(
     # Use optimized bottom-up construction - Not working yet
     return _bulk_create_bottom_up(klist, k, DIM, l_factor)
 
+def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
+    """
+    Create a KList from a list of entries.
+    
+    Args:
+        entries: A list of Entry objects
+        KListClass: The KList class to use
+        
+    Returns:
+        A new KListBase instance containing the entries
+    """
+    klist = KListClass()
+    logger.info(f"[BULK CREATE] Creating KList with {entries} entries")
+
+
+    insert_entry_fn = klist.insert_entry  # Cache method reference
+    for entry, _ in entries:
+        klist, _ = insert_entry_fn(entry)
+    return klist
+
+def _build_leaf_level_trees_new(
+    entries: list[tuple[Entry, None]],
+    boundaries_map: list[int],
+    dummy: Entry,
+    KListClass: type[KListBase],
+    NodeClass: type[GKPlusNodeBase],
+    TreeClass: type[GKPlusTreeBase],
+    l_factor: float,
+    has_dummy: bool,
+) -> list[GKPlusTreeBase]:
+    """Build leaf level trees from entries."""
+    leaf_trees = []
+    if not has_dummy:
+        # The leaf always has a dummy item, so we need to create it in a separate tree first
+        node_set = _bulk_create_klist([(dummy, None)], KListClass)
+        node = NodeClass(1, node_set, None) 
+        tree = TreeClass(l_factor=l_factor)
+        tree.node = node
+        leaf_trees.append(tree)
+        prev_node = tree.node
+    else:
+        prev_node = None
+
+    for i in range(len(boundaries_map)):
+        start_idx = boundaries_map[i]
+        end_idx = boundaries_map[i + 1] if i + 1 < len(boundaries_map) else len(entries)
+        node_entries = entries[start_idx:end_idx]
+        logger.info(f"[BULK CREATE] Creating leaf node {i} with entries: %s", 
+                    [entry.item.key for entry, _ in node_entries]
+                )
+        if prev_node is None:
+            # has_dummy must be True
+            node_entries = [(dummy, None)] + node_entries
+
+        # Create node set - always use KList for simplicity in bulk creation
+        # This ensures we don't get into recursive loops and maintains correctness
+        node_set = _bulk_create_klist(node_entries, KListClass)
+        leaf_node = NodeClass(1, node_set, None)
+        leaf_tree = TreeClass(l_factor=l_factor)
+        leaf_tree.node = leaf_node
+        if prev_node is not None:
+            prev_node.next = leaf_tree.node
+        prev_node = leaf_tree.node 
+        leaf_trees.append(leaf_tree)
+
+    return leaf_trees
+
+def _build_internal_levels_new(
+    rank_entries_map: dict[int, list[Entry]],
+    boundaries_map: dict[int, list[int]],
+    rank_dummy_map: dict[int, bool],
+    leaf_trees: list[GKPlusTreeBase],
+    TreeClass: type[GKPlusTreeBase],
+    NodeClass: type[GKPlusNodeBase],
+    KListClass: type[KListBase],
+    threshold: int,
+    l_factor: float,
+) -> GKPlusTreeBase:
+    """
+    Build internal levels of the GKPlusTree from leaf level trees.
+    
+    Args:
+        rank_entries_map: Map of ranks to entries
+        boundaries_map: Map of rank boundaries
+        leaf_trees: List of leaf trees created from entries
+        dummy: The dummy entry to use
+        TreeClass: The tree class to use for creating nodes
+        NodeClass: The node class to use for creating nodes
+        KListClass: The KList class to use for creating nodes
+        threshold: The threshold for KList vs GKPlusTree conversion
+        l_factor: The threshold factor for conversion
+        DIM: The dimension of the tree
+        
+    Returns:
+        A new GKPlusTreeBase instance representing the root of the tree
+    """
+    # Iterate over ranks in reverse order to build internal levels
+    max_rank = next(reversed(rank_entries_map))
+    logger.info(f"[BULK CREATE] Starting internal level creation from rank {max_rank} to 1")
+    
+    dummy = Entry(get_dummy(TreeClass.DIM), None)
+    rank_trees_map: dict[int, GKPlusTreeBase] = {}
+
+    rank = max_rank
+    while rank >= 2:
+        trees = []
+        entries    = rank_entries_map[rank]
+        has_dummy  = rank_dummy_map[rank]
+        bounds     = boundaries_map[rank]       # e.g. [b0, b1, b2, …]
+        # rev_starts   -> b_last, b_{n-1}, …, b0
+        rev_starts = reversed(bounds)
+        # rev_ends     -> len(entries), b_last, b_{n-1}, …, b1
+        rev_ends   = chain([len(entries)], reversed(bounds[:-1]))
+
+        for start_idx, end_idx in zip(rev_starts, rev_ends):
+            # lazily grab exactly the slice we need
+            segment = islice(entries, start_idx, end_idx)
+
+            # if the very first segment needs a dummy, prepend it
+            if start_idx == 0 and has_dummy:
+                segment = chain([(dummy, None)], segment)
+
+            # now materialize just this segment
+            node_entries = list(segment)
+
+            if len(node_entries) < 2:
+                continue
+
+            logger.info(
+                "[BULK CREATE] Creating rank %d node (rev) with entries: %r",
+                rank,
+                [e.item.key for e, _ in node_entries],
+            )
+
+            
+
+
+            for idx, (entry, child_idx) in enumerate(islice(node_entries, 0, None)):
+                logger.info(
+                    f"[BULK CREATE] Skipping entry {entry.item.key} in rank {rank} with child {child_idx} ",
+                )
+                
+
+
+                
+                
+
+            # Create node set - always use KList for simplicity in bulk creation
+            # This ensures we don't get into recursive loops and maintains correctness
+            node_set = _bulk_create_klist(node_entries, KListClass)
+            tree_node = NodeClass(1, node_set, None)
+            tree = TreeClass(l_factor=l_factor)
+            tree.node = tree_node
+            trees.append(tree)
+        rank_trees_map[rank] = trees
+        rank -= 1
+
+    for rank in rank_trees_map:
+        for tree in rank_trees_map[rank]:
+            logger.info(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
+
+
 def _bulk_create_bottom_up(
     klist: KListBase,
     k: int,
@@ -1450,411 +1614,531 @@ def _bulk_create_bottom_up(
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
     """
-    # Get required classes and functions
     create_gkplus_tree_fn = _get_create_gkplus_tree()
-    group_size = calculate_group_size(k)
-    KListClass = type(klist)
-    
-    # Create sample tree to get classes
     sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
-    NodeClass = sample_tree.NodeClass
-    TreeClass = type(sample_tree)
-    
-    # Cache threshold calculation
-    threshold = int(k * l_factor)
-    dummy = Entry(get_dummy(DIM), None)
-    create_replica_fn = _create_replica
-
-    # rank_node_lists maps:
-    #   rank → (list_of_node_lists, next_higher_rank)
-    ranks_lists: dict[int, tuple[list[list[Entry]], Optional[int]]] = {}
-    
-    current_max_rank = 0
-    prev_rank = 0
-    for entry in klist:
-        rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
-        lists = ranks_lists.get(rank)
-        
-        # Leaf insertion only
-        if rank == 1:
-            if lists:
-                lists[-1].append(entry)
-            else:
-                ranks_lists[1] = [[dummy, entry]] # create list of node lists for rank 1
-            prev_rank = rank
-            if current_max_rank == 0:
-                current_max_rank = 1
-            continue
-        
-        # Internal insertion of replicas and leaf node creation
-        replica = Entry(create_replica_fn(entry.item.key), None)
-        if rank == prev_rank:
-            # Simply append to the last current rank list
-            lists[-1].append(replica)
-            ranks_lists[1].append([entry]) # create leaf with original entry
-        elif rank < prev_rank:
-            # 'Unfold' intermediate node using previous entry's replica as pivot.
-            pivot = ranks_lists[1][-1][-1]
-            pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
-            lists[-1].append([pivot_replica, replica])
-            ranks_lists[1].append([entry]) # create leaf with original entry
-        else:
-            # Check if we need to create a new node list for this rank
-            # Create a new node if the last entry in next higher rank > last entry in the current rank (indicating a new node boundary)
-            # Create new node list using the first entry of the last node of the previous rank as pivot
-            if not lists:
-                pivot = ranks_lists[prev_rank][-1][0]
-                pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
-                lists[-1].append([pivot_replica, replica])
-            else:
-                # Find the maximum entry in the next higher existing rank
-                lists[-1][-1].item.key <= ranks_lists[rank+1][-1][-1].item.key
-
-            if current_max_rank <= rank:
-                # Create new list for this rank
-                    ranks_lists[rank] = [[dummy, entry]]
-                else:
-                    # Append to existing list
-                    ranks_lists[rank][-1].append(entry)
-                current_max_rank = rank
-            
-            # Create a new list for this rank if it doesn't exist
-            if rank not in ranks_lists:
-                ranks_lists[rank] = [[]]
-            
-            # Append the entry to the new rank's list
-            replica = Entry(create_replica_fn(entry.item.key), None)
-            ranks_lists[rank][-1].append(replica)
-            ranks_lists[1].append([entry])
-
-        elif rank not in ranks_lists:
-            ranks_lists[rank] = [[]]
-        ranks_lists[rank].append(entry)
-
-        
-
-    if not ranks_lists:
+    if klist.is_empty():
         return sample_tree
     
+    # Get required classes and functions
+    NodeClass = sample_tree.NodeClass
+    TreeClass = type(sample_tree)
+    KListClass = type(klist)
+    create_replica_fn = _create_replica
+    group_size = calculate_group_size(k)
     
-    # Add dummy entry at the beginning (always rank 1 for leaves)
-    dummy_entry = Entry(get_dummy(DIM), None)
-    ranks_lists[1] = [dummy_entry]
-    # Dummy always starts at leaf level
+    # Comment when testing
+    entries = list(klist)
+    keys = [entry.item.key for entry in entries]
+    ranks = calc_ranks(entries, group_size, DIM)
+    logger.info(f"[BULK CREATE] keys: {keys}")
+    logger.info(f"[BULK CREATE] ranks: {ranks}")
 
-    # Build tree using correct node boundary logic
-    return _build_correct_tree_structure(entries, ranks, TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
+    # Cache frequently used values
+    threshold = int(k * l_factor)
+    dummy = Entry(get_dummy(DIM), None)
+    rank_entries_map: dict[int, list[Entry]] = {}
+    rank_entries_map[1] = [(dummy, None)]  # at least one entry at rank 1
+    boundaries_map: dict[int, list[int]] = {}
+    boundaries_map[1] = [0]
+    for entry in klist:
+        insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+        rank_entries_map[1].append((entry, None)) # Always append original entry to leaf (rank 1) list
 
+        # only leaf insertion
+        if insert_rank == 1:
+            continue
 
-def _build_correct_tree_structure(
-    entries: List[Entry],
-    ranks: List[int],
-    TreeClass: type,
-    NodeClass: type,
-    KListClass: type,
-    threshold: int,
-    l_factor: float,
-    DIM: int
-) -> 'GKPlusTreeBase':
-    """
-    Build GK+-tree with correct structure following the rules:
-    1. First entry in all nodes: left_subtree = None
-    2. Other entries: left_subtree contains items < entry.item.key
-    3. All nodes: right_subtree contains items ≥ largest entry key
-    4. Leaf nodes (rank == 1): right_subtree = None
-    
-    Algorithm:
-    1. Identify node boundaries based on rank changes
-    2. Create leaf level with all entries grouped by boundaries
-    3. Build internal levels by replicating higher rank entries
-    4. Link subtrees correctly according to GK+-tree rules
-    """
-    if not entries:
-        return TreeClass(l_factor=l_factor)
-    
-    # Step 1: Identify node boundaries based on rank increases
-    node_boundaries = _find_node_boundaries(ranks)
-    
-    # Step 2: Create leaf level with all entries grouped by boundaries
-    leaf_trees = _create_leaf_level_trees(entries, node_boundaries, TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
-    
-    # Step 3: Build internal levels by replicating higher rank entries
-    max_rank = max(ranks)
-    root_tree = _build_internal_levels_correct(entries, ranks, node_boundaries, leaf_trees, max_rank, 
-                                             TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
-    
-    return root_tree
+        # Add boundary for rank 1 (leaf) if it doesn't already exist
+        boundary_pos = len(rank_entries_map[1]) - 1
+        if boundary_pos not in boundaries_map[1]:
+            boundaries_map[1].append(boundary_pos)
 
-
-def _find_node_boundaries(ranks: List[int]) -> List[int]:
-    """
-    Find node boundaries based on rank increases.
-    Returns list of indices where new nodes should start.
-    """
-    boundaries = [0]  # Always start with first entry
-    
-    for i in range(1, len(ranks)):
-        if ranks[i] > ranks[i-1]:
-            # Higher rank indicates start of new node
-            boundaries.append(i)
-    
-    return boundaries
-
-
-def _create_leaf_level_trees(
-    entries: List[Entry],
-    boundaries: List[int],
-    TreeClass: type,
-    NodeClass: type,
-    KListClass: type,
-    threshold: int,
-    l_factor: float,
-    DIM: int
-) -> List:
-    """
-    Create leaf trees containing all entries, grouped by boundaries.
-    Each leaf contains entries between consecutive boundaries.
-    Follows GK+-tree rules: leaf nodes have right_subtree = None
-    """
-    leaf_trees = []
-    
-    for i in range(len(boundaries)):
-        start_idx = boundaries[i]
-        end_idx = boundaries[i + 1] if i + 1 < len(boundaries) else len(entries)
-        
-        # Get entries for this leaf node
-        node_entries = entries[start_idx:end_idx]
-        
-        # Create node set - always use KList for simplicity in bulk creation
-        # This ensures we don't get into recursive loops and maintains correctness
-        node_set = KListClass()
-        for entry in node_entries:
-            node_set, _ = node_set.insert_entry(entry)
-        
-        # Create leaf node (always rank 1, right_subtree = None for leaves)
-        leaf_node = NodeClass(1, node_set, None)
-        
-        # Create tree wrapper
-        leaf_tree = TreeClass(l_factor=l_factor)
-        leaf_tree.node = leaf_node
-        leaf_trees.append(leaf_tree)
-    
-    # Link leaf nodes for iteration
-    for i in range(len(leaf_trees) - 1):
-        leaf_trees[i].node.next = leaf_trees[i + 1]
-    
-    return leaf_trees
-
-
-def _build_internal_levels_correct(
-    entries: List[Entry],
-    ranks: List[int],
-    boundaries: List[int],
-    current_level_trees: List,
-    max_rank: int,
-    TreeClass: type,
-    NodeClass: type,
-    KListClass: type,
-    threshold: int,
-    l_factor: float,
-    DIM: int
-):
-    """
-    Build internal levels correctly following GK+-tree structure rules:
-    1. First entry in node: left_subtree = None
-    2. Other entries: left_subtree contains items < entry.key
-    3. All nodes: right_subtree contains items ≥ largest entry key
-    """
-    current_rank = 1
-    
-    # Build levels from rank 2 up to max_rank
-    while current_rank < max_rank:
-        current_rank += 1
-        
-        # Find entries that should be replicated to this level
-        separator_data = []
-        
-        for i, (entry, rank) in enumerate(zip(entries, ranks)):
-            if rank >= current_rank:
-                # This entry should be replicated to this level
-                child_idx = _find_child_node_index(i, boundaries)
-                separator_data.append((entry, child_idx, i))
-        
-        if not separator_data:
-            # No more separators needed at this level
-            break
-        
-        # Create internal nodes for this level with correct structure
-        new_level_trees = _create_internal_level_correct(
-            separator_data, current_level_trees, current_rank,
-            TreeClass, NodeClass, KListClass, threshold, l_factor, DIM
-        )
-        
-        current_level_trees = new_level_trees
-        
-        # Update boundaries for next level (each internal node becomes a new boundary)
-        boundaries = list(range(len(current_level_trees) + 1))
-    
-    # Return root tree (should be single tree at top level)
-    if len(current_level_trees) == 1:
-        return current_level_trees[0]
-    else:
-        # Multiple trees at top level - create a root to contain them
-        return _create_single_root_tree(current_level_trees, max_rank + 1, TreeClass, NodeClass, KListClass, l_factor, DIM)
-
-
-def _create_internal_level_correct(
-    separator_data: List[Tuple[Entry, int, int]],  # (entry, child_idx, original_idx)
-    child_trees: List,
-    rank: int,
-    TreeClass: type,
-    NodeClass: type,
-    KListClass: type,
-    threshold: int,
-    l_factor: float,
-    DIM: int
-) -> List:
-    """
-    Create internal nodes correctly following GK+-tree structure rules.
-    
-    Key rules:
-    1. First entry in node: left_subtree = None
-    2. Other entries: left_subtree = previous child tree
-    3. Node's right_subtree = rightmost child tree for this node
-    """
-    if not separator_data:
-        return child_trees
-    
-    # Group separators by which internal node they should belong to
-    # For simplicity, create one internal node per group of separators that fit threshold
-    internal_trees = []
-    
-    i = 0
-    while i < len(separator_data):
-        # Collect separators for this internal node (up to threshold)
-        node_separators = []
-        node_child_indices = []
-        
-        # Take separators up to threshold or until we need to start a new node
-        while i < len(separator_data) and len(node_separators) < threshold:
-            entry, child_idx, orig_idx = separator_data[i]
-            
-            # Create replica for internal node
-            replica = _create_replica(entry.item.key)
-            separator_entry = Entry(replica, None)
-            
-            node_separators.append(separator_entry)
-            node_child_indices.append(child_idx)
-            i += 1
-        
-        # Create node set
-        node_set = KListClass()
-        for j, sep_entry in enumerate(node_separators):
-            # First entry: left_subtree = None
-            # Other entries: left_subtree = previous child
-            if j == 0:
-                sep_entry.left_subtree = None
+        # Propagate entry replicas to higher levels up to the current rank
+        rank = 2
+        while rank <= insert_rank:
+        # for r in range(2, insert_rank + 1):
+            replica = Entry(create_replica_fn(entry.item.key), None)
+            rank_list = rank_entries_map.get(rank, None)
+            child_idx = boundaries_map[rank - 1][-1]
+            if rank_list is not None:
+                rank_list.append((replica, child_idx))
             else:
-                prev_child_idx = node_child_indices[j-1]
-                if prev_child_idx < len(child_trees):
-                    sep_entry.left_subtree = child_trees[prev_child_idx]
+                rank_entries_map[rank] = [(replica, child_idx)]
+                boundaries_map[rank] = [0]
+
+            # Check if we need to create a boundary for this rank
+            if rank == insert_rank or not rank_list:
+                rank += 1
+                continue
+
+            boundaries_map[rank].append(len(rank_entries_map[rank]) - 1)
+            logger.info(
+                "[BULK CREATE] Added entry %s to rank %d, boundaries: %s",
+                replica.item.key, rank, boundaries_map[rank]
+            )
+            rank += 1
+
+    # Comment when testing
+    logger.info(
+        "[BULK CREATE] Created rank entries map:\n%s",
+        pprint.pformat(rank_entries_map)
+    )
+    logger.info(
+        "[BULK CREATE] Created boundaries map:\n%s",
+        pprint.pformat(boundaries_map)
+    )
+    for entry in klist:
+        rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+        sample_tree, _ = sample_tree.insert_entry(entry, rank)
+    logger.info(
+        "[BULK CREATE] Sample tree after inserting entries:\n%s",
+        print_pretty(sample_tree)
+    )
+
+    # Add dummy flags if required
+    rank_dummy_map: dict[int, bool] = {}
+    parent_first_key = None
+
+    for rank in reversed(rank_entries_map):
+        cur_first_key = rank_entries_map[rank][0][0].item.key
+        
+        # First iteration (highest rank) or current key is smaller than parent
+        is_dummy = parent_first_key is None or cur_first_key < parent_first_key
+        rank_dummy_map[rank] = is_dummy
+        parent_first_key = cur_first_key
+
+    logger.info(
+        "[BULK CREATE] Rank dummy map:\n%s",
+        pprint.pformat(rank_dummy_map)
+    )
+
+    leaf_trees = _build_leaf_level_trees_new(
+        rank_entries_map[1],
+        boundaries_map[1],
+        dummy,
+        KListClass,
+        NodeClass,
+        TreeClass,
+        l_factor,
+        rank_dummy_map[1],
+    )
+    for tree in leaf_trees:
+        logger.info(f"[BULK CREATE] Leaf tree: {print_pretty(tree)}")
+
+    root_tree = _build_internal_levels_new(
+        rank_entries_map, boundaries_map, rank_dummy_map, leaf_trees,
+        TreeClass, NodeClass, KListClass, threshold, l_factor
+    )
+
+    logger.info(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
+
+    exit()
+
+    # current_max_rank = 0
+    # prev_rank = 0
+    # for entry in klist:
+    #     rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+    #     lists = ranks_lists.get(rank)
+        
+    #     # Leaf insertion only
+    #     if rank == 1:
+    #         if lists:
+    #             lists[-1].append(entry)
+    #         else:
+    #             ranks_lists[1] = [[dummy, entry]] # create list of node lists for rank 1
+    #         prev_rank = rank
+    #         if current_max_rank == 0:
+    #             current_max_rank = 1
+    #         continue
+        
+    #     # Internal insertion of replicas and leaf node creation
+    #     replica = Entry(create_replica_fn(entry.item.key), None)
+    #     if rank == prev_rank:
+    #         # Simply append to the last current rank list
+    #         lists[-1].append(replica)
+    #     elif rank < prev_rank:
+    #         # 'Unfold' intermediate node using first entry of the last node of the previous rank as pivot (node boundary)
+    #         pivot = ranks_lists[1][-1][-1]
+    #         pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
+    #         if not lists:
+    #             ranks_lists[rank] = [[pivot_replica, replica]]
+    #         else:
+    #             lists[-1].append(replica)
             
-            node_set, _ = node_set.insert_entry(sep_entry)
-        
-        # Determine right_subtree: rightmost child for this node
-        right_subtree = None
-        if node_child_indices:
-            rightmost_child_idx = max(node_child_indices)
-            if rightmost_child_idx + 1 < len(child_trees):
-                right_subtree = child_trees[rightmost_child_idx + 1]
-        
-        # Create internal node
-        internal_node = NodeClass(rank, node_set, right_subtree)
-        
-        # Create tree wrapper
-        internal_tree = TreeClass(l_factor=l_factor)
-        internal_tree.node = internal_node
-        internal_trees.append(internal_tree)
-    
-    return internal_trees
+    #     else:
+    #         # Rank is higher than previous rank
+    #         # Check if we need to create a new node list for this rank
+    #         if not lists:
+    #             # 
+    #             pivot = ranks_lists[prev_rank][-1][0]
+    #             pivot_replica = Entry(create_replica_fn(pivot.item.key), None)
+    #             ranks_lists[rank] = [pivot_replica, replica]
+    #         else:
+    #             if current_max_rank > rank:
+    #                 # Find the maximum entry in the next higher existing rank
+    #                 for higher_rank in range(rank + 1, current_max_rank + 1):
+    #                     next_higher_lists = ranks_lists.get(higher_rank)
+    #                     if next_higher_lists:
+    #                         # Get last entry of last list
+    #                         next_higher_entry = next_higher_lists[-1][-1]
+    #                         break
+
+    #                 else:
+    #                     lists[-1][-1].item.key <= ranks_lists[rank+1][-1][-1].item.key
+
+    #     ranks_lists[1].append([entry]) # always create leaf with original entry
 
 
-def _create_single_root_tree(
-    child_trees: List,
-    rank: int,
-    TreeClass: type,
-    NodeClass: type,
-    KListClass: type,
-    l_factor: float,
-    DIM: int
-):
-    """Create a single root tree to contain multiple child trees."""
-    # Create a root with dummy entry
-    root_set = KListClass()
-    dummy_entry = Entry(get_dummy(DIM), None)
-    dummy_entry.left_subtree = None  # First entry rule
-    root_set, _ = root_set.insert_entry(dummy_entry)
-    
-    # Right subtree is the first child tree
-    right_subtree = child_trees[0] if child_trees else None
-    
-    root_node = NodeClass(rank, root_set, right_subtree)
-    
-    root_tree = TreeClass(l_factor=l_factor)
-    root_tree.node = root_node
-    return root_tree
+            
+            # Create a new node if the last entry in next higher rank > last entry in the current rank (indicating a new node boundary)
+            # Create new node list using the first entry of the last node of the previous rank as pivot
 
 
-def _find_child_node_index(entry_index: int, boundaries: List[int]) -> int:
-    """Find which child node (leaf) an entry belongs to based on boundaries."""
-    for i in range(len(boundaries) - 1):
-        if boundaries[i] <= entry_index < boundaries[i + 1]:
-            return i
-    return len(boundaries) - 1  # Last boundary
+        #     if current_max_rank <= rank:
+        #         # Create new list for this rank
+        #             ranks_lists[rank] = [[dummy, entry]]
+        #         else:
+        #             # Append to existing list
+        #             ranks_lists[rank][-1].append(entry)
+        #         current_max_rank = rank
+            
+        #     # Create a new list for this rank if it doesn't exist
+        #     if rank not in ranks_lists:
+        #         ranks_lists[rank] = [[]]
+            
+        #     # Append the entry to the new rank's list
+        #     replica = Entry(create_replica_fn(entry.item.key), None)
+        #     ranks_lists[rank][-1].append(replica)
+        #     ranks_lists[1].append([entry])
 
+        # elif rank not in ranks_lists:
+        #     ranks_lists[rank] = [[]]
+        # ranks_lists[rank].append(entry)
 
-def _create_internal_level_nodes(
-    separator_entries: List[Entry],
-    child_indices: List[int],
-    child_nodes: List,
-    rank: int,
-    NodeClass: type,
-    KListClass: type,
-    threshold: int,
-    l_factor: float,
-    DIM: int
-) -> List:
-    """Create internal nodes for a specific rank level."""
-    if not separator_entries:
-        return child_nodes
-    
-    # Group separators that should go in the same internal node
-    # (This is a simplified version - in practice, you might want more sophisticated grouping)
-    internal_nodes = []
-    
-    # For simplicity, create one internal node per separator
-    # In a more optimized version, you'd group multiple separators per internal node
-    for i, (sep_entry, child_idx) in enumerate(zip(separator_entries, child_indices)):
-        # Create node set with separator
-        node_set = KListClass()
-        node_set, _ = node_set.insert_entry(sep_entry)
         
-        # Link to child - create a tree wrapper for the child node
-        if child_idx < len(child_nodes):
-            create_gkplus_tree_fn = _get_create_gkplus_tree()
-            left_child = create_gkplus_tree_fn(KListClass.KListNodeClass.CAPACITY, DIM, l_factor)
-            left_child.node = child_nodes[child_idx]
-            sep_entry.left_subtree = left_child
-        
-        # Right subtree is next child (if exists)  
-        right_child = None
-        if child_idx + 1 < len(child_nodes):
-            create_gkplus_tree_fn = _get_create_gkplus_tree()
-            right_child = create_gkplus_tree_fn(KListClass.KListNodeClass.CAPACITY, DIM, l_factor)
-            right_child.node = child_nodes[child_idx + 1]
-        
-        # Create internal node
-        internal_node = NodeClass(rank, node_set, right_child)
-        internal_nodes.append(internal_node)
+
+    # if not ranks_lists:
+    #     return sample_tree
     
-    return internal_nodes
+    
+    # # Add dummy entry at the beginning (always rank 1 for leaves)
+    # dummy_entry = Entry(get_dummy(DIM), None)
+    # ranks_lists[1] = [dummy_entry]
+    # # Dummy always starts at leaf level
+
+    # # Build tree using correct node boundary logic
+    # return _build_correct_tree_structure(entries, ranks, TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
+
+
+# def _build_correct_tree_structure(
+#     entries: List[Entry],
+#     ranks: List[int],
+#     TreeClass: type,
+#     NodeClass: type,
+#     KListClass: type,
+#     threshold: int,
+#     l_factor: float,
+#     DIM: int
+# ) -> 'GKPlusTreeBase':
+#     """
+#     Build GK+-tree with correct structure following the rules:
+#     1. First entry in all nodes: left_subtree = None
+#     2. Other entries: left_subtree contains items < entry.item.key
+#     3. All nodes: right_subtree contains items ≥ largest entry key
+#     4. Leaf nodes (rank == 1): right_subtree = None
+    
+#     Algorithm:
+#     1. Identify node boundaries based on rank changes
+#     2. Create leaf level with all entries grouped by boundaries
+#     3. Build internal levels by replicating higher rank entries
+#     4. Link subtrees correctly according to GK+-tree rules
+#     """
+#     if not entries:
+#         return TreeClass(l_factor=l_factor)
+    
+#     # Step 1: Identify node boundaries based on rank increases
+#     node_boundaries = _find_node_boundaries(ranks)
+    
+#     # Step 2: Create leaf level with all entries grouped by boundaries
+#     leaf_trees = _create_leaf_level_trees(entries, node_boundaries, TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
+    
+#     # Step 3: Build internal levels by replicating higher rank entries
+#     max_rank = max(ranks)
+#     root_tree = _build_internal_levels_correct(entries, ranks, node_boundaries, leaf_trees, max_rank, 
+#                                              TreeClass, NodeClass, KListClass, threshold, l_factor, DIM)
+    
+#     return root_tree
+
+
+# def _find_node_boundaries(ranks: List[int]) -> List[int]:
+#     """
+#     Find node boundaries based on rank increases.
+#     Returns list of indices where new nodes should start.
+#     """
+#     boundaries = [0]  # Always start with first entry
+    
+#     for i in range(1, len(ranks)):
+#         if ranks[i] > ranks[i-1]:
+#             # Higher rank indicates start of new node
+#             boundaries.append(i)
+    
+#     return boundaries
+
+
+# def _create_leaf_level_trees(
+#     entries: List[Entry],
+#     boundaries: List[int],
+#     TreeClass: type,
+#     NodeClass: type,
+#     KListClass: type,
+#     threshold: int,
+#     l_factor: float,
+#     DIM: int
+# ) -> List:
+#     """
+#     Create leaf trees containing all entries, grouped by boundaries.
+#     Each leaf contains entries between consecutive boundaries.
+#     Follows GK+-tree rules: leaf nodes have right_subtree = None
+#     """
+#     leaf_trees = []
+    
+#     for i in range(len(boundaries)):
+#         start_idx = boundaries[i]
+#         end_idx = boundaries[i + 1] if i + 1 < len(boundaries) else len(entries)
+        
+#         # Get entries for this leaf node
+#         node_entries = entries[start_idx:end_idx]
+        
+#         # Create node set - always use KList for simplicity in bulk creation
+#         # This ensures we don't get into recursive loops and maintains correctness
+#         node_set = KListClass()
+#         for entry in node_entries:
+#             node_set, _ = node_set.insert_entry(entry)
+        
+#         # Create leaf node (always rank 1, right_subtree = None for leaves)
+#         leaf_node = NodeClass(1, node_set, None)
+        
+#         # Create tree wrapper
+#         leaf_tree = TreeClass(l_factor=l_factor)
+#         leaf_tree.node = leaf_node
+#         leaf_trees.append(leaf_tree)
+    
+#     # Link leaf nodes for iteration
+#     for i in range(len(leaf_trees) - 1):
+#         leaf_trees[i].node.next = leaf_trees[i + 1]
+    
+#     return leaf_trees
+
+
+# def _build_internal_levels_correct(
+#     entries: List[Entry],
+#     ranks: List[int],
+#     boundaries: List[int],
+#     current_level_trees: List,
+#     max_rank: int,
+#     TreeClass: type,
+#     NodeClass: type,
+#     KListClass: type,
+#     threshold: int,
+#     l_factor: float,
+#     DIM: int
+# ):
+#     """
+#     Build internal levels correctly following GK+-tree structure rules:
+#     1. First entry in node: left_subtree = None
+#     2. Other entries: left_subtree contains items < entry.key
+#     3. All nodes: right_subtree contains items ≥ largest entry key
+#     """
+#     current_rank = 1
+    
+#     # Build levels from rank 2 up to max_rank
+#     while current_rank < max_rank:
+#         current_rank += 1
+        
+#         # Find entries that should be replicated to this level
+#         separator_data = []
+        
+#         for i, (entry, rank) in enumerate(zip(entries, ranks)):
+#             if rank >= current_rank:
+#                 # This entry should be replicated to this level
+#                 child_idx = _find_child_node_index(i, boundaries)
+#                 separator_data.append((entry, child_idx, i))
+        
+#         if not separator_data:
+#             # No more separators needed at this level
+#             break
+        
+#         # Create internal nodes for this level with correct structure
+#         new_level_trees = _create_internal_level_correct(
+#             separator_data, current_level_trees, current_rank,
+#             TreeClass, NodeClass, KListClass, threshold, l_factor, DIM
+#         )
+        
+#         current_level_trees = new_level_trees
+        
+#         # Update boundaries for next level (each internal node becomes a new boundary)
+#         boundaries = list(range(len(current_level_trees) + 1))
+    
+#     # Return root tree (should be single tree at top level)
+#     if len(current_level_trees) == 1:
+#         return current_level_trees[0]
+#     else:
+#         # Multiple trees at top level - create a root to contain them
+#         return _create_single_root_tree(current_level_trees, max_rank + 1, TreeClass, NodeClass, KListClass, l_factor, DIM)
+
+
+# def _create_internal_level_correct(
+#     separator_data: List[Tuple[Entry, int, int]],  # (entry, child_idx, original_idx)
+#     child_trees: List,
+#     rank: int,
+#     TreeClass: type,
+#     NodeClass: type,
+#     KListClass: type,
+#     threshold: int,
+#     l_factor: float,
+#     DIM: int
+# ) -> List:
+#     """
+#     Create internal nodes correctly following GK+-tree structure rules.
+    
+#     Key rules:
+#     1. First entry in node: left_subtree = None
+#     2. Other entries: left_subtree = previous child tree
+#     3. Node's right_subtree = rightmost child tree for this node
+#     """
+#     if not separator_data:
+#         return child_trees
+    
+#     # Group separators by which internal node they should belong to
+#     # For simplicity, create one internal node per group of separators that fit threshold
+#     internal_trees = []
+    
+#     i = 0
+#     while i < len(separator_data):
+#         # Collect separators for this internal node (up to threshold)
+#         node_separators = []
+#         node_child_indices = []
+        
+#         # Take separators up to threshold or until we need to start a new node
+#         while i < len(separator_data) and len(node_separators) < threshold:
+#             entry, child_idx, orig_idx = separator_data[i]
+            
+#             # Create replica for internal node
+#             replica = _create_replica(entry.item.key)
+#             separator_entry = Entry(replica, None)
+            
+#             node_separators.append(separator_entry)
+#             node_child_indices.append(child_idx)
+#             i += 1
+        
+#         # Create node set
+#         node_set = KListClass()
+#         for j, sep_entry in enumerate(node_separators):
+#             # First entry: left_subtree = None
+#             # Other entries: left_subtree = previous child
+#             if j == 0:
+#                 sep_entry.left_subtree = None
+#             else:
+#                 prev_child_idx = node_child_indices[j-1]
+#                 if prev_child_idx < len(child_trees):
+#                     sep_entry.left_subtree = child_trees[prev_child_idx]
+            
+#             node_set, _ = node_set.insert_entry(sep_entry)
+        
+#         # Determine right_subtree: rightmost child for this node
+#         right_subtree = None
+#         if node_child_indices:
+#             rightmost_child_idx = max(node_child_indices)
+#             if rightmost_child_idx + 1 < len(child_trees):
+#                 right_subtree = child_trees[rightmost_child_idx + 1]
+        
+#         # Create internal node
+#         internal_node = NodeClass(rank, node_set, right_subtree)
+        
+#         # Create tree wrapper
+#         internal_tree = TreeClass(l_factor=l_factor)
+#         internal_tree.node = internal_node
+#         internal_trees.append(internal_tree)
+    
+#     return internal_trees
+
+
+# def _create_single_root_tree(
+#     child_trees: List,
+#     rank: int,
+#     TreeClass: type,
+#     NodeClass: type,
+#     KListClass: type,
+#     l_factor: float,
+#     DIM: int
+# ):
+#     """Create a single root tree to contain multiple child trees."""
+#     # Create a root with dummy entry
+#     root_set = KListClass()
+#     dummy_entry = Entry(get_dummy(DIM), None)
+#     dummy_entry.left_subtree = None  # First entry rule
+#     root_set, _ = root_set.insert_entry(dummy_entry)
+    
+#     # Right subtree is the first child tree
+#     right_subtree = child_trees[0] if child_trees else None
+    
+#     root_node = NodeClass(rank, root_set, right_subtree)
+    
+#     root_tree = TreeClass(l_factor=l_factor)
+#     root_tree.node = root_node
+#     return root_tree
+
+
+# def _find_child_node_index(entry_index: int, boundaries: List[int]) -> int:
+#     """Find which child node (leaf) an entry belongs to based on boundaries."""
+#     for i in range(len(boundaries) - 1):
+#         if boundaries[i] <= entry_index < boundaries[i + 1]:
+#             return i
+#     return len(boundaries) - 1  # Last boundary
+
+
+# def _create_internal_level_nodes(
+#     separator_entries: List[Entry],
+#     child_indices: List[int],
+#     child_nodes: List,
+#     rank: int,
+#     NodeClass: type,
+#     KListClass: type,
+#     threshold: int,
+#     l_factor: float,
+#     DIM: int
+# ) -> List:
+#     """Create internal nodes for a specific rank level."""
+#     if not separator_entries:
+#         return child_nodes
+    
+#     # Group separators that should go in the same internal node
+#     # (This is a simplified version - in practice, you might want more sophisticated grouping)
+#     internal_nodes = []
+    
+#     # For simplicity, create one internal node per separator
+#     # In a more optimized version, you'd group multiple separators per internal node
+#     for i, (sep_entry, child_idx) in enumerate(zip(separator_entries, child_indices)):
+#         # Create node set with separator
+#         node_set = KListClass()
+#         node_set, _ = node_set.insert_entry(sep_entry)
+        
+#         # Link to child - create a tree wrapper for the child node
+#         if child_idx < len(child_nodes):
+#             create_gkplus_tree_fn = _get_create_gkplus_tree()
+#             left_child = create_gkplus_tree_fn(KListClass.KListNodeClass.CAPACITY, DIM, l_factor)
+#             left_child.node = child_nodes[child_idx]
+#             sep_entry.left_subtree = left_child
+        
+#         # Right subtree is next child (if exists)  
+#         right_child = None
+#         if child_idx + 1 < len(child_nodes):
+#             create_gkplus_tree_fn = _get_create_gkplus_tree()
+#             right_child = create_gkplus_tree_fn(KListClass.KListNodeClass.CAPACITY, DIM, l_factor)
+#             right_child.node = child_nodes[child_idx + 1]
+        
+#         # Create internal node
+#         internal_node = NodeClass(rank, node_set, right_child)
+#         internal_nodes.append(internal_node)
+    
+#     return internal_nodes

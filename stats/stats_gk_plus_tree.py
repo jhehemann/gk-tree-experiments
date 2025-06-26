@@ -333,8 +333,8 @@ if __name__ == "__main__":
     # sizes = [10, 100, 1000, 10_000, 100_000]
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
-    Ks = [4]
-    l_factor = 1.0
+    Ks = [2]
+    l_factor = 3.0
     repetitions = 1
 
     for n in sizes:
