@@ -334,7 +334,7 @@ if __name__ == "__main__":
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
     Ks = [2]
-    l_factor = 3.0
+    l_factor = 4.0
     repetitions = 1
 
     for n in sizes:
