@@ -1536,15 +1536,15 @@ def _build_internal_levels_new(
     dummy = Entry(get_dummy(TreeClass.DIM), None)
     rank_trees_map: dict[int, GKPlusTreeBase] = {}
 
-    rank = max_rank
-    while rank >= 2:
+    rank = 2
+    while rank <= max_rank:
         entries = rank_entries_map.get(rank, None)
         logger.info(f"[BULK CREATE] Processing rank {rank} with entries: %s",
                     [entry.item.key for entry, _ in entries] if entries else []
                 )
         if entries is None:
             logger.info(f"[BULK CREATE] No entries for rank {rank}, skipping")
-            rank -= 1
+            rank += 1
             continue
 
         trees = []
@@ -1613,7 +1613,7 @@ def _build_internal_levels_new(
             tree.node = tree_node
             trees.append(tree)
         rank_trees_map[rank] = trees
-        rank -= 1
+        rank += 1
 
     for rank in rank_trees_map:
         for tree in rank_trees_map[rank]:
@@ -1667,8 +1667,10 @@ def _bulk_create_bottom_up(
     rank_entries_map: dict[int, list[Entry]] = {}
     rank_entries_map[1] = [(dummy, None)]  # at least one entry at rank 1
     boundaries_map: dict[int, list[int]] = {}
-    # boundaries_map[1] = [0]
     add_boundary_map: dict[int, bool] = {}
+    prev_pivot_map: dict[int, int] = {}
+    # rank_node_slots_map: dict[int, Optional[list[int]]] = {}
+    # prev = None  # Previous entry for collapsing boundaries
     max_rank = 1
     for entry in klist:
         insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
@@ -1697,58 +1699,93 @@ def _bulk_create_bottom_up(
 
         # Propagate entry replicas to higher levels up to the current rank
         rank = insert_rank
+        
+        # Cache the entry key to avoid repeated attribute access
+        entry_key = entry.item.key
+        
         while rank > 0:
-            
-            replica = Entry(create_replica_fn(entry.item.key), None)
-            insert_entry = entry if rank == 1 else replica
-            ranks = rank_entries_map.get(rank, None)
-            boundaries = boundaries_map.get(rank, None)
+            # Batch dictionary lookups for better cache efficiency
+            ranks = rank_entries_map.get(rank)
+            boundaries = boundaries_map.get(rank)
             add_boundary = add_boundary_map.get(rank, True)
-            child_add_boundary = add_boundary_map.get(rank - 1, True)
-            child_boundaries = boundaries_map.get(rank - 1, None)
-            if child_boundaries and not child_add_boundary:
-                child_idx = child_boundaries[-1]
-            elif child_boundaries is None and rank == 2:
-                child_idx = 0
-            else:
-                child_idx = None
+            
+            # Only process ranks that need entry insertion
             if rank == insert_rank or rank == 1:
-                if ranks is not None:
-                    rank_entries_map[rank].append((insert_entry, child_idx))
-                    
-                else:
-                    if insert_rank < max_rank:
-                        rank_entries_map[rank] = [(insert_entry, child_idx)]
-                    else:
-                        rank_entries_map[rank] = [(dummy, None), (insert_entry, child_idx)]
+                # Create fresh replica for each rank (except leaf which uses original entry)
+                insert_entry = entry if rank == 1 else Entry(create_replica_fn(entry_key), None)
                 
+                # Calculate child index efficiently
+                child_idx = None
+                if rank > 1:
+                    child_add_boundary = add_boundary_map.get(rank - 1, True)
+                    child_boundaries = boundaries_map.get(rank - 1)
+                    if child_boundaries and not child_add_boundary:
+                        child_idx = len(child_boundaries) - 1
+                    elif child_boundaries is None and rank == 2:
+                        child_idx = 0
+                
+                prev_pivot = prev_pivot_map.get(rank, None)
+
+                # Optimize entry insertion
+                if ranks is not None:
+                    logger.info(f"[BULK CREATE] Inserting entry {insert_entry.item.key} at rank {rank} with child index {child_idx}. Previous pivot: {prev_pivot}")
+                    if prev_pivot is not None:
+                        ranks.append((Entry(create_replica_fn(prev_pivot), None), None))
+                    ranks.append((insert_entry, child_idx))
+                    logger.info(f"[BULK CREATE] Updated rank {rank} entries: %s",
+                                [e.item.key for e, _ in ranks]
+                            )
+                else:
+                    # Create new rank entry list
+                    new_entries = [(insert_entry, child_idx)]
+                    if insert_rank >= max_rank:
+                        new_entries.insert(0, (dummy, None))
+                    else:
+                        new_entries.insert(0, (Entry(create_replica_fn(prev_pivot), None), None))
+                    rank_entries_map[rank] = new_entries
+                
+                # Optimized boundary management
                 if rank == insert_rank:
-                    if rank == 1 and len(add_boundary_map) == 0:
+                    # Handle special case for rank 1 initialization
+                    if rank == 1 and not add_boundary_map:
                         boundaries_map[rank] = [0]
                         add_boundary_map[rank] = False
-                    if add_boundary:
-                        if boundaries is not None:
-                            boundaries_map[rank].append(len(ranks) - 1)
+                    elif add_boundary:
+                        # Calculate boundary position once
+                        if prev_pivot is not None:
+                            boundary_pos = (len(ranks) - 2) if boundaries is not None else 0
                         else:
-                            boundaries_map[rank] = [0]
-                        add_boundary_map[rank] = False
+                            boundary_pos = (len(ranks) - 1) if boundaries is not None else 0
 
-                elif rank != insert_rank:
-                    # if add_boundary is not None and not add_boundary:
-                    if boundaries is not None:
-                        boundaries_map[rank].append(len(ranks) - 1)
+                        if boundaries is not None:
+                            boundaries.append(boundary_pos)
+                        else:
+                            boundaries_map[rank] = [boundary_pos]
                         add_boundary_map[rank] = False
-                    else:
-                        boundaries_map[rank] = [0, len(ranks) - 1]
-                        add_boundary_map[rank] = False
-
+                        
+                elif boundaries is not None:
+                    # Non-insert rank boundary update
+                    boundary_pos = len(ranks) - 1
+                    boundaries.append(boundary_pos)
+                    add_boundary_map[rank] = False
+                else:
+                    # Initialize boundaries for new rank
+                    rank_size = len(rank_entries_map[rank])
+                    boundaries_map[rank] = [0, rank_size - 1]
+                    add_boundary_map[rank] = False
+                
                 rank -= 1
+                prev = entry
+                prev_pivot_map[rank] = None
                 continue
             
-            # Create a boundary for all lower ranks
-            if add_boundary is not None and not add_boundary:
+            # Handle non-insert/non-leaf ranks: set boundary flag for lower ranks
+            if not add_boundary:
                 add_boundary_map[rank] = True
+            
 
+            prev_pivot_map[rank] = entry_key
+            logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
             rank -= 1
         max_rank = insert_rank if insert_rank > max_rank else max_rank
 
