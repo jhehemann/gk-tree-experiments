@@ -26,6 +26,14 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from tests.utils import (
     assert_tree_invariants_raise,
 )
+# random.seed(7)
+# np.random.seed(1)
+# random.seed(9)
+# np.random.seed(1)
+# random.seed(10)
+# np.random.seed(1)
+# random.seed(11)
+# np.random.seed(1)
 
 # Assume create_gtree(items) builds a GPlusTree from a list of (Item, rank) pairs.
 def create_gtree(items, K=16, l_factor=1.0) -> GKPlusTreeBase:

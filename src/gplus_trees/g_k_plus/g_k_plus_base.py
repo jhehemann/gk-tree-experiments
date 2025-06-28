@@ -1557,9 +1557,9 @@ def _build_internal_levels_new(
                         [entry.item.key for entry, _ in node_entries]
                     )
             
-            for entry in islice(node_entries, 1, None):
-                # do something"""
-                break
+            # for entry in islice(node_entries, 1, None):
+            #     # do something"""
+            #     break
 
     # rank = max_rank
     # while rank >= 2:
@@ -1667,21 +1667,24 @@ def _bulk_create_bottom_up(
     rank_entries_map: dict[int, list[Entry]] = {}
     rank_entries_map[1] = [(dummy, None)]  # at least one entry at rank 1
     boundaries_map: dict[int, list[int]] = {}
-    boundaries_map[1] = [0]
+    # boundaries_map[1] = [0]
     add_boundary_map: dict[int, bool] = {}
     max_rank = 1
     for entry in klist:
         insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
-        rank_entries_map[1].append((entry, None)) # Always append original entry to leaf (rank 1) list
+        # rank_entries_map[1].append((entry, None)) # Always append original entry to leaf (rank 1) list
 
-        # only leaf insertion
-        if insert_rank == 1:
-            continue
+        # # only leaf insertion
+        # if insert_rank == 1:
+        #     if add_boundary_map.get(1, True):
+        #         boundaries_map[1].append(len(rank_entries_map[1]) - 1)
+        #         add_boundary_map[1] = False
+        #     continue
 
-        # Add boundary for rank 1 (leaf) if it doesn't already exist
-        boundary_pos = len(rank_entries_map[1]) - 1
-        if boundary_pos not in boundaries_map[1]:
-            boundaries_map[1].append(boundary_pos)
+        # # Add boundary for rank 1 (leaf) if it doesn't already exist
+        # boundary_pos = len(rank_entries_map[1]) - 1
+        # if boundary_pos not in boundaries_map[1]:
+        #     boundaries_map[1].append(boundary_pos)
 
         # replica = Entry(create_replica_fn(entry.item.key), None)
         # rank_list = rank_entries_map.get(rank, None)
@@ -1693,42 +1696,64 @@ def _bulk_create_bottom_up(
         #         boundaries_map[rank] = [0]
 
         # Propagate entry replicas to higher levels up to the current rank
-        rank = 2
-        while rank <= insert_rank:
-        # for r in range(2, insert_rank + 1):
+        rank = insert_rank
+        while rank > 0:
+            
             replica = Entry(create_replica_fn(entry.item.key), None)
+            insert_entry = entry if rank == 1 else replica
             ranks = rank_entries_map.get(rank, None)
             boundaries = boundaries_map.get(rank, None)
             add_boundary = add_boundary_map.get(rank, True)
+            child_add_boundary = add_boundary_map.get(rank - 1, True)
             child_boundaries = boundaries_map.get(rank - 1, None)
-            child_idx = child_boundaries[-1] if child_boundaries is not None else None
-            if rank == insert_rank:
+            if child_boundaries and not child_add_boundary:
+                child_idx = child_boundaries[-1]
+            elif child_boundaries is None and rank == 2:
+                child_idx = 0
+            else:
+                child_idx = None
+            if rank == insert_rank or rank == 1:
                 if ranks is not None:
-                    rank_entries_map[rank].append((replica, child_idx))
+                    rank_entries_map[rank].append((insert_entry, child_idx))
+                    
                 else:
                     if insert_rank < max_rank:
-                        rank_entries_map[rank] = [(replica, child_idx)]
+                        rank_entries_map[rank] = [(insert_entry, child_idx)]
                     else:
-                        rank_entries_map[rank] = [(dummy, None), (replica, child_idx)]
+                        rank_entries_map[rank] = [(dummy, None), (insert_entry, child_idx)]
                 
-                if add_boundary:
+                if rank == insert_rank:
+                    if rank == 1 and len(add_boundary_map) == 0:
+                        boundaries_map[rank] = [0]
+                        add_boundary_map[rank] = False
+                    if add_boundary:
+                        if boundaries is not None:
+                            boundaries_map[rank].append(len(ranks) - 1)
+                        else:
+                            boundaries_map[rank] = [0]
+                        add_boundary_map[rank] = False
+
+                elif rank != insert_rank:
+                    # if add_boundary is not None and not add_boundary:
                     if boundaries is not None:
                         boundaries_map[rank].append(len(ranks) - 1)
+                        add_boundary_map[rank] = False
                     else:
-                        boundaries_map[rank] = [0]
-                    add_boundary_map[rank] = False
+                        boundaries_map[rank] = [0, len(ranks) - 1]
+                        add_boundary_map[rank] = False
 
-                rank += 1
+                rank -= 1
                 continue
             
             # Create a boundary for all lower ranks
             if add_boundary is not None and not add_boundary:
                 add_boundary_map[rank] = True
 
-            rank += 1
+            rank -= 1
         max_rank = insert_rank if insert_rank > max_rank else max_rank
 
     # Comment when testing
+    # if IS_DEBUG:
     logger.info(
         "[BULK CREATE] Created rank entries map:\n%s",
         pprint.pformat(rank_entries_map)
