@@ -1669,8 +1669,9 @@ def _bulk_create_bottom_up(
     boundaries_map: dict[int, list[int]] = {}
     add_boundary_map: dict[int, bool] = {}
     prev_pivot_map: dict[int, int] = {}
-    # rank_node_slots_map: dict[int, Optional[list[int]]] = {}
-    # prev = None  # Previous entry for collapsing boundaries
+    rank_node_slots_map: dict[int, Optional[list[int]]] = {}
+    rank_node_slots_map[1] = [[(dummy, None)]]  # at least one entry at rank 1
+
     max_rank = 1
     for entry in klist:
         insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
@@ -1708,6 +1709,8 @@ def _bulk_create_bottom_up(
             ranks = rank_entries_map.get(rank)
             boundaries = boundaries_map.get(rank)
             add_boundary = add_boundary_map.get(rank, True)
+            node_slots = rank_node_slots_map.get(rank, None)
+            prev_pivot = prev_pivot_map.get(rank, None)
             
             # Only process ranks that need entry insertion
             if rank == insert_rank or rank == 1:
@@ -1717,34 +1720,60 @@ def _bulk_create_bottom_up(
                 # Calculate child index efficiently
                 child_idx = None
                 if rank > 1:
-                    child_add_boundary = add_boundary_map.get(rank - 1, True)
-                    child_boundaries = boundaries_map.get(rank - 1)
-                    if child_boundaries and not child_add_boundary:
-                        child_idx = len(child_boundaries) - 1
-                    elif child_boundaries is None and rank == 2:
+                    # child_add_boundary = add_boundary_map.get(rank - 1, True)
+                    child_slots = rank_node_slots_map.get(rank - 1)
+                    if child_slots:
+                        child_idx = len(child_slots) - 1
+                    elif child_slots is None and rank == 2:
                         child_idx = 0
                 
-                prev_pivot = prev_pivot_map.get(rank, None)
-
-                # Optimize entry insertion
+                # Entry insertion
                 if ranks is not None:
-                    logger.info(f"[BULK CREATE] Inserting entry {insert_entry.item.key} at rank {rank} with child index {child_idx}. Previous pivot: {prev_pivot}")
+                    logger.info(f"[BULK CREATE] Inserting entry {insert_entry.item.key} with child index {child_idx} at rank {rank} into {[e.item.key for e, _ in ranks]}, node slots: {[[e.item.key for e, _ in slot] for slot in node_slots]}. Previous pivot: {prev_pivot}")
                     if prev_pivot is not None:
-                        ranks.append((Entry(create_replica_fn(prev_pivot), None), None))
+                        pivot = Entry(create_replica_fn(prev_pivot), None)
+                        ranks.append((pivot, None))
+                        node_slots[-1].append((pivot, None))
                     ranks.append((insert_entry, child_idx))
+                    
+                    if rank != insert_rank:
+                        node_slots.append([(insert_entry, child_idx)])
+                    else:    
+                        node_slots[-1].append((insert_entry, child_idx))
                     logger.info(f"[BULK CREATE] Updated rank {rank} entries: %s",
                                 [e.item.key for e, _ in ranks]
                             )
                 else:
+                    logger.info(f"[BULK CREATE] Creating new rank {rank} with entry {insert_entry.item.key} and child index {child_idx}. Previous pivot: {prev_pivot}")
                     # Create new rank entry list
                     new_entries = [(insert_entry, child_idx)]
+                    new_entries_slots = [(insert_entry, child_idx)]
                     if insert_rank >= max_rank:
                         new_entries.insert(0, (dummy, None))
+                        new_entries_slots.insert(0, (dummy, None))
+                        prev_pivot = dummy.item.key
                     else:
                         new_entries.insert(0, (Entry(create_replica_fn(prev_pivot), None), None))
+                        new_entries_slots.insert(0, (Entry(create_replica_fn(prev_pivot), None), None))
                     rank_entries_map[rank] = new_entries
+                    if node_slots is not None:
+                        logger.info(f"Node slots for rank {rank} are not None, appending new entries: %s",
+                                    [e.item.key for e, _ in new_entries_slots])
+                        node_slots[-1].extend(new_entries_slots)
+                        logger.info(f"[BULK CREATE] Updated node slots for rank {rank}: %s",
+                                    [[e.item.key for e, _ in slot] for slot in node_slots]
+                                )
+                    else:
+                        rank_node_slots_map[rank] = [new_entries_slots]
+
+                logger.info(f"[BULK CREATE] Entries for rank {rank}: %s",
+                            [e.item.key for e, _ in rank_entries_map[rank]]
+                        )
+                logger.info(f"[BULK CREATE] Rank node slots for rank {rank}: %s",
+                            [[e.item.key for e, _ in slot] for slot in rank_node_slots_map[rank]]
+                        )
                 
-                # Optimized boundary management
+                # Boundary management
                 if rank == insert_rank:
                     # Handle special case for rank 1 initialization
                     if rank == 1 and not add_boundary_map:
@@ -1768,22 +1797,44 @@ def _bulk_create_bottom_up(
                     boundary_pos = len(ranks) - 1
                     boundaries.append(boundary_pos)
                     add_boundary_map[rank] = False
+
+                    # if node_slots is not None:
+                    #     node_slots.append([])
+                    # else:
+                    #     rank_node_slots_map[rank] = [[], []]
+                    # logger.info(f"[BULK CREATE] Adding new list for rank {rank} at {entry_key}.")
+                    # logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
                 else:
                     # Initialize boundaries for new rank
                     rank_size = len(rank_entries_map[rank])
                     boundaries_map[rank] = [0, rank_size - 1]
                     add_boundary_map[rank] = False
+                    # if node_slots is not None:
+                    #     node_slots.append([])
+                    # else:
+                    #     rank_node_slots_map[rank] = [[], []]
+                    # logger.info(f"[BULK CREATE] Changing pivot from {prev_pivot} to {entry_key} for rank {rank} at {entry_key}.")
+                    # prev_pivot_map[rank] = entry_key
+                    # logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
+
                 
-                rank -= 1
-                prev = entry
+                logger.info(f"[BULK CREATE] Setting pivot for rank {rank} to None at {entry_key}. Previous pivot: {prev_pivot}")
                 prev_pivot_map[rank] = None
+                rank -= 1
                 continue
             
+
+
             # Handle non-insert/non-leaf ranks: set boundary flag for lower ranks
             if not add_boundary:
                 add_boundary_map[rank] = True
             
-
+            
+            if node_slots is not None:
+                node_slots.append([])
+            else:
+                rank_node_slots_map[rank] = [[], []]
+            logger.info(f"[BULK CREATE] Changing pivot from {prev_pivot} to {entry_key} for rank {rank} at {entry_key}.")
             prev_pivot_map[rank] = entry_key
             logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
             rank -= 1
@@ -1794,6 +1845,10 @@ def _bulk_create_bottom_up(
     logger.info(
         "[BULK CREATE] Created rank entries map:\n%s",
         pprint.pformat(rank_entries_map)
+    )
+    logger.info(
+        "[BULK CREATE] Created rank node slots map:\n%s",
+        pprint.pformat(rank_node_slots_map)
     )
     logger.info(
         "[BULK CREATE] Created boundaries map:\n%s",
