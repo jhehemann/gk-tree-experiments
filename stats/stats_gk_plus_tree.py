@@ -28,10 +28,10 @@ from tests.utils import (
 )
 # random.seed(7)
 # np.random.seed(1)
-# random.seed(9)
-# np.random.seed(1)
-random.seed(10)
+random.seed(9)
 np.random.seed(1)
+# random.seed(10)
+# np.random.seed(1)
 # random.seed(11)
 # np.random.seed(1)
 
