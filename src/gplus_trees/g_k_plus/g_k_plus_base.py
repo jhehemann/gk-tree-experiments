@@ -1557,6 +1557,7 @@ def _build_internal_levels_new(
             
             for entry, child_idx in islice(node_entries, 1, None):
                 entry.left_subtree = sub_trees[child_idx] if child_idx and child_idx < len(sub_trees) else sub_trees[last_child_idx + 1]
+                child_idx = last_child_idx + 1 if child_idx is None else child_idx
                 if child_idx is not None:
                     if IS_DEBUG:
                         logger.info(f"[BULK CREATE] Entry {entry.item.key} changing last child index from {last_child_idx} to {child_idx}")
@@ -1594,6 +1595,9 @@ def _build_internal_levels_new(
             if IS_DEBUG:
                 logger.debug(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
 
+    tree = rank_trees_map[max_rank][0]  # Get the root tree from the last rank
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] Finished internal level creation, root tree: {tree}")
     return tree
 
 
@@ -1829,6 +1833,7 @@ def _bulk_create_bottom_up(
         logger.info(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
 
     exit()
+    return root_tree
 
     # current_max_rank = 0
     # prev_rank = 0
