@@ -1437,12 +1437,13 @@ def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KLi
         A new KListBase instance containing the entries
     """
     klist = KListClass()
-    logger.info(f"[BULK CREATE] Creating KList with {[entry.item.key for entry, _ in entries]} entries and their left subtrees:")
-    for entry, _ in entries:
-        if entry.left_subtree:
-            logger.info(f"  - {entry.item.key} -> left subtree: {print_pretty(entry.left_subtree)}")
-        else:
-            logger.info(f"  - {entry.item.key} has no left subtree")
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] Creating KList with {[entry.item.key for entry, _ in entries]} entries and their left subtrees:")
+        for entry, _ in entries:
+            if entry.left_subtree:
+                logger.info(f"  - {entry.item.key} -> left subtree: {print_pretty(entry.left_subtree)}")
+            else:
+                logger.info(f"  - {entry.item.key} has no left subtree")
 
     insert_entry_fn = klist.insert_entry  # Cache method reference
     for entry, _ in entries:
@@ -1462,17 +1463,19 @@ def _build_leaf_level_trees_new(
     """Build leaf level trees from entries."""
     leaf_trees = []
     prev_node = None
-
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] Starting leaf level creation with {len(entries)} entries and boundaries: {boundaries_map}")
     for i in range(len(boundaries_map)):
         start_idx = boundaries_map[i]
         end_idx = boundaries_map[i + 1] if i + 1 < len(boundaries_map) else len(entries)
         node_entries = entries[start_idx:end_idx]
-        # logger.info(f"[BULK CREATE] Creating leaf node {i} with entries: %s", 
-        #             [entry.item.key for entry, _ in node_entries]
-        #         )
-        if prev_node is None:
-            # has_dummy must be True
-            node_entries = [(dummy, None)] + node_entries
+        if IS_DEBUG:
+            logger.info(f"[BULK CREATE] Creating leaf node {i} with entries: %s", 
+                    [entry.item.key for entry, _ in node_entries]
+                )
+        # if prev_node is None:
+        #     # has_dummy must be True
+        #     node_entries = [(dummy, None)] + node_entries
 
         # Create node set - always use KList for simplicity in bulk creation
         # This ensures we don't get into recursive loops and maintains correctness
@@ -1517,7 +1520,8 @@ def _build_internal_levels_new(
         A new GKPlusTreeBase instance representing the root of the tree
     """
     rank_trees_map: dict[int, GKPlusTreeBase] = {}
-    logger.info(f"[BULK CREATE] Starting internal level creation from rank {2} to {max_rank}")
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] Starting internal level creation from rank {2} to {max_rank}")
 
     rank = 2
     sub_trees = leaf_trees
@@ -1527,7 +1531,8 @@ def _build_internal_levels_new(
         subtrees_next = []
         entries = rank_entries_map.get(rank, [])
         boundaries = boundaries_map.get(rank, [])
-        logger.info(f"[BULK CREATE] Processing rank {rank} with entries: %s",
+        if IS_DEBUG:
+            logger.info(f"[BULK CREATE] Processing rank {rank} with entries: %s",
                     [entry.item.key for entry, _ in entries] if entries else []
                 )
         if not entries:
@@ -1536,47 +1541,59 @@ def _build_internal_levels_new(
             continue
 
         trees = []
-        last_child_idx = -2
+        last_child_idx = -1
         for i in range(len(boundaries)):
-            last_child_idx += 1
+            
+            # if i == 0:
+            #     last_child_idx -= 1
             start_idx = boundaries[i]
             end_idx = boundaries[i + 1] if i + 1 < len(boundaries) else len(entries)
             node_entries = entries[start_idx:end_idx]
             
-            logger.info(f"[BULK CREATE] Creating rank {rank} node {i} with entries: %s", 
+            if IS_DEBUG:
+                logger.info(f"[BULK CREATE] Creating rank {rank} node {i} with entries: %s", 
                         [entry.item.key for entry, _ in node_entries]
                     )
             
             for entry, child_idx in islice(node_entries, 1, None):
                 entry.left_subtree = sub_trees[child_idx] if child_idx and child_idx < len(sub_trees) else sub_trees[last_child_idx + 1]
-                if child_idx:
-                    logger.info(f"[BULK CREATE] Entry {entry.item.key} changing last child index from {last_child_idx} to {child_idx}")
+                if child_idx is not None:
+                    if IS_DEBUG:
+                        logger.info(f"[BULK CREATE] Entry {entry.item.key} changing last child index from {last_child_idx} to {child_idx}")
                     subtrees_next.extend(sub_trees[last_child_idx + 1:child_idx])
                     last_child_idx = child_idx
                 else:
                     subtrees_next.append(sub_trees[last_child_idx + 1])
+                    if IS_DEBUG:
+                        logger.debug(f"[BULK CREATE] Entry {entry.item.key} has no child, incrementing last child index from {last_child_idx} to {last_child_idx + 1}")
                     last_child_idx += 1
 
             # Create node set - always use KList for implementation in bulk creation
             node_set = _bulk_create_klist(node_entries, KListClass)
-            logger.info(f"[BULK CREATE] Created node set for rank {rank} node {i}: {print_pretty(node_set)}")
-            logger.info(f"[BULK CREATE] Right subtree: {print_pretty(sub_trees[last_child_idx + 1]) if last_child_idx + 1 < len(sub_trees) else 'None'}")
+            if IS_DEBUG:
+                logger.info(f"[BULK CREATE] Created node set for rank {rank} node {i}: {print_pretty(node_set)}")
+                logger.info(f"[BULK CREATE] Right subtree: {print_pretty(sub_trees[last_child_idx + 1]) if last_child_idx + 1 < len(sub_trees) else 'None'}")
             tree_node = NodeClass(rank, node_set, sub_trees[last_child_idx + 1])
+            last_child_idx += 1
             tree = TreeClass(l_factor=l_factor)
             tree.node = tree_node
             trees.append(tree)
             subtrees_next.append(tree)
-        logger.info(f"[BULK CREATE] Subtrees for next iteration:")
-        for tree in subtrees_next:
-            logger.info(print_pretty(tree))
+        
+        subtrees_next.extend(sub_trees[last_child_idx + 1:])
+        if IS_DEBUG:
+            logger.info(f"[BULK CREATE] Subtrees for next iteration:")
+            for tree in subtrees_next:
+                logger.info(print_pretty(tree))
         sub_trees = subtrees_next
         rank_trees_map[rank] = trees
         rank += 1
 
     for rank in rank_trees_map:
         for tree in rank_trees_map[rank]:
-            logger.info(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
-    
+            if IS_DEBUG:
+                logger.debug(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
+
     return tree
 
 
@@ -1618,8 +1635,9 @@ def _bulk_create_bottom_up(
     entries_sample = list(klist)
     keys_sample = [entry.item.key for entry in entries_sample]
     ranks_sample = calc_ranks(entries_sample, group_size, DIM)
-    logger.info(f"[BULK CREATE] keys: {keys_sample}")
-    logger.info(f"[BULK CREATE] ranks: {ranks_sample}")
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] keys: {keys_sample}")
+        logger.info(f"[BULK CREATE] ranks: {ranks_sample}")
 
     # Cache frequently used values
     threshold = int(k * l_factor)
@@ -1662,7 +1680,8 @@ def _bulk_create_bottom_up(
                 
                 # Entry insertion
                 if ranks is not None:
-                    logger.info(f"[BULK CREATE] Inserting entry {insert_entry.item.key} with child index {child_idx} at rank {rank} into {[e.item.key for e, _ in ranks]}, node slots: {[[e.item.key for e, _ in slot] for slot in node_slots]}. Previous pivot: {prev_pivot}")
+                    if IS_DEBUG:
+                        logger.info(f"[BULK CREATE] Inserting entry {insert_entry.item.key} with child index {child_idx} at rank {rank} into {[e.item.key for e, _ in ranks]}, node slots: {[[e.item.key for e, _ in slot] for slot in node_slots]}. Previous pivot: {prev_pivot}")
                     if prev_pivot is not None:
                         pivot = Entry(create_replica_fn(prev_pivot), None)
                         ranks.append((pivot, False))
@@ -1673,11 +1692,13 @@ def _bulk_create_bottom_up(
                         node_slots.append([(insert_entry, child_idx)])
                     else:    
                         node_slots[-1].append((insert_entry, child_idx))
-                    logger.info(f"[BULK CREATE] Updated rank {rank} entries: %s",
+                    if IS_DEBUG:
+                        logger.info(f"[BULK CREATE] Updated rank {rank} entries: %s",
                                 [e.item.key for e, _ in ranks]
                             )
                 else:
-                    logger.info(f"[BULK CREATE] Creating new rank {rank} with entry {insert_entry.item.key} and child index {child_idx}. Previous pivot: {prev_pivot}")
+                    if IS_DEBUG:
+                        logger.info(f"[BULK CREATE] Creating new rank {rank} with entry {insert_entry.item.key} and child index {child_idx}. Previous pivot: {prev_pivot}")
                     # Create new rank entry list
                     new_entries = [(insert_entry, child_idx)]
                     new_entries_slots = [(insert_entry, child_idx)]
@@ -1690,19 +1711,22 @@ def _bulk_create_bottom_up(
                         new_entries_slots.insert(0, (Entry(create_replica_fn(prev_pivot), False), None))
                     rank_entries_map[rank] = new_entries
                     if node_slots is not None:
-                        logger.info(f"Node slots for rank {rank} are not None, appending new entries: %s",
+                        if IS_DEBUG:
+                            logger.info(f"Node slots for rank {rank} are not None, appending new entries: %s",
                                     [e.item.key for e, _ in new_entries_slots])
                         node_slots[-1].extend(new_entries_slots)
-                        logger.info(f"[BULK CREATE] Updated node slots for rank {rank}: %s",
+                        if IS_DEBUG:
+                            logger.info(f"[BULK CREATE] Updated node slots for rank {rank}: %s",
                                     [[e.item.key for e, _ in slot] for slot in node_slots]
                                 )
                     else:
                         rank_node_slots_map[rank] = [new_entries_slots]
 
-                logger.info(f"[BULK CREATE] Entries for rank {rank}: %s",
+                if IS_DEBUG:
+                    logger.info(f"[BULK CREATE] Entries for rank {rank}: %s",
                             [e.item.key for e, _ in rank_entries_map[rank]]
                         )
-                logger.info(f"[BULK CREATE] Rank node slots for rank {rank}: %s",
+                    logger.info(f"[BULK CREATE] Rank node slots for rank {rank}: %s",
                             [[e.item.key for e, _ in slot] for slot in rank_node_slots_map[rank]]
                         )
                 
@@ -1736,7 +1760,8 @@ def _bulk_create_bottom_up(
                     boundaries_map[rank] = [0, rank_size - 1]
                     add_boundary_map[rank] = False
 
-                logger.info(f"[BULK CREATE] Setting pivot for rank {rank} to None at {entry_key}. Previous pivot: {prev_pivot}")
+                if IS_DEBUG:
+                    logger.info(f"[BULK CREATE] Setting pivot for rank {rank} to None at {entry_key}. Previous pivot: {prev_pivot}")
                 prev_pivot_map[rank] = None
                 rank -= 1
                 continue
@@ -1750,33 +1775,36 @@ def _bulk_create_bottom_up(
                 node_slots.append([])
             else:
                 rank_node_slots_map[rank] = [[], []]
-            logger.info(f"[BULK CREATE] Changing pivot from {prev_pivot} to {entry_key} for rank {rank} at {entry_key}.")
+            if IS_DEBUG:
+                logger.info(f"[BULK CREATE] Changing pivot from {prev_pivot} to {entry_key} for rank {rank} at {entry_key}.")
             prev_pivot_map[rank] = entry_key
-            logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
+            if IS_DEBUG:
+                logger.info(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
             rank -= 1
         max_rank = insert_rank if insert_rank > max_rank else max_rank
 
     # Comment when testing
-    # if IS_DEBUG:
-    # logger.info(
-    #     "[BULK CREATE] Created rank entries map:\n%s",
-    #     pprint.pformat(rank_entries_map)
-    # )
-    # logger.info(
-    #     "[BULK CREATE] Created rank node slots map:\n%s",
-    #     pprint.pformat(rank_node_slots_map)
-    # )
-    # logger.info(
-    #     "[BULK CREATE] Created boundaries map:\n%s",
-    #     pprint.pformat(boundaries_map)
-    # )
+    if IS_DEBUG:
+        logger.info(
+            "[BULK CREATE] Created rank entries map:\n%s",
+            pprint.pformat(rank_entries_map)
+        )
+        logger.info(
+            "[BULK CREATE] Created rank node slots map:\n%s",
+            pprint.pformat(rank_node_slots_map)
+        )
+        logger.info(
+            "[BULK CREATE] Created boundaries map:\n%s",
+            pprint.pformat(boundaries_map)
+        )
     for entry_sample in klist:
         rank_sample = calc_rank_from_group_size(entry_sample.item.key, group_size, DIM)
         sample_tree, _ = sample_tree.insert_entry(entry_sample, rank_sample)
-    logger.info(
+    if IS_DEBUG:
+        logger.info(
         "[BULK CREATE] Sample tree after inserting entries:\n%s",
         print_pretty(sample_tree)
-    )
+        )
 
     leaf_trees = _build_leaf_level_trees_new(
         rank_entries_map[1],
@@ -1797,7 +1825,8 @@ def _bulk_create_bottom_up(
         TreeClass, NodeClass, KListClass, threshold, l_factor, max_rank
     )
 
-    logger.info(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
+    if IS_DEBUG:
+        logger.info(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
 
     exit()
 
