@@ -31,10 +31,10 @@ IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
 
 # random.seed(7)
 # np.random.seed(1)
-random.seed(9)
-np.random.seed(1)
-random.seed(10)
-np.random.seed(1)
+# random.seed(9)
+# np.random.seed(1)
+# random.seed(10)
+# np.random.seed(1)
 # random.seed(11)
 # np.random.seed(1)
 
@@ -344,8 +344,8 @@ if __name__ == "__main__":
     # sizes = [10, 100, 1000, 10_000, 100_000]
     # List of K values for which we want to run experiments.
     # Ks = [2, 4, 16, 64]
-    Ks = [2]
-    l_factor = 4.0
+    Ks = [4]
+    l_factor = 1.0
     repetitions = 1
 
     for n in sizes:

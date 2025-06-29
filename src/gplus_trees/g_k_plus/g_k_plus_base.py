@@ -4,6 +4,9 @@ from __future__ import annotations
 from typing import Optional, Type, TypeVar, Tuple, List
 from itertools import islice, chain
 
+import copy
+
+
 from gplus_trees.base import (
     AbstractSetDataStructure,
     Item,
@@ -1156,7 +1159,8 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     if klist.is_empty():
         return create_gkplus_tree(K, DIM, l_factor)
 
-    return bulk_create_gkplus_tree(klist, DIM, l_factor)
+    entries = [entry for entry in klist]
+    return bulk_create_gkplus_tree(entries, DIM, l_factor, type(klist))
 
     entries = list(klist)
     tree = create_gkplus_tree(K, DIM, l_factor)
@@ -1393,9 +1397,10 @@ def _create_gkplus_tree_from_entries(
 #   - Recurse on the higher rank items list to create the higher rank nodes
 # 2. Recurse on the rank 1 groupings that have entries count > threshold
 def bulk_create_gkplus_tree(
-    klist: KListBase,
+    entries: list[Entry],
     DIM: int,
     l_factor: float,
+    KListClass: type[KListBase],
 ) -> GKPlusTreeBase:
     """
     Create a new GKPlusTree with optimized bottom-up bulk creation.
@@ -1415,15 +1420,14 @@ def bulk_create_gkplus_tree(
     Returns:
         A new GKPlusTreeBase instance
     """
-    KListClass = type(klist)
     k = KListClass.KListNodeClass.CAPACITY
-    
-    if klist.is_empty():
+
+    if not entries:
         tree = _get_create_gkplus_tree()(k, DIM, l_factor)
         return tree
 
     # Use optimized bottom-up construction - Not working yet
-    return _bulk_create_bottom_up(klist, k, DIM, l_factor)
+    return _bulk_create_bottom_up(entries, k, DIM, l_factor, KListClass)
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
     """
@@ -1461,6 +1465,7 @@ def _build_leaf_level_trees_new(
     # has_dummy: bool,
 ) -> list[GKPlusTreeBase]:
     """Build leaf level trees from entries."""
+    threshold = KListClass.KListNodeClass.CAPACITY * l_factor
     leaf_trees = []
     prev_node = None
     if IS_DEBUG:
@@ -1479,7 +1484,11 @@ def _build_leaf_level_trees_new(
 
         # Create node set - always use KList for simplicity in bulk creation
         # This ensures we don't get into recursive loops and maintains correctness
-        node_set = _bulk_create_klist(node_entries, KListClass)
+        if len(node_entries) <= threshold:
+            node_set = _bulk_create_klist(node_entries, KListClass)
+        else:
+            raw_entries = [entry for entry, _ in node_entries]
+            node_set = bulk_create_gkplus_tree(raw_entries, TreeClass.DIM + 1, l_factor, KListClass)
         leaf_node = NodeClass(1, node_set, None)
         leaf_tree = TreeClass(l_factor=l_factor)
         leaf_tree.node = leaf_node
@@ -1571,7 +1580,13 @@ def _build_internal_levels_new(
                     last_child_idx += 1
 
             # Create node set - always use KList for implementation in bulk creation
-            node_set = _bulk_create_klist(node_entries, KListClass)
+            # node_set = _bulk_create_klist(node_entries, KListClass)
+            if len(node_entries) <= threshold:
+                node_set = _bulk_create_klist(node_entries, KListClass)
+            else:
+                raw_entries = [entry for entry, _ in node_entries]
+                node_set = bulk_create_gkplus_tree(raw_entries, TreeClass.DIM + 1, l_factor, KListClass)
+
             if IS_DEBUG:
                 logger.info(f"[BULK CREATE] Created node set for rank {rank} node {i}: {print_pretty(node_set)}")
                 logger.info(f"[BULK CREATE] Right subtree: {print_pretty(sub_trees[last_child_idx + 1]) if last_child_idx + 1 < len(sub_trees) else 'None'}")
@@ -1603,10 +1618,11 @@ def _build_internal_levels_new(
 
 
 def _bulk_create_bottom_up(
-    klist: KListBase,
+    entries: list[Entry],
     k: int,
     DIM: int,
     l_factor: float,
+    KListClass: type[KListBase],
 ) -> GKPlusTreeBase:
     """
     Bottom-up bulk creation of GK+-tree.
@@ -1626,24 +1642,13 @@ def _bulk_create_bottom_up(
     """
     create_gkplus_tree_fn = _get_create_gkplus_tree()
     sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
-    if klist.is_empty():
-        return sample_tree
     
     # Get required classes and functions
     NodeClass = sample_tree.NodeClass
     TreeClass = type(sample_tree)
-    KListClass = type(klist)
     create_replica_fn = _create_replica
     group_size = calculate_group_size(k)
     
-    # Comment when testing
-    entries_sample = list(klist)
-    keys_sample = [entry.item.key for entry in entries_sample]
-    ranks_sample = calc_ranks(entries_sample, group_size, DIM)
-    if IS_DEBUG:
-        logger.info(f"[BULK CREATE] keys: {keys_sample}")
-        logger.info(f"[BULK CREATE] ranks: {ranks_sample}")
-
     # Cache frequently used values
     threshold = int(k * l_factor)
     dummy = Entry(get_dummy(DIM), None)
@@ -1656,7 +1661,7 @@ def _bulk_create_bottom_up(
     rank_node_slots_map[1] = [[(dummy, None)]]  # at least one entry at rank 1
 
     max_rank = 1
-    for entry in klist:
+    for entry in entries:
         insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
         entry_key = entry.item.key
         rank = insert_rank
@@ -1802,9 +1807,9 @@ def _bulk_create_bottom_up(
             "[BULK CREATE] Created boundaries map:\n%s",
             pprint.pformat(boundaries_map)
         )
-    for entry_sample in klist:
-        rank_sample = calc_rank_from_group_size(entry_sample.item.key, group_size, DIM)
-        sample_tree, _ = sample_tree.insert_entry(entry_sample, rank_sample)
+    # for entry_sample in entries:
+    #     rank_sample = calc_rank_from_group_size(entry_sample.item.key, group_size, DIM)
+    #     sample_tree, _ = sample_tree.insert_entry(entry_sample, rank_sample)
     if IS_DEBUG:
         logger.info(
         "[BULK CREATE] Sample tree after inserting entries:\n%s",
