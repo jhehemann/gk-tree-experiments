@@ -26,12 +26,15 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from tests.utils import (
     assert_tree_invariants_raise,
 )
+from gplus_trees.g_k_plus.base import logger
+IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
+
 # random.seed(7)
 # np.random.seed(1)
 random.seed(9)
 np.random.seed(1)
-# random.seed(10)
-# np.random.seed(1)
+random.seed(10)
+np.random.seed(1)
 # random.seed(11)
 # np.random.seed(1)
 
@@ -321,7 +324,7 @@ if __name__ == "__main__":
 
     # 3) Configure logging to write to that file (and still print to console, if you like)
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler(log_path, mode="w"),
@@ -347,10 +350,10 @@ if __name__ == "__main__":
 
     for n in sizes:
         for K in Ks:
-            logging.info("")
-            logging.info("")
-            logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor} repetitions = {repetitions} ----------------")
+            logger.info("")
+            logger.info("")
+            logger.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor} repetitions = {repetitions} ----------------")
             t0 = time.perf_counter()
             repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor)
             elapsed = time.perf_counter() - t0
-            logging.info(f"Total experiment time: {elapsed:.3f} seconds")
+            logger.info(f"Total experiment time: {elapsed:.3f} seconds")

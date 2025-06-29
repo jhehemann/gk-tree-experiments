@@ -6,7 +6,7 @@ from typing import Optional
 
 
 def setup_logging(
-    level: int = logging.INFO,
+    level: int = logging.DEBUG,
     format_string: Optional[str] = None,
     handler_type: str = "stream"
 ) -> logging.Logger:
@@ -59,10 +59,10 @@ def get_logger(name: str) -> logging.Logger:
         Logger instance
     """
     # Ensure base logging is set up
-    if not logging.getLogger("GPlusTree").hasHandlers():
+    if not logging.getLogger("gplus_trees").hasHandlers():
         setup_logging()
 
-    return logging.getLogger(f"GPlusTree.{name}")
+    return logging.getLogger(f"gplus_trees.{name}")
 
 
 def get_test_logger(name: str) -> logging.Logger:
@@ -83,7 +83,7 @@ def get_test_logger(name: str) -> logging.Logger:
         formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
         logger.propagate = False
     
     return logger
