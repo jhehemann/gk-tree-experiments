@@ -1158,11 +1158,11 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
 
     return bulk_create_gkplus_tree(klist, DIM, l_factor)
 
-    # entries = list(klist)
-    # tree = create_gkplus_tree(K, DIM, l_factor)
-    # ranks = [] 
-    # for entry in entries:
-    #     ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
+    entries = list(klist)
+    tree = create_gkplus_tree(K, DIM, l_factor)
+    ranks = [] 
+    for entry in entries:
+        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
 
     # Insert entry instances with their ranks
     tree_insert_entry = tree.insert_entry
@@ -1484,7 +1484,7 @@ def _build_leaf_level_trees_new(
         leaf_tree = TreeClass(l_factor=l_factor)
         leaf_tree.node = leaf_node
         if prev_node is not None:
-            prev_node.next = leaf_tree.node
+            prev_node.next = leaf_tree
         prev_node = leaf_tree.node 
         leaf_trees.append(leaf_tree)
 
@@ -1520,6 +1520,7 @@ def _build_internal_levels_new(
         A new GKPlusTreeBase instance representing the root of the tree
     """
     rank_trees_map: dict[int, GKPlusTreeBase] = {}
+    rank_trees_map[1] = leaf_trees  # Rank 1 trees are the leaf trees
     if IS_DEBUG:
         logger.info(f"[BULK CREATE] Starting internal level creation from rank {2} to {max_rank}")
 
@@ -1590,10 +1591,10 @@ def _build_internal_levels_new(
         rank_trees_map[rank] = trees
         rank += 1
 
-    for rank in rank_trees_map:
-        for tree in rank_trees_map[rank]:
-            if IS_DEBUG:
-                logger.debug(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
+    # for rank in rank_trees_map:
+    #     for tree in rank_trees_map[rank]:
+    #         if IS_DEBUG:
+    #             logger.debug(f"[BULK CREATE] Rank {rank} tree: {print_pretty(tree)}")
 
     tree = rank_trees_map[max_rank][0]  # Get the root tree from the last rank
     if IS_DEBUG:
@@ -1832,7 +1833,7 @@ def _bulk_create_bottom_up(
     if IS_DEBUG:
         logger.info(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
 
-    exit()
+    # exit()
     return root_tree
 
     # current_max_rank = 0
