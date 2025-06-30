@@ -315,7 +315,7 @@ if __name__ == "__main__":
 
     # 3) Configure logging to write to that file (and still print to console, if you like)
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler(log_path, mode="w"),
