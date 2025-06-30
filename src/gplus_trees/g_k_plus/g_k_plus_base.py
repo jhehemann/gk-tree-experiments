@@ -1307,48 +1307,55 @@ def _build_internal_levels(
     rank = 2
     sub_trees = leaf_trees
 
+    # Pre-allocate list to avoid repeated reallocations
+    subtrees_lift = []
+    
     while rank <= max_rank:
-        # Cache dictionary lookups at start of iteration
-        entries = rank_entries_map.get(rank, [])
-        boundaries = boundaries_map.get(rank, [])
-            
+        # Fast path: skip ranks with no entries
+        entries = rank_entries_map.get(rank)
         if not entries:
-            subtrees_next = sub_trees
             rank += 1
             continue
 
-        subtrees_next = []
-        prev_child_idx = -1 # Initialize to -1 to handle first child correctly
-        
-        # Cache frequently accessed values
+        # Cache dictionary lookup and length calculations
+        boundaries = boundaries_map.get(rank, [])
         boundaries_len = len(boundaries)
         entries_len = len(entries)
+            
+        # Clear and reuse the list instead of creating new ones
+        subtrees_lift.clear()
+        prev_child_idx = -1
         
+        # Cache sub_trees indexing for better performance
+        sub_trees_get = sub_trees.__getitem__
+        subtrees_lift_append = subtrees_lift.append
+        
+        # Handle rank node sets and subtrees
         for i in range(boundaries_len):
             start_idx = boundaries[i]
-            end_idx = boundaries[i + 1] if i + 1 < boundaries_len else entries_len
+            end_idx = boundaries[i + 1] if i < boundaries_len - 1 else entries_len
             node_entries = entries[start_idx:end_idx]
             
             # Create node entries and attach left subtrees
             for entry, child_idx in islice(node_entries, 1, None):
                 next_child_idx = prev_child_idx + 1
-                if child_idx:
-                    entry.left_subtree = sub_trees[child_idx]
-
-                    # Check for collapsed subtrees at the current rank and lift them to the next
+                
+                if child_idx is not None and child_idx is not False:
+                    entry.left_subtree = sub_trees_get(child_idx)
+                    # Check for collapsed subtrees and lift them to the next level
                     if next_child_idx < child_idx:
                         for i in range(next_child_idx, child_idx):
-                            subtrees_next.append(sub_trees[i])
+                            subtrees_lift.append(sub_trees[i])
                 else:
                     # We can use the next child index because we lifted the earlier missing subtrees from the lower ranks
-                    entry.left_subtree = sub_trees[next_child_idx]
+                    entry.left_subtree = sub_trees_get(next_child_idx)
                     child_idx = next_child_idx
                 
                 prev_child_idx = child_idx
 
             # Create node set
-            if len(node_entries) <= threshold:
-                # If entries are below threshold, create a KList
+            node_entries_len = len(node_entries)
+            if node_entries_len <= threshold:
                 node_set = bulk_create_klist_fn(node_entries, KListClass)
             else:
                 # If entries exceed threshold, create a GKPlusTree
@@ -1356,27 +1363,27 @@ def _build_internal_levels(
                 raw_entries = [entry for entry, _ in node_entries]
                 node_set = bulk_create_gkplus_tree_fn(raw_entries, tree_dim_plus_one, l_factor, KListClass)
 
-            # Create the node with right subtree
+            # Create tree node with right subtree
             prev_child_idx += 1
-            right_subtree = sub_trees[prev_child_idx]
+            right_subtree = sub_trees_get(prev_child_idx)
             tree_node = NodeClass(rank, node_set, right_subtree)
             tree = TreeClass(l_factor=l_factor)
             tree.node = tree_node
-            
-            # lift the current tree to the next rank to be assigned as a subtree
-            subtrees_next.append(tree) 
-        
+
+            # Lift the subtree to the next level to be assigned as a subtree
+            subtrees_lift_append(tree)
+
         # Lift the remaining subtrees
-        start_idx = prev_child_idx + 1
+        remaining_start_idx = prev_child_idx + 1
         len_sub_trees = len(sub_trees)
-        if start_idx < len_sub_trees:
-            for i in range(start_idx, len_sub_trees):
-                subtrees_next.append(sub_trees[i])
-        
-        sub_trees = subtrees_next
+        if remaining_start_idx < len_sub_trees:
+            for i in range(remaining_start_idx, len_sub_trees):
+                subtrees_lift.append(sub_trees[i])
+
+        sub_trees, subtrees_lift = subtrees_lift, sub_trees
         rank += 1
     
-    # The first tree after processing the highest rank is the root tree
+    # The first and only tree after processing the highest rank is the root tree
     return sub_trees[0] 
 
 
