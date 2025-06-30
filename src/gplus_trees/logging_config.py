@@ -59,10 +59,10 @@ def get_logger(name: str) -> logging.Logger:
         Logger instance
     """
     # Ensure base logging is set up
-    if not logging.getLogger("GPlusTree").hasHandlers():
+    if not logging.getLogger("gplus_trees").hasHandlers():
         setup_logging()
 
-    return logging.getLogger(f"GPlusTree.{name}")
+    return logging.getLogger(f"gplus_trees.{name}")
 
 
 def get_test_logger(name: str) -> logging.Logger:
