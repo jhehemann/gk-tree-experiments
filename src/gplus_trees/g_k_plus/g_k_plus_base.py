@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 from typing import Optional, Type, TypeVar, Tuple, List
+from itertools import islice, chain
+
+import copy
+
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
@@ -11,6 +15,7 @@ from gplus_trees.base import (
     RetrievalResult,
 )
 import logging
+import pprint
 
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
@@ -21,6 +26,7 @@ from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
 from gplus_trees.g_k_plus.utils import (
     calc_ranks,
     calc_rank_for_dim,
+    calc_rank_from_group_size,
     calculate_group_size,
 )
 
@@ -1061,17 +1067,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if tree.is_empty():
             return tree
 
-        # fast path: no dummy items in the tree
         tree_item_count = tree.item_count()
         expected_klist_size = tree_item_count - 1  # Exclude the dummy item
         real_item_count = tree.real_item_count()
+        
+        # Fast path: no dummy items in the tree
         if expected_klist_size == real_item_count:
             if IS_DEBUG:
                 logger.debug(f"Item count {tree_item_count} - 1 is equal to real item count {real_item_count} in tree {print_pretty(tree)}")
-            # raise ValueError(
-            #     f"Item count {tree_item_count} is equal to real item count in tree {print_pretty(tree)}. "
-            #     "This should not happen, as it indicates that the tree does not contain any dummy items."
-            # )
             if expected_klist_size <= threshold:
                 # Collapse into a KList
                 if IS_DEBUG:
@@ -1156,252 +1159,444 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     if klist.is_empty():
         return create_gkplus_tree(K, DIM, l_factor)
 
-    # return bulk_create_gkplus_tree(klist, DIM, l_factor)
-
-    entries = list(klist)
-    tree = create_gkplus_tree(K, DIM, l_factor)
-    ranks = [] 
-    for entry in entries:
-        ranks.append(calc_rank_for_dim(entry.item.key, K, DIM))
-
-    # Insert entry instances with their ranks
-    tree_insert_entry = tree.insert_entry
-    for i, entry in enumerate(entries):
-        if i < len(ranks):
-            rank = int(ranks[i])
-            tree, _ = tree_insert_entry(entry, rank)
-    return tree
+    entries = [entry for entry in klist]
+    return bulk_create_gkplus_tree(entries, DIM, l_factor, type(klist))
 
 
-def _create_node_from_entries(
-    entries: List[Entry],
-    rank: int,
-    KListClass: type[KListBase],
-    NodeClass: type[GKPlusNodeBase],
-    DIM: int,
-    l_factor: float = 1.0,
-) -> GKPlusNodeBase:
-    """Create a GKPlusTreeBase node from a list of entries."""
-    k = KListClass.KListNodeClass.CAPACITY
-    threshold = int(k * l_factor)
-    if len(entries) <= threshold:
-        node_set = KListClass()
-        for entry in entries:
-            node_set, _ = node_set.insert_entry(entry)
-    else:
-        # Recursive case 'Dimension': create a GKPlusTree with the next higher dimension
-        # Instantiate node set with the resulting tree
-        group_size = calculate_group_size(k)
-        node_set, _ = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM + 1, l_factor)
-        if IS_DEBUG:
-            logger.debug(f"[CREATE NODE] Created node set from entries {[entry.item.key for entry in entries]} to {print_pretty(node_set)}")
-    return NodeClass(rank, node_set, None)
-
-
-def create_gkplus_tree_rec(
-    pairs: List[Tuple[Entry, int]],
-    KListClass: type[KListBase],
-    DIM: int,
-    l_factor: float = 1.0,
-    prev_leaf: Optional[GKPlusTreeBase] = None,
-) -> GKPlusTreeBase:
-    """ Create a GKPlusTree recursively from a list of (entry, rank) pairs.
-    Args:
-        pairs: A list of tuples (Entry, rank) - sorted by rank descending (1) and key ascending (2)
-        K: The capacity parameter for the tree
-        DIM: The dimension of the tree
-        l_factor: The threshold factor for conversion
-        add_dummy: Whether to add a dummy entry to the current pairs list
-    Returns:
-        A GKPlusTreeBase instance containing the entries
-    """
-    if not pairs:
-        return None
-
-    # Get the maximum rank from the pairs
-    # Ensure it is at least 1 for the case where the pivot entry is the only entry
-    max_rank = max(1, max(rank for _, rank in pairs))
-    k = KListClass.KListNodeClass.CAPACITY
-    node_set: Optional[AbstractSetDataStructure] = None
-    tree = _get_create_gkplus_tree()(k, DIM, l_factor) 
-    NodeClass = tree.NodeClass
-
-    # set the pivot entry's rank to the maximum rank
-    entry0, _ = pairs[0]
-    pairs[0] = (entry0, max_rank)
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE NEW] Creating tree with keys {[pair[0].item.key for pair in pairs]} and ranks {[pair[1] for pair in pairs]}")
-
-    # Base case: if the maximum rank is 1, create a leaf node
-    if max_rank == 1:
-        # Create a leaf node with the entries
-        entries = [entry for entry, _ in pairs]
-        node = _create_node_from_entries(entries, 1, KListClass, NodeClass, DIM, l_factor)
-        if prev_leaf is not None:
-            # Link the previous leaf to the new leaf
-            prev_leaf.node.next = tree
-
-            if IS_DEBUG:
-                logger.debug(f"[REC CREATE] Linking previous leaf {print_pretty(prev_leaf)} to new leaf {tree.__class__.__name__} (Instance to be filled with entries)")
-        prev_leaf = tree
-        tree.node = node
-        # logger.debug(f"[REC CREATE FINISHED] Created tree: {print_pretty(tree)}")
-        return tree, prev_leaf
-
-    # Recursive case 'Subtree': create root, split pairs based on keys and create subtrees
-    max_rank_entries: List[Entry] = [] # will become the root entries
-    subtrees_pairs: List[List[Tuple[Entry, int]]] = [[]] # lower tree level subtree entries
-
-    # Prepare node and subtree entries
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Preparing subtree pairs")
-    subtree_idx = 0
-    for pair in pairs:
-        entry, rank = pair
-        if rank < max_rank: # items in the left subtree of a higher rank item are strictly smaller
-            # logger.debug(f"[REC CREATE] Adding entry {entry.item.key} with rank {rank} to subtree {subtree_idx}")
-            subtrees_pairs[subtree_idx].append(pair)
-        else:
-            # logger.debug(f"[REC CREATE] Adding replica of entry {entry.item.key} with rank {rank} to max rank entries")
-            # The item has maximum rank and will become a root entry
-            replica = _create_replica(entry.item.key) # Non-leaf nodes contain replicas
-            max_rank_entries.append(Entry(replica, None)) 
-            
-            # The item also becomes the pivot for the next subtree
-            pair = (entry, 0) # Reset rank to 0 to be determined by the next subtrees max rank
-            subtrees_pairs.append([pair]) # start a new subtree list with the pivot entry
-            # logger.debug(f"[REC CREATE] Starting new subtree with pivot entry {pair[0].item.key} and default rank {pair[1]}")
-            subtree_idx += 1
-
-
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Max rank entries initialized: {[entry.item.key for entry in max_rank_entries]}")
-
-    for i, subtree_pairs in enumerate(subtrees_pairs[:-1]):
-        if IS_DEBUG:
-            logger.debug(f"[REC CREATE] Subtree pairs for entry {max_rank_entries[i].item.key}: {[pair[0].item.key for pair in subtree_pairs]} with ranks {[pair[1] for pair in subtree_pairs]}")
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Finished preparing subtree pairs")
-
-    # Attach subtrees to the max rank entries
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Creating and attaching subtrees to max rank entries")
-    for i, entry in enumerate(max_rank_entries):
-        if i < len(subtrees_pairs):
-            subtree_pairs = subtrees_pairs[i]
-            if subtree_pairs:
-                # Create a GKPlusTree for the subtree
-                if IS_DEBUG:
-                    logger.debug(f"[REC CREATE] Creating subtree for entry {entry.item.key} with pairs: {[pair[0].item.key for pair in subtree_pairs]} and ranks {[pair[1] for pair in subtree_pairs]}")
-                subtree_tree, prev_leaf = create_gkplus_tree_rec(
-                    subtree_pairs,
-                    KListClass,
-                    DIM,
-                    l_factor,
-                    prev_leaf=prev_leaf
-                )
-                entry.left_subtree = subtree_tree
-    
-    # Create the root node with max rank entries
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Creating root node with max rank entries: {[entry.item.key for entry in max_rank_entries]}")
-    root_node = _create_node_from_entries(
-        max_rank_entries,
-        max_rank,
-        KListClass,
-        NodeClass,
-        DIM,
-        l_factor,
-    )
-
-    # Create a new GKPlusTreeBase instance from the entries in the last subtrees_pairs list and assign it to the node's right subtree
-    # Reset pivot rank in right subtree to 0 to be determined by the next subtrees max rank
-    r_subtree_pairs = subtrees_pairs[-1]
-    entry0, _ = r_subtree_pairs[0] 
-    r_subtree_pairs[0] = (entry0, 0)
-
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE] Creating right subtree with pairs: {[pair[0].item.key for pair in r_subtree_pairs]} and ranks {[pair[1] for pair in r_subtree_pairs]}")
-    right_subtree, prev_leaf = create_gkplus_tree_rec(
-        r_subtree_pairs,
-        KListClass,
-        DIM,
-        l_factor, 
-        prev_leaf=prev_leaf
-    )
-
-    root_node.right_subtree = right_subtree
-    tree.node = root_node
-    if IS_DEBUG:
-        logger.debug(f"[REC CREATE FINISHED] Created tree: {print_pretty(tree)}")
-    return tree, prev_leaf
-
-def _create_gkplus_tree_from_entries(
-    entries: list[Entry],
-    group_size: int,
-    KListClass: type[KListBase],
-    DIM: int,
-    l_factor: float,
-) -> GKPlusTreeBase:
-    """
-    Create a GKPlusTree from a list of (entry, rank) pairs.
-    
-    Args:
-        pairs: A list of tuples (Entry, rank)
-        K: The capacity parameter for the tree
-        DIM: The dimension of the tree
-        l_factor: The threshold factor for conversion
-        
-    Returns:
-        A new GKPlusTreeBase instance containing the entries
-    """
-    ranks = calc_ranks(entries, group_size, DIM)
-    key_2_dim_1_rank = calc_rank_for_dim(entries[0].item.key, KListClass.KListNodeClass.CAPACITY, DIM)
-    if IS_DEBUG:
-        logger.debug(f"[CREATE] Creating GKPlusTree with entries {[entry.item.key for entry in entries]} and {ranks} ranks for dim {DIM} with l_factor {l_factor}")
-    pairs = list(zip(entries, ranks))
-    
-    # TODO: Find a way to avoid O(len(pairs)) for dummy insertion 
-    # Prepend with pivot entry, which has always the lowest key and max rank and no left subtree
-    pivot = Entry(get_dummy(DIM), None)  # Set dummy as the pivot for a new tree
-    if IS_DEBUG:
-        logger.debug(f"[PIVOT] Set dummy as pivot for dim {DIM}: {pivot.item.key} with rank 0")
-        logger.debug(f"[PIVOT] Pairs before adding pivot: {pairs}")
-    pairs.insert(0, (pivot, 0))  # Set the rank to default value 0 – will be determined later
-    if IS_DEBUG:
-        logger.debug(f"[PIVOT] Pairs after adding pivot: {pairs}")
-
-    return create_gkplus_tree_rec(pairs, KListClass, DIM, l_factor)
-
-# TODO: Check if creating from leaf to root is faster than from root to leaf
-# 1. Segment all rank 1 groupings separated by higher rank items
-#   - Create duplicates for the higher rank items and cache them in a separate list
-#   - Recurse on the higher rank items list to create the higher rank nodes
-# 2. Recurse on the rank 1 groupings that have entries count > threshold
 def bulk_create_gkplus_tree(
-    klist: KListBase,
+    entries: list[Entry],
     DIM: int,
     l_factor: float,
+    KListClass: type[KListBase],
 ) -> GKPlusTreeBase:
     """
-    Create a new GKPlusTree with the specified parameters.
+    Create a new GKPlusTree with optimized bottom-up bulk creation.
+    
+    This implementation builds the tree from leaves to root, which is much more
+    efficient than the recursive top-down approach because:
+    1. Single pass over data to calculate all ranks
+    2. Direct leaf creation without recursion
+    3. Iterative bottom-up construction
+    4. Better memory locality and cache efficiency
     
     Args:
-        K: The capacity parameter for the tree
+        klist: The KList to convert
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
         
     Returns:
         A new GKPlusTreeBase instance
     """
-    KListClass = type(klist)
     k = KListClass.KListNodeClass.CAPACITY
-    if klist.is_empty():
+
+    if not entries:
         tree = _get_create_gkplus_tree()(k, DIM, l_factor)
         return tree
 
-    group_size = calculate_group_size(k)
-    entries = list(klist)
-    tree, _ = _create_gkplus_tree_from_entries(entries, group_size, KListClass, DIM, l_factor)
+    # Use optimized bottom-up construction - Not working yet
+    return _bulk_create_bottom_up(entries, k, DIM, l_factor, KListClass)
+
+
+def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
+    """
+    Create a KList from a list of entries.
     
-    return tree
+    Args:
+        entries: A list of Entry objects
+        KListClass: The KList class to use
+        
+    Returns:
+        A new KListBase instance containing the entries
+    """
+    klist = KListClass()
+    if IS_DEBUG:
+        logger.debug(f"[BULK CREATE] Creating KList with {[entry.item.key for entry, _ in entries]} entries and their left subtrees:")
+        for entry, _ in entries:
+            if entry.left_subtree:
+                logger.debug(f"  - {entry.item.key} -> left subtree: {print_pretty(entry.left_subtree)}")
+            else:
+                logger.debug(f"  - {entry.item.key} has no left subtree")
+
+    insert_entry_fn = klist.insert_entry  # Cache method reference
+    for entry, _ in entries:
+        klist, _ = insert_entry_fn(entry)
+    return klist
+
+
+def _build_leaf_level_trees(
+    entries: list[tuple[Entry, None]],
+    boundaries_map: list[int],
+    dummy: Entry,
+    KListClass: type[KListBase],
+    NodeClass: type[GKPlusNodeBase],
+    TreeClass: type[GKPlusTreeBase],
+    l_factor: float,
+    # has_dummy: bool,
+) -> list[GKPlusTreeBase]:
+    """Build leaf level trees from entries."""
+    threshold = KListClass.KListNodeClass.CAPACITY * l_factor
+    leaf_trees = []
+    prev_node = None
+    if IS_DEBUG:
+        logger.debug(f"[BULK CREATE] Starting leaf level creation with {len(entries)} entries and boundaries: {boundaries_map}")
+    for i in range(len(boundaries_map)):
+        start_idx = boundaries_map[i]
+        end_idx = boundaries_map[i + 1] if i + 1 < len(boundaries_map) else len(entries)
+        node_entries = entries[start_idx:end_idx]
+        if IS_DEBUG:
+            logger.debug(f"[BULK CREATE] Creating leaf node {i} with entries: %s", 
+                    [entry.item.key for entry, _ in node_entries]
+                )
+        # if prev_node is None:
+        #     # has_dummy must be True
+        #     node_entries = [(dummy, None)] + node_entries
+
+        # Create node set - always use KList for simplicity in bulk creation
+        # This ensures we don't get into recursive loops and maintains correctness
+        if len(node_entries) <= threshold:
+            node_set = _bulk_create_klist(node_entries, KListClass)
+        else:
+            raw_entries = [entry for entry, _ in node_entries]
+            node_set = bulk_create_gkplus_tree(raw_entries, TreeClass.DIM + 1, l_factor, KListClass)
+        leaf_node = NodeClass(1, node_set, None)
+        leaf_tree = TreeClass(l_factor=l_factor)
+        leaf_tree.node = leaf_node
+        if prev_node is not None:
+            prev_node.next = leaf_tree
+        prev_node = leaf_tree.node 
+        leaf_trees.append(leaf_tree)
+
+    return leaf_trees
+
+def _build_internal_levels(
+    rank_entries_map: dict[int, list[Entry]],
+    boundaries_map: dict[int, list[int]],
+    leaf_trees: list[GKPlusTreeBase],
+    TreeClass: type[GKPlusTreeBase],
+    NodeClass: type[GKPlusNodeBase],
+    KListClass: type[KListBase],
+    threshold: int,
+    l_factor: float,
+    max_rank: int,
+) -> GKPlusTreeBase:
+    """
+    Build internal levels of the GKPlusTree from leaf level trees.
+    
+    Args:
+        rank_entries_map: Map of ranks to entries
+        boundaries_map: Map of rank boundaries
+        leaf_trees: List of leaf trees created from entries
+        TreeClass: The tree class to use for creating nodes
+        NodeClass: The node class to use for creating nodes
+        KListClass: The KList class to use for creating nodes
+        threshold: The threshold for KList vs GKPlusTree conversion
+        l_factor: The threshold factor for conversion
+        max_rank: The maximum rank to process
+        
+    Returns:
+        A new GKPlusTreeBase instance representing the root of the tree
+    """
+    rank_trees_map: dict[int, GKPlusTreeBase] = {}
+    rank_trees_map[1] = leaf_trees  # Rank 1 trees are the leaf trees
+
+    # Cache frequently accessed functions and values for better performance
+    bulk_create_klist_fn = _bulk_create_klist
+    bulk_create_gkplus_tree_fn = bulk_create_gkplus_tree
+    tree_dim_plus_one = TreeClass.DIM + 1
+
+    rank = 2
+    sub_trees = leaf_trees
+
+    while rank <= max_rank:
+        # Cache dictionary lookups at start of iteration
+        entries = rank_entries_map.get(rank, [])
+        boundaries = boundaries_map.get(rank, [])
+            
+        if not entries:
+            subtrees_next = sub_trees
+            rank += 1
+            continue
+
+        subtrees_next = []
+        prev_child_idx = -1 # Initialize to -1 to handle first child correctly
+        
+        # Cache frequently accessed values
+        boundaries_len = len(boundaries)
+        entries_len = len(entries)
+        
+        for i in range(boundaries_len):
+            start_idx = boundaries[i]
+            end_idx = boundaries[i + 1] if i + 1 < boundaries_len else entries_len
+            node_entries = entries[start_idx:end_idx]
+            
+            # Create node entries and attach left subtrees
+            for entry, child_idx in islice(node_entries, 1, None):
+                next_child_idx = prev_child_idx + 1
+                if child_idx:
+                    entry.left_subtree = sub_trees[child_idx]
+
+                    # Check for collapsed subtrees at the current rank and lift them to the next
+                    if next_child_idx < child_idx:
+                        for i in range(next_child_idx, child_idx):
+                            subtrees_next.append(sub_trees[i])
+                else:
+                    # We can use the next child index because we lifted the earlier missing subtrees from the lower ranks
+                    entry.left_subtree = sub_trees[next_child_idx]
+                    child_idx = next_child_idx
+                
+                prev_child_idx = child_idx
+
+            # Create node set
+            if len(node_entries) <= threshold:
+                # If entries are below threshold, create a KList
+                node_set = bulk_create_klist_fn(node_entries, KListClass)
+            else:
+                # If entries exceed threshold, create a GKPlusTree
+                # Extract raw entries as bulk_create_gkplus_tree expects a list of entries, not (Entry, child_idx) tuples
+                raw_entries = [entry for entry, _ in node_entries]
+                node_set = bulk_create_gkplus_tree_fn(raw_entries, tree_dim_plus_one, l_factor, KListClass)
+
+            # Create the node with right subtree
+            prev_child_idx += 1
+            right_subtree = sub_trees[prev_child_idx]
+            tree_node = NodeClass(rank, node_set, right_subtree)
+            tree = TreeClass(l_factor=l_factor)
+            tree.node = tree_node
+            
+            # lift the current tree to the next rank to be assigned as a subtree
+            subtrees_next.append(tree) 
+        
+        # Lift the remaining subtrees
+        start_idx = prev_child_idx + 1
+        len_sub_trees = len(sub_trees)
+        if start_idx < len_sub_trees:
+            for i in range(start_idx, len_sub_trees):
+                subtrees_next.append(sub_trees[i])
+        
+        sub_trees = subtrees_next
+        rank += 1
+    
+    # The first tree after processing the highest rank is the root tree
+    return sub_trees[0] 
+
+
+def _bulk_create_bottom_up(
+    entries: list[Entry],
+    k: int,
+    DIM: int,
+    l_factor: float,
+    KListClass: type[KListBase],
+) -> GKPlusTreeBase:
+    """
+    Bottom-up bulk creation of GK+-tree.
+    
+    Key insights:
+    1. All entries exist in leaf nodes
+    2. Rank determines node boundaries: higher rank = start of new node
+    3. Higher rank entries are replicated upward to their rank level
+    4. Threshold determines KList vs GKPlusTree for node implementation
+    5. Entries are already sorted from KList iteration
+    
+    Args:
+        klist: The sorted KList to convert
+        k: The capacity parameter for the tree
+        DIM: The dimension of the tree
+        l_factor: The threshold factor for conversion
+    """
+    create_gkplus_tree_fn = _get_create_gkplus_tree()
+    sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
+    
+    # Get required classes and functions
+    NodeClass = sample_tree.NodeClass
+    TreeClass = type(sample_tree)
+    create_replica_fn = _create_replica
+    group_size = calculate_group_size(k)
+    
+    # Cache frequently used values
+    threshold = int(k * l_factor)
+    dummy = Entry(get_dummy(DIM), None)
+    rank_entries_map: dict[int, list[Entry]] = {}
+    rank_entries_map[1] = [(dummy, None)]  # at least one entry at rank 1
+    boundaries_map: dict[int, list[int]] = {}
+    add_boundary_map: dict[int, bool] = {}
+    prev_pivot_map: dict[int, int] = {}
+    rank_node_slots_map: dict[int, Optional[list[int]]] = {}
+    rank_node_slots_map[1] = [[(dummy, None)]]  # at least one entry at rank 1
+
+    max_rank = 1
+    for entry in entries:
+        insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+        entry_key = entry.item.key
+        rank = insert_rank
+        
+        while rank > 0:
+            # Batch dictionary lookups for better cache efficiency
+            ranks = rank_entries_map.get(rank)
+            boundaries = boundaries_map.get(rank)
+            add_boundary = add_boundary_map.get(rank, True)
+            node_slots = rank_node_slots_map.get(rank, None)
+            prev_pivot = prev_pivot_map.get(rank, None)
+            
+            # Check if this rank needs entry insertion (primary path)
+            is_insert_or_leaf_rank = (rank == insert_rank or rank == 1)
+            
+            if is_insert_or_leaf_rank:
+                # Create fresh replica for each rank (except leaf which uses original entry)
+                insert_entry = entry if rank == 1 else Entry(create_replica_fn(entry_key), None)
+                
+                # Calculate child index efficiently - minimize lookups
+                child_idx = None
+                if rank > 1:
+                    child_slots = rank_node_slots_map.get(rank - 1)
+                    if child_slots:
+                        child_idx = len(child_slots) - 1
+                    elif child_slots is None and rank == 2:
+                        child_idx = 0
+                
+                # Entry insertion with consolidated logic
+                if ranks is not None:
+                    # Existing rank - append entries
+                    if IS_DEBUG:
+                        logger.debug(f"[BULK CREATE] Inserting entry {insert_entry.item.key} with child index {child_idx} at rank {rank} into {[e.item.key for e, _ in ranks]}, node slots: {[[e.item.key for e, _ in slot] for slot in node_slots]}. Previous pivot: {prev_pivot}")
+                    
+                    if prev_pivot is not None:
+                        pivot = Entry(create_replica_fn(prev_pivot), None)
+                        ranks.append((pivot, False))
+                        node_slots[-1].append((pivot, False))
+                    
+                    ranks.append((insert_entry, child_idx))
+                    
+                    # Node slot management - consolidated conditional
+                    if rank != insert_rank:
+                        node_slots.append([(insert_entry, child_idx)])
+                    else:    
+                        node_slots[-1].append((insert_entry, child_idx))
+                    
+                    if IS_DEBUG:
+                        logger.debug(f"[BULK CREATE] Updated rank {rank} entries: %s", [e.item.key for e, _ in ranks])
+                else:
+                    # New rank creation
+                    if IS_DEBUG:
+                        logger.debug(f"[BULK CREATE] Creating new rank {rank} with entry {insert_entry.item.key} and child index {child_idx}. Previous pivot: {prev_pivot}")
+                    
+                    new_entries = [(insert_entry, child_idx)]
+                    new_entries_slots = [(insert_entry, child_idx)]
+                    
+                    # Consolidate pivot insertion logic
+                    if insert_rank >= max_rank:
+                        new_entries.insert(0, (dummy, False))
+                        new_entries_slots.insert(0, (dummy, False))
+                        prev_pivot = dummy.item.key
+                    else:
+                        pivot_entry = Entry(create_replica_fn(prev_pivot), None)
+                        pivot_slot = Entry(create_replica_fn(prev_pivot), False)
+                        new_entries.insert(0, (pivot_entry, False))
+                        new_entries_slots.insert(0, (pivot_slot, None))
+                    
+                    rank_entries_map[rank] = new_entries
+                    
+                    # Node slots handling
+                    if node_slots is not None:
+                        if IS_DEBUG:
+                            logger.debug(f"Node slots for rank {rank} are not None, appending new entries: %s", [e.item.key for e, _ in new_entries_slots])
+                        node_slots[-1].extend(new_entries_slots)
+                        if IS_DEBUG:
+                            logger.debug(f"[BULK CREATE] Updated node slots for rank {rank}: %s", [[e.item.key for e, _ in slot] for slot in node_slots])
+                    else:
+                        rank_node_slots_map[rank] = [new_entries_slots]
+
+                if IS_DEBUG:
+                    logger.debug(f"[BULK CREATE] Entries for rank {rank}: %s", [e.item.key for e, _ in rank_entries_map[rank]])
+                    logger.debug(f"[BULK CREATE] Rank node slots for rank {rank}: %s", [[e.item.key for e, _ in slot] for slot in rank_node_slots_map[rank]])
+                
+                # Boundary management - streamlined logic
+                if rank == insert_rank:
+                    # Handle special case for rank 1 initialization
+                    if rank == 1 and not add_boundary_map:
+                        boundaries_map[rank] = [0]
+                    elif add_boundary:
+                        # Calculate boundary position - eliminate redundant conditionals
+                        boundary_pos = (len(ranks) - (2 if prev_pivot is not None else 1)) if boundaries is not None else 0
+                        
+                        if boundaries is not None:
+                            boundaries.append(boundary_pos)
+                        else:
+                            boundaries_map[rank] = [boundary_pos]
+                    
+                    add_boundary_map[rank] = False
+                elif boundaries is not None:
+                    # Non-insert rank boundary update
+                    boundaries.append(len(ranks) - 1)
+                    add_boundary_map[rank] = False
+                else:
+                    # Initialize boundaries for new rank
+                    boundaries_map[rank] = [0, len(rank_entries_map[rank]) - 1]
+                    add_boundary_map[rank] = False
+
+                if IS_DEBUG:
+                    logger.debug(f"[BULK CREATE] Setting pivot for rank {rank} to None at {entry_key}. Previous pivot: {prev_pivot}")
+                
+                prev_pivot_map[rank] = None
+            else:
+                # Handle non-insert/non-leaf ranks: set boundary flag for lower ranks
+                if not add_boundary:
+                    add_boundary_map[rank] = True
+                
+                # Node slots management for non-insert ranks
+                if node_slots is not None:
+                    node_slots.append([])
+                else:
+                    rank_node_slots_map[rank] = [[], []]
+                
+                if IS_DEBUG:
+                    logger.debug(f"[BULK CREATE] Changing pivot from {prev_pivot} to {entry_key} for rank {rank} at {entry_key}.")
+                    logger.debug(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
+                
+                prev_pivot_map[rank] = entry_key
+            
+            rank -= 1
+        max_rank = insert_rank if insert_rank > max_rank else max_rank
+
+    # Comment when testing
+    if IS_DEBUG:
+        logger.debug(
+            "[BULK CREATE] Created rank entries map:\n%s",
+            pprint.pformat(rank_entries_map)
+        )
+        logger.debug(
+            "[BULK CREATE] Created rank node slots map:\n%s",
+            pprint.pformat(rank_node_slots_map)
+        )
+        logger.debug(
+            "[BULK CREATE] Created boundaries map:\n%s",
+            pprint.pformat(boundaries_map)
+        )
+    # for entry_sample in entries:
+    #     rank_sample = calc_rank_from_group_size(entry_sample.item.key, group_size, DIM)
+    #     sample_tree, _ = sample_tree.insert_entry(entry_sample, rank_sample)
+    if IS_DEBUG:
+        logger.debug(
+        "[BULK CREATE] Sample tree after inserting entries:\n%s",
+        print_pretty(sample_tree)
+        )
+
+    leaf_trees = _build_leaf_level_trees(
+        rank_entries_map[1],
+        boundaries_map[1],
+        dummy,
+        KListClass,
+        NodeClass,
+        TreeClass,
+        l_factor,
+    )
+
+    root_tree = _build_internal_levels(
+        rank_entries_map, boundaries_map, leaf_trees,
+        TreeClass, NodeClass, KListClass, threshold, l_factor, max_rank
+    )
+
+    if IS_DEBUG:
+        logger.debug(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
+
+    # exit()
+    return root_tree
