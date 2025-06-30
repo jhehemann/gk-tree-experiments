@@ -30,6 +30,24 @@ from gplus_trees.g_k_plus.utils import (
     calculate_group_size,
 )
 
+class RankData:
+    """Consolidated data structure for each rank level in bulk tree creation."""
+    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'add_boundary', 'pivot_key')
+    
+    def __init__(self, 
+                 entries: Optional[list[Entry]] = None,
+                 child_indices: Optional[list[int]] = None,
+                 next_child_idx: int = 0,
+                 boundaries: Optional[list[int]] = None,
+                 add_boundary: bool = True,
+                 pivot_key: Optional[int] = None):
+        self.entries = entries
+        self.child_indices = child_indices
+        self.next_child_idx = next_child_idx
+        self.boundaries = boundaries
+        self.add_boundary = add_boundary
+        self.pivot_key = pivot_key
+
 t = TypeVar('t', bound='GKPlusTreeBase')
 
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
@@ -1204,19 +1222,17 @@ def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KLi
 
 
 def _build_leaf_level_trees(
-    entries: list[Entry],
-    boundaries_map: list[int],
+    rank_data_map: dict[int, RankData],
     KListClass: type[KListBase],
     NodeClass: type[GKPlusNodeBase],
     TreeClass: type[GKPlusTreeBase],
     l_factor: float,
 ) -> list[GKPlusTreeBase]:
     """
-    Build leaf level trees from entries and node boundaries.
+    Build leaf level trees from rank data for rank 1.
     
     Args:
-        entries: List of Entry objects to be inserted into the leaf nodes
-        boundaries_map: Map of node boundaries for leaf level creation
+        rank_data_map: Consolidated rank data map containing entries and boundaries
         KListClass: The KList class to use for creating klists
         NodeClass: The node class to use for creating nodes
         TreeClass: The tree class to use for creating trees
@@ -1224,6 +1240,11 @@ def _build_leaf_level_trees(
     Returns:
         A list of GKPlusTreeBase instances representing the leaf level trees
     """
+    
+    # Extract rank 1 data
+    rank_1_data = rank_data_map[1]
+    entries = rank_1_data.entries
+    boundaries_map = rank_1_data.boundaries
     
     threshold = KListClass.KListNodeClass.CAPACITY * l_factor
     leaf_trees = []
@@ -1256,9 +1277,7 @@ def _build_leaf_level_trees(
     return leaf_trees
 
 def _build_internal_levels(
-    rank_entries_map: dict[int, list[Entry]],
-    child_idx_map: dict[int, list[int]],
-    boundaries_map: dict[int, list[int]],
+    rank_data_map: dict[int, RankData],
     leaf_trees: list[GKPlusTreeBase],
     TreeClass: type[GKPlusTreeBase],
     NodeClass: type[GKPlusNodeBase],
@@ -1268,11 +1287,10 @@ def _build_internal_levels(
     max_rank: int,
 ) -> GKPlusTreeBase:
     """
-    Build internal levels of the GKPlusTree from entries, node boundaries and leaf level trees.
+    Build internal levels of the GKPlusTree from rank data and leaf level trees.
     
     Args:
-        rank_entries_map: Map of ranks (tree levels) to entries
-        boundaries_map: Map of ranks (tree levels) to node boundaries
+        rank_data_map: Consolidated rank data map containing entries, boundaries, and child indices
         leaf_trees: List of leaf trees created
         TreeClass: The tree class to use for creating trees
         NodeClass: The node class to use for creating nodes
@@ -1298,14 +1316,15 @@ def _build_internal_levels(
     
     while rank <= max_rank:
         # Fast path: skip ranks with no entries
-        entries = rank_entries_map.get(rank)
-        if not entries:
+        rank_data = rank_data_map.get(rank)
+        if not rank_data or not rank_data.entries:
             rank += 1
             continue
 
-        # Cache dictionary lookup and length calculations
-        child_idx_list = child_idx_map.get(rank, [])
-        boundaries = boundaries_map.get(rank, [])
+        # Extract data for this rank
+        entries = rank_data.entries
+        child_idx_list = rank_data.child_indices or []
+        boundaries = rank_data.boundaries or []
         boundaries_len = len(boundaries)
         entries_len = len(entries)
 
@@ -1403,163 +1422,135 @@ def _bulk_create_bottom_up(
     create_gkplus_tree_fn = _get_create_gkplus_tree()
     sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
     
-    # Get required classes and functions
+    # Pre-cache all constants and frequently used objects
     NodeClass = sample_tree.NodeClass
     TreeClass = type(sample_tree)
     create_replica_fn = _create_replica
     group_size = calculate_group_size(k)
-    
-    # Cache frequently used values
-    rank_entries_map: dict[int, list[Entry]] = {}
-    child_idx_map: dict[int, Optional[int]] = {}
-    next_child_idx_map: dict[int, int] = {}
-    boundaries_map: dict[int, list[int]] = {}
-    add_boundary_map: dict[int, bool] = {}
-    pivot_key_map: dict[int, int] = {}
-
     threshold = int(k * l_factor)
     dummy = Entry(get_dummy(DIM), None)
-    rank_entries_map[1] = [dummy]  # at least one entry at rank 1
+    dummy_key = dummy.item.key
+    
+    # Consolidated rank data structure  
+    rank_data_map: dict[int, RankData] = {}
 
     max_rank = 1
     for entry in entries:
         insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
         entry_key = entry.item.key
-        rank = insert_rank
         
-        while rank > 0:
-            rank_entries = rank_entries_map.get(rank)
-            boundaries = boundaries_map.get(rank)
-            add_boundary = add_boundary_map.get(rank, True)
-            child_indices = child_idx_map.get(rank, None)
-            pivot_key = pivot_key_map.get(rank, None)
-            next_child_idx = next_child_idx_map.get(rank, 0)
+        # Update max_rank early to avoid repeated comparisons
+        if insert_rank > max_rank:
+            max_rank = insert_rank
+        
+        # Process ranks from insert_rank down to 1, with cached lookups
+        for rank in range(insert_rank, 0, -1):
+            # Get or create rank data
+            if rank not in rank_data_map:
+                rank_data_map[rank] = RankData()
+            
+            rank_data = rank_data_map[rank]
+            
+            # Cache all values for this rank
+            rank_entries = rank_data.entries
+            boundaries = rank_data.boundaries
+            add_boundary = rank_data.add_boundary
+            child_indices = rank_data.child_indices
+            pivot_key = rank_data.pivot_key
+            next_child_idx = rank_data.next_child_idx
 
-            if rank == insert_rank or rank == 1:
-                # Create fresh replica for each rank (except leaf which uses original entry)
+            is_insert_or_leaf_rank = (rank == insert_rank or rank == 1)
+            
+            if is_insert_or_leaf_rank:
+                # Create entry once and reuse
                 insert_entry = entry if rank == 1 else Entry(create_replica_fn(entry_key), None)
 
                 # Entry insertion
                 if rank_entries is not None:
-                    # Entries exist, append entries
-                    if IS_DEBUG:
-                        logger.debug(f"[BULK CREATE] Inserting entry {insert_entry.item.key} with child index {next_child_idx} at rank {rank} into {[e.item.key for e in rank_entries]}. Child indices: {child_idx_map.get(rank, [])}. Previous pivot: {pivot_key}")
-
-                    # Insert pivot if needed
+                    # Direct insertion - no temporary lists needed
                     if pivot_key is not None:
-                        pivot = Entry(create_replica_fn(pivot_key), None)
-                        rank_entries.append(pivot)
-                        child_indices.append(None) # Pivot entries never have left subtrees
-
+                        rank_entries.append(Entry(create_replica_fn(pivot_key), None))
+                        if child_indices is not None:
+                            child_indices.append(None)
+                    
                     rank_entries.append(insert_entry)
                     if rank > 1:
-                        child_indices.append(next_child_idx)
+                        if child_indices is not None:
+                            child_indices.append(next_child_idx)
+                        else:
+                            rank_data.child_indices = [None, next_child_idx]
                         next_child_idx += 1
-                        next_child_idx_map[rank] = next_child_idx
-                    
-                    if IS_DEBUG:
-                        logger.debug(f"[BULK CREATE] Updated rank {rank} entries: %s", [e.item.key for e in rank_entries])
+                        rank_data.next_child_idx = next_child_idx
                 else:
-                    # No entries, create new list for this rank
-                    if IS_DEBUG:
-                        logger.debug(f"[BULK CREATE] Creating new rank {rank} with entry {insert_entry.item.key} and child index {next_child_idx}. Previous pivot: {pivot_key}")
-                    
-                    new_entries = []
-                    
-                    # Insert pivot
-                    if insert_rank >= max_rank:
-                        new_entries.append(dummy)
-                        pivot_key = dummy.item.key
+                    # Initialize new rank with pre-sized lists
+                    if rank == 1:
+                        # For rank 1 (leaf level), always start with dummy
+                        new_entries = [dummy, insert_entry]
+                        pivot_key = dummy_key
+                    elif rank == max_rank or pivot_key is None:
+                        new_entries = [dummy, insert_entry]
+                        pivot_key = dummy_key
                     else:
                         pivot_entry = Entry(create_replica_fn(pivot_key), None)
-                        new_entries.append(pivot_entry)
+                        new_entries = [pivot_entry, insert_entry]
                     
-                    # Append the insert entry
-                    new_entries.append(insert_entry)
-                    rank_entries_map[rank] = new_entries
+                    rank_data.entries = new_entries
                     
-                    # Assign child indices for non-leaf ranks
+                    # Initialize child indices for non-leaf ranks
                     if rank > 1:
-                        child_idx_map[rank] = [None, next_child_idx]
+                        rank_data.child_indices = [None, next_child_idx]
                         next_child_idx += 1
-                        next_child_idx_map[rank] = next_child_idx
-
-                if IS_DEBUG:
-                    logger.debug(f"[BULK CREATE] Entries for rank {rank}: %s", [e.item.key for e in rank_entries_map[rank]])
-                    logger.debug(f"[BULK CREATE] Child node indices for rank {rank}: %s", [child_idx_map.get(rank, [])])
+                        rank_data.next_child_idx = next_child_idx
 
                 # Boundary management
                 if rank == insert_rank:
                     # Handle special case for rank 1 initialization
-                    if rank == 1 and not add_boundary_map:
-                        boundaries_map[rank] = [0]
+                    if rank == 1 and len(rank_data.entries) == 2:
+                        rank_data.boundaries = [0]
                     elif add_boundary:
-                        # Calculate boundary position after insertion
-                        # If a pivot was inserted, the boundary is at the second last entry, else it is at the last entry
-                        boundary_pos = (len(rank_entries) - (2 if pivot_key is not None else 1)) if boundaries is not None else 0
+                        # Pre-calculate boundary position
+                        rank_entries_len = len(rank_entries) if rank_entries else 2
+                        boundary_pos = rank_entries_len - (2 if pivot_key is not None else 1)
+                        
                         if boundaries is not None:
                             boundaries.append(boundary_pos)
                         else:
-                            boundaries_map[rank] = [boundary_pos]
-
-                elif boundaries is not None:
-                    boundaries.append(len(rank_entries) - 1)
+                            rank_data.boundaries = [boundary_pos]
                 else:
-                    boundaries_map[rank] = [0, len(rank_entries) - 1]
+                    # Simplified boundary updates
+                    rank_entries_len = len(rank_entries) if rank_entries else 2
+                    boundary_pos = rank_entries_len - 1
+                    
+                    if boundaries is not None:
+                        boundaries.append(boundary_pos)
+                    else:
+                        rank_data.boundaries = [0, boundary_pos]
                 
-                add_boundary_map[rank] = False
-
-                if IS_DEBUG:
-                    logger.debug(f"[BULK CREATE] Setting pivot for rank {rank} to None at {entry_key}. Previous pivot: {pivot_key}")
-                
-                pivot_key_map[rank] = None
+                rank_data.add_boundary = False
+                rank_data.pivot_key = None
             else:
                 # Handle non-insert/non-leaf ranks: set boundary flag for lower ranks
                 if not add_boundary:
-                    add_boundary_map[rank] = True
-                
-                if IS_DEBUG:
-                    logger.debug(f"[BULK CREATE] Adding boundary at rank {rank} at {entry_key}, setting it as pivot for next entry.")
-                
-                pivot_key_map[rank] = entry_key
-                next_child_idx += 1
-                next_child_idx_map[rank] = next_child_idx
+                    rank_data.add_boundary = True
+
+                rank_data.pivot_key = entry_key
+                rank_data.next_child_idx = next_child_idx + 1
 
             rank -= 1
         max_rank = insert_rank if insert_rank > max_rank else max_rank
 
-    # Comment when testing
-    if IS_DEBUG:
-        logger.debug(
-            "[BULK CREATE] Created rank entries map:\n%s",
-            pprint.pformat(rank_entries_map)
-        )
-        logger.debug(
-            "[BULK CREATE] Created boundaries map:\n%s",
-            pprint.pformat(boundaries_map)
-        )
-        logger.debug(
-            "[BULK CREATE] Created child index map:\n%s",
-            pprint.pformat(child_idx_map)
-        )
-
     # Build leaf level
     leaf_trees = _build_leaf_level_trees(
-        rank_entries_map[1],
-        boundaries_map[1],
+        rank_data_map,
         KListClass,
         NodeClass,
         TreeClass,
         l_factor,
     )
 
-    # Build internal tree levels
     root_tree = _build_internal_levels(
-        rank_entries_map, child_idx_map, boundaries_map, leaf_trees,
+        rank_data_map, leaf_trees,
         TreeClass, NodeClass, KListClass, threshold, l_factor, max_rank
     )
-
-    if IS_DEBUG:
-        logger.debug(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
 
     return root_tree
