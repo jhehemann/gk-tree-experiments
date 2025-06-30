@@ -1127,22 +1127,18 @@ def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
     # Note: dummy key of DIM j is -j.
     for entry in tree:
         tree_dummy = get_dummy(tree.DIM)
-        # logger.debug(f"[TREE TO KLIST] Processing entry {entry.item.key} with dummy {tree_dummy.key}")
         if entry.item.key > tree_dummy.key:
-            # logger.debug(f"[TREE TO KLIST] Inserting entry {entry.item.key} as it is larger than the tree's dummy key {tree_dummy.key}")
             klist, _ = klist.insert_entry(entry)
-            # logger.debug(f"[TREE TO KLIST] KList after insertion: {print_pretty(klist)}")
     return klist
 
 
 def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) -> GKPlusTreeBase:
     """
-    Convert a KList to a GKPlusTree by inserting each (item, rank) pair.
-    Uses the factory pattern to create a tree with the specified capacity K.
+    Convert a KList to a GKPlusTree by extracting its entries and creating a new tree from them.
     
     Args:
         klist: The KList to convert
-        K: The capacity parameter
+        K: The KList capacity (number of items per klist node)
         DIM: The dimension for the new tree
         l_factor: The threshold factor for conversion
         
@@ -1170,19 +1166,13 @@ def bulk_create_gkplus_tree(
     KListClass: type[KListBase],
 ) -> GKPlusTreeBase:
     """
-    Create a new GKPlusTree with optimized bottom-up bulk creation.
-    
-    This implementation builds the tree from leaves to root, which is much more
-    efficient than the recursive top-down approach because:
-    1. Single pass over data to calculate all ranks
-    2. Direct leaf creation without recursion
-    3. Iterative bottom-up construction
-    4. Better memory locality and cache efficiency
+    Create a GKPlusTree from a list of entries.
     
     Args:
-        klist: The KList to convert
+        entries: List of Entry objects to be inserted into the tree
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
+        KListClass: The KList class to use for creating klists
         
     Returns:
         A new GKPlusTreeBase instance
@@ -1193,21 +1183,11 @@ def bulk_create_gkplus_tree(
         tree = _get_create_gkplus_tree()(k, DIM, l_factor)
         return tree
 
-    # Use optimized bottom-up construction - Not working yet
     return _bulk_create_bottom_up(entries, k, DIM, l_factor, KListClass)
 
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
-    """
-    Create a KList from a list of entries.
-    
-    Args:
-        entries: A list of Entry objects
-        KListClass: The KList class to use
-        
-    Returns:
-        A new KListBase instance containing the entries
-    """
+    """Create a KList from a list of entries."""
     klist = KListClass()
     if IS_DEBUG:
         logger.debug(f"[BULK CREATE] Creating KList with {[entry.item.key for entry in entries]} entries and their left subtrees:")
@@ -1230,9 +1210,21 @@ def _build_leaf_level_trees(
     NodeClass: type[GKPlusNodeBase],
     TreeClass: type[GKPlusTreeBase],
     l_factor: float,
-    # has_dummy: bool,
 ) -> list[GKPlusTreeBase]:
-    """Build leaf level trees from entries."""
+    """
+    Build leaf level trees from entries and node boundaries.
+    
+    Args:
+        entries: List of Entry objects to be inserted into the leaf nodes
+        boundaries_map: Map of node boundaries for leaf level creation
+        KListClass: The KList class to use for creating klists
+        NodeClass: The node class to use for creating nodes
+        TreeClass: The tree class to use for creating trees
+        l_factor: The threshold factor for conversion
+    Returns:
+        A list of GKPlusTreeBase instances representing the leaf level trees
+    """
+    
     threshold = KListClass.KListNodeClass.CAPACITY * l_factor
     leaf_trees = []
     prev_node = None
@@ -1276,16 +1268,16 @@ def _build_internal_levels(
     max_rank: int,
 ) -> GKPlusTreeBase:
     """
-    Build internal levels of the GKPlusTree from leaf level trees.
+    Build internal levels of the GKPlusTree from entries, node boundaries and leaf level trees.
     
     Args:
-        rank_entries_map: Map of ranks to entries
-        boundaries_map: Map of rank boundaries
-        leaf_trees: List of leaf trees created from entries
-        TreeClass: The tree class to use for creating nodes
+        rank_entries_map: Map of ranks (tree levels) to entries
+        boundaries_map: Map of ranks (tree levels) to node boundaries
+        leaf_trees: List of leaf trees created
+        TreeClass: The tree class to use for creating trees
         NodeClass: The node class to use for creating nodes
-        KListClass: The KList class to use for creating nodes
-        threshold: The threshold for KList vs GKPlusTree conversion
+        KListClass: The KList class to use for creating klists
+        threshold: The threshold for node set type (KList vs GKPlusTree)
         l_factor: The threshold factor for conversion
         max_rank: The maximum rank to process
         
@@ -1390,8 +1382,8 @@ def _bulk_create_bottom_up(
     KListClass: type[KListBase],
 ) -> GKPlusTreeBase:
     """
-    Bottom-up bulk creation of GK+-tree.
-    
+    Bottom-up bulk creation of a GKPlusTree from a list of entries.
+
     Key insights:
     1. All entries exist in leaf nodes
     2. Rank determines node boundaries: higher rank = start of new node
@@ -1400,10 +1392,13 @@ def _bulk_create_bottom_up(
     5. Entries are already sorted from KList iteration
     
     Args:
-        klist: The sorted KList to convert
+        entries: A list of Entry objects to insert into the tree
         k: The capacity parameter for the tree
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
+        KListClass: The KList class to use for creating KLists
+    Returns:
+        A new GKPlusTreeBase instance containing the entries
     """
     create_gkplus_tree_fn = _get_create_gkplus_tree()
     sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
@@ -1548,6 +1543,7 @@ def _bulk_create_bottom_up(
             pprint.pformat(child_idx_map)
         )
 
+    # Build leaf level
     leaf_trees = _build_leaf_level_trees(
         rank_entries_map[1],
         boundaries_map[1],
@@ -1557,6 +1553,7 @@ def _bulk_create_bottom_up(
         l_factor,
     )
 
+    # Build internal tree levels
     root_tree = _build_internal_levels(
         rank_entries_map, child_idx_map, boundaries_map, leaf_trees,
         TreeClass, NodeClass, KListClass, threshold, l_factor, max_rank
@@ -1565,5 +1562,4 @@ def _bulk_create_bottom_up(
     if IS_DEBUG:
         logger.debug(f"[BULK CREATE] Root tree: {print_pretty(root_tree)}")
 
-    # exit()
     return root_tree
