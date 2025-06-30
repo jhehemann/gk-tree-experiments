@@ -1318,8 +1318,7 @@ def _build_internal_levels(
             continue
 
         subtrees_next = []
-        trees = []
-        last_child_idx = -1
+        prev_child_idx = -1 # Initialize to -1 to handle first child correctly
         
         # Cache frequently accessed values
         boundaries_len = len(boundaries)
@@ -1330,42 +1329,55 @@ def _build_internal_levels(
             end_idx = boundaries[i + 1] if i + 1 < boundaries_len else entries_len
             node_entries = entries[start_idx:end_idx]
             
+            # Create node entries and attach left subtrees
             for entry, child_idx in islice(node_entries, 1, None):
-                entry.left_subtree = sub_trees[child_idx] if child_idx and child_idx < len(sub_trees) else sub_trees[last_child_idx + 1]
-                child_idx = last_child_idx + 1 if child_idx is None else child_idx
-                if child_idx is not None:
-                    subtrees_next.extend(sub_trees[last_child_idx + 1:child_idx])
-                    last_child_idx = child_idx
-                else:
-                    subtrees_next.append(sub_trees[last_child_idx + 1])
-                    last_child_idx += 1
+                next_child_idx = prev_child_idx + 1
+                if child_idx:
+                    entry.left_subtree = sub_trees[child_idx]
 
-            # Create node set - use cached function references
+                    # Check for collapsed subtrees at the current rank and lift them to the next
+                    if next_child_idx < child_idx:
+                        for i in range(next_child_idx, child_idx):
+                            subtrees_next.append(sub_trees[i])
+                else:
+                    # We can use the next child index because we lifted the earlier missing subtrees from the lower ranks
+                    entry.left_subtree = sub_trees[next_child_idx]
+                    child_idx = next_child_idx
+                
+                prev_child_idx = child_idx
+
+            # Create node set
             if len(node_entries) <= threshold:
+                # If entries are below threshold, create a KList
                 node_set = bulk_create_klist_fn(node_entries, KListClass)
             else:
-                # Optimize list comprehension for better performance
+                # If entries exceed threshold, create a GKPlusTree
+                # Extract raw entries as bulk_create_gkplus_tree expects a list of entries, not (Entry, child_idx) tuples
                 raw_entries = [entry for entry, _ in node_entries]
                 node_set = bulk_create_gkplus_tree_fn(raw_entries, tree_dim_plus_one, l_factor, KListClass)
-                
-            tree_node = NodeClass(rank, node_set, sub_trees[last_child_idx + 1] if last_child_idx + 1 < len(sub_trees) else None)
-            last_child_idx += 1
+
+            # Create the node with right subtree
+            prev_child_idx += 1
+            right_subtree = sub_trees[prev_child_idx]
+            tree_node = NodeClass(rank, node_set, right_subtree)
             tree = TreeClass(l_factor=l_factor)
             tree.node = tree_node
-            # trees.append(tree)
-            if rank_trees_map.get(rank) is None:
-                rank_trees_map[rank] = [tree]
-            else:
-                rank_trees_map[rank].append(tree)
-            subtrees_next.append(tree)
+            
+            # lift the current tree to the next rank to be assigned as a subtree
+            subtrees_next.append(tree) 
         
-        subtrees_next.extend(sub_trees[last_child_idx + 1:])
+        # Lift the remaining subtrees
+        start_idx = prev_child_idx + 1
+        len_sub_trees = len(sub_trees)
+        if start_idx < len_sub_trees:
+            for i in range(start_idx, len_sub_trees):
+                subtrees_next.append(sub_trees[i])
+        
         sub_trees = subtrees_next
-        # rank_trees_map[rank] = trees
         rank += 1
-
-    tree = rank_trees_map[max_rank][0]  # Get the root tree from the last rank
-    return tree
+    
+    # The first tree after processing the highest rank is the root tree
+    return sub_trees[0] 
 
 
 def _bulk_create_bottom_up(
