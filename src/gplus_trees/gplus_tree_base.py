@@ -128,7 +128,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         return self._insert_non_empty(insert_entry, rank)
 
     def retrieve(
-        self, key: int
+        self, key: int, with_next: bool = True
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Searches for an item with a matching key in the G+-tree.
@@ -161,32 +161,25 @@ class GPlusTreeBase(AbstractSetDataStructure):
             found_entry, next_entry = node.set.retrieve(key)
 
             if node.rank == 1:
-                while True:
-                    node = cur.node
-                    # Attempt to retrieve from this node's set
-                    found_entry, next_entry = node.set.retrieve(key)
+                # We've reached a leaf node
+                if not with_next:
+                    found_entry, _ = node.set.retrieve(key, with_next=False)
+                    return found_entry, None
 
-                    # if node.rank == 1:
-                    while next_entry is None and node.next is not None:
-                        # Find the next entry (no dummy) in the linked leaf list
-                        node = node.next.node
-                        for entry in node.set:
-                            if entry.item.key > key:
-                                next_entry = entry
-                                break
-                    
-                    return found_entry, next_entry
+                # Get the entry and next from this leaf node
+                found_entry, next_entry = node.set.retrieve(key, with_next=True)
 
-            # if node.rank == 1:
-            #     if next_entry is None and node.next is not None:
-            #         # If leaf has a linked next node, update next_entry
-            #         next_entry = node.next.node.set.get_min().found_entry
-            #         return RetrievalResult(found_entry, next_entry)
-            #     else:
-            #         # Leaf node: return found_entry and next_entry
-            #         return RetrievalResult(found_entry, next_entry)
-            
-            # Descend based on presence of next_entry
+                # If no next entry found in current node, check linked leaf nodes
+                if next_entry is None and node.next is not None:
+                    # Find the next entry (no dummy) in the linked leaf list
+                    next_node = node.next.node
+                    for entry in next_node.set:
+                        if entry.item.key > key:
+                            next_entry = entry
+                            break
+                        
+                return found_entry, next_entry
+
             cur = next_entry.left_subtree if next_entry else node.right_subtree
     
     def delete(self, item):

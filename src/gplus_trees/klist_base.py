@@ -472,8 +472,8 @@ class KListBase(AbstractSetDataStructure):
         
         self._rebuild_index()
         return self
-    
-    def retrieve(self, key: int) -> Tuple[Optional[Entry], Optional[Entry]]:
+
+    def retrieve(self, key: int, with_next: bool = True) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Search for `key` using linear search on the list or binary search O(log l + log k) on the index, based on the number of entries in the node.
         
@@ -515,6 +515,11 @@ class KListBase(AbstractSetDataStructure):
                     # Exact match?
                     if entry.item.key == key:
                         found = entry
+                        
+                        # Early return if we don't need the next entry
+                        if not with_next:
+                            return found, None
+                        
                         # Find successor
                         if i + 1 < len(entries):
                             succ = entries[i+1]
@@ -537,6 +542,10 @@ class KListBase(AbstractSetDataStructure):
         # Exact match?
         if i < len(entries) and entries[i].item.key == key:
             found = entries[i]
+            
+            if not with_next:
+                return found, None
+            
             # Find successor (in-node or from next node)
             if i + 1 < len(entries):
                 succ = entries[i+1]
