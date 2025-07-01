@@ -92,7 +92,6 @@ class KListNodeBase:
                         return None, False
             else:
                 # Binary search for larger lists - more efficient with higher capacities
-                # i = bisect_left([e.item.key for e in entries], x_key)
                 i = bisect_left(keys, x_key)
                 if i < len(entries) and keys[i] == x_key:
                     return None, False
@@ -141,7 +140,7 @@ class KListNodeBase:
         if not entries:
             return None, None, True
 
-        keys = [e.item.key for e in entries]
+        keys = self.keys
         i = bisect_left(keys, key)
 
         # Case A: found exact
@@ -190,10 +189,6 @@ class KListBase(AbstractSetDataStructure):
         self._prefix_counts_tot = []   # List[int]
         self._prefix_counts_real = []  # List[int], real items count (excluding dummy items)
         self._bounds = []              # List[int], max key per node (optional)
-        
-
-    def __lt__(self, other):
-        return self.key < other.key
     
     def __bool__(self) -> bool:
         # return False when empty, True when non-empty
@@ -499,6 +494,7 @@ class KListBase(AbstractSetDataStructure):
         # Get the target node
         node = self._nodes[node_idx]
         entries = node.entries
+        keys = node.keys
         
         # Empty node (shouldn't happen if index is maintained)
         if not entries:
@@ -535,8 +531,6 @@ class KListBase(AbstractSetDataStructure):
             return None, None
         else:
             # Binary search for larger lists
-            # TODO: Store keys in a separate list for O(log k) search
-            keys = [e.item.key for e in entries]
             i = bisect_left(keys, key)
         
         # Exact match?
@@ -616,31 +610,27 @@ class KListBase(AbstractSetDataStructure):
             return self, None, right
 
         split_node = self._nodes[node_idx]
-        # logger.debug(f"Split node at key {key}: entries={[e.item.key for e in split_node.entries]}, keys={split_node.keys}, real_keys={split_node.real_keys}")
         prev_node = self._nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
 
         # --- bisect inside that node -----------------------------------------
-        keys = [e.item.key for e in split_node.entries]
         node_entries = split_node.entries
         node_keys = split_node.keys
-        
-        i = bisect_left(keys, key)
-        exact = i < len(keys) and keys[i] == key
+
+        i = bisect_left(node_keys, key)
+        exact = i < len(node_keys) and node_keys[i] == key
 
         left_entries = node_entries[:i]
         right_entries = node_entries[i + 1 if exact else i :]
         left_subtree = node_entries[i].left_subtree if exact else None
 
-        left_keys = keys[:i]
-        right_keys = keys[i + 1 if exact else i :]
+        left_keys = node_keys[:i]
+        right_keys = node_keys[i + 1 if exact else i :]
 
         real_keys = split_node.real_keys
         j = bisect_left(real_keys, key)
         left_real_keys = real_keys[:j]
         right_real_keys = real_keys[j + 1 if exact else j :]
-        
-        # logger.debug(f"Split at key {key}: left_entries={[e.item.key for e in left_entries]}, right_entries={[e.item.key for e in right_entries]}, left_keys={left_keys}, right_keys={right_keys}, left_real_keys={left_real_keys}, right_real_keys={right_real_keys}")
 
         # ------------- build LEFT --------------------------------------------
         # left = type(self)()
