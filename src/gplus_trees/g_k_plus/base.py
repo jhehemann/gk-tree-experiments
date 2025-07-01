@@ -4,8 +4,7 @@ from typing import Optional, Tuple, TypeVar, Iterator
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
-    Entry,
-    RetrievalResult
+    Entry
 )
 from gplus_trees.logging_config import get_logger
 
@@ -19,13 +18,13 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
     """
 
     @abstractmethod
-    def get_min(self) -> 'RetrievalResult':
+    def get_min(self) -> Tuple[Optional['Entry'], Optional['Entry']]:
         """
         Retrieve the minimum entry in the set data structure.
         Returns:
-            RetrievalResult: A named tuple containing:
-                - found_entry: The minimum entry in the set.
-                - next_entry: The next entry in sorted order after the minimum entry.
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
+                - found_entry: The minimum entry in the set
+                - next_entry: The next entry in sorted order after the minimum entry
         """
         pass
 

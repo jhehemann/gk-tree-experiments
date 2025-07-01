@@ -11,7 +11,6 @@ from gplus_trees.base import (
     Item,
     Entry,
     _create_replica,
-    RetrievalResult,
 )
 from gplus_trees.klist_base import KListBase
 import logging
@@ -130,7 +129,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
     def retrieve(
         self, key: int
-    ) -> RetrievalResult:
+    ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Searches for an item with a matching key in the G+-tree.
 
@@ -142,16 +141,15 @@ class GPlusTreeBase(AbstractSetDataStructure):
             key (int): The key to search for.
 
         Returns:
-            RetrievalResult: Contains:
-                found_item (Optional[Item]): The value associated with the key, or None if not found.
-                next_pair (Tuple[Optional[Item], Optional[GPlusTreeBase]]):
-                    The next item in sorted order and its associated subtree, or (None, None).
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
+                - found_entry: The entry with the matching key if found, otherwise None
+                - next_entry: The subsequent entry in sorted order, or None if no next entry exists
         """
         if not isinstance(key, int):
             raise TypeError(f"retrieve(): key must be an int, got {type(key).__name__}")
         
         if self.is_empty():
-            return RetrievalResult(None, None)
+            return None, None
 
         cur = self
         found_entry: Optional[Entry] = None
@@ -160,19 +158,13 @@ class GPlusTreeBase(AbstractSetDataStructure):
         while True:
             node = cur.node
             # Attempt to retrieve from this node's set
-            res = node.set.retrieve(key)
-            
-            found_entry = res.found_entry
-            next_entry = res.next_entry
+            found_entry, next_entry = node.set.retrieve(key)
 
             if node.rank == 1:
                 while True:
                     node = cur.node
                     # Attempt to retrieve from this node's set
-                    res = node.set.retrieve(key)
-                    
-                    found_entry = res.found_entry
-                    next_entry = res.next_entry
+                    found_entry, next_entry = node.set.retrieve(key)
 
                     # if node.rank == 1:
                     while next_entry is None and node.next is not None:
@@ -183,7 +175,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                                 next_entry = entry
                                 break
                     
-                    return RetrievalResult(found_entry, next_entry)
+                    return found_entry, next_entry
 
             # if node.rank == 1:
             #     if next_entry is None and node.next is not None:
@@ -276,8 +268,8 @@ class GPlusTreeBase(AbstractSetDataStructure):
             if node_rank == rank:
                 # Only retrieve once
                 res = node.set.retrieve(x_key)
-                existing_x_entry = res.found_entry
-                next_entry = res.next_entry
+                existing_x_entry = res[0]
+                next_entry = res[1]
                 # Fast path: update existing item
                 if existing_x_entry:
                     if x_entry.left_subtree is not None:
@@ -302,7 +294,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
             parent = cur
             
             # Cache the next_entry to avoid repeated access
-            next_entry = res.next_entry
+            next_entry = res[1]
             if next_entry:
                 cur = next_entry.left_subtree
             else:
@@ -340,7 +332,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
         # Unfold intermediate node between parent and current
         # Set replica of the current node's min as first entry.
-        min_entry = cur.node.set.get_min().found_entry
+        min_entry = cur.node.set.get_min()[0]
         min_replica = _create_replica(min_entry.item.key)
         new_set, _ = self.SetClass().insert_entry(Entry(min_replica, None))
         new_tree = TreeClass()
@@ -362,11 +354,11 @@ class GPlusTreeBase(AbstractSetDataStructure):
         while True:
             node = cur.node
             if node.rank == 1:
-                entry = node.set.retrieve(key).found_entry
+                entry = node.set.retrieve(key)[0]
                 if entry:
                     entry.item.value = new_item.value
                 return self, inserted
-            next = node.set.retrieve(key).next_entry
+            next = node.set.retrieve(key)[1]
             cur = next.left_subtree if next else node.right_subtree
 
     def _insert_new_item(
@@ -425,12 +417,12 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 right_entry = next_entry if next_entry else None
                 
                 # TODO: Check if this can just be the insert_entry
-                left_x_entry = node.set.retrieve(x_key).found_entry
+                left_x_entry = node.set.retrieve(x_key)[0]
                 cur = subtree
             else:
                 # Node splitting required - get updated next_entry
                 res = node.set.retrieve(x_key)
-                next_entry = res.next_entry
+                next_entry = res[1]
 
                 # Split node at x_key
                 left_split, _, right_split = node.set.split_inplace(x_key)
@@ -866,12 +858,12 @@ def gtree_stats_(t: GPlusTreeBase,
     if child_stats and child_stats[0].least_item is not None:
         stats.least_item = child_stats[0].least_item
     else:
-        stats.least_item = node_set.find_pivot().found_entry.item
+        stats.least_item = node_set.find_pivot()[0].item
 
     if right_stats.greatest_item is not None:
         stats.greatest_item = right_stats.greatest_item
     else:
-        stats.greatest_item = node_set.get_max().found_entry.item
+        stats.greatest_item = node_set.get_max()[0].item
 
     # ---------- leaf walk ONCE at the root -----------------------------
     if node_rank == 1:          # leaf node: base values
@@ -930,7 +922,7 @@ def gtree_stats_(t: GPlusTreeBase,
         elif last_leaf is not None:
             # Check if greatest item matches last leaf's greatest item
             last_count = last_leaf.set.item_count()
-            last_item = last_leaf.set.get_max().found_entry.item
+            last_item = last_leaf.set.get_max()[0].item
             if stats.greatest_item is not last_item:
                 stats.linked_leaf_nodes = False
 

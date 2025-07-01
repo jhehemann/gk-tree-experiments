@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import NamedTuple, Optional, TypeVar, Generic, List
+from typing import NamedTuple, Optional, TypeVar, Generic, List, Tuple
 import hashlib
 import logging
 from gplus_trees.logging_config import get_logger
@@ -91,7 +91,7 @@ class AbstractSetDataStructure(ABC, Generic[T]):
     @abstractmethod
     def retrieve(
         self, key: int
-    ) -> 'RetrievalResult':
+    ) -> Tuple[Optional['Entry'], Optional['Entry']]:
         """
         Retrieve the entry associated with the given key from the set data structure.
 
@@ -99,10 +99,9 @@ class AbstractSetDataStructure(ABC, Generic[T]):
             key (int): The key of the entry to retrieve.
         
         Returns:
-            RetrievalResult: A named tuple containing:
-                - found_entry: A tuple (item, left_subtree) if the key is found; otherwise, None.
-                - next_entry: A tuple (next_item, left_subtree) representing the next entry in sorted order,
-                            or None if no subsequent entry exists.
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
+                - found_entry: The entry with the matching key if found, otherwise None
+                - next_entry: The subsequent entry in sorted order, or None if no next entry exists
         """
         pass
 

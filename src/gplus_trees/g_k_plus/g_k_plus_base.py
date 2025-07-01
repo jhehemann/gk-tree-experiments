@@ -12,7 +12,6 @@ from gplus_trees.base import (
     Item,
     Entry,
     _create_replica,
-    RetrievalResult,
 )
 import logging
 import pprint
@@ -294,7 +293,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         return count
 
-    def find_pivot(self) -> RetrievalResult:
+    def find_pivot(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Returns the pivot entry of a node in the next lower dimension.
 
@@ -303,11 +302,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         the lower dimension itself or the next larger entry in the current tree.
 
         Returns:
-            RetrievalResult: The pivot entry and the next entry in the tree.
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (pivot_entry, next_entry)
         """
 
         if self.is_empty():
-            return RetrievalResult(None, None)
+            return None, None
 
         dummy_pivot = get_dummy(self.DIM - 1).key
 
@@ -324,19 +323,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if pivot is None:
             raise ValueError(f"No pivot entry in tree {print_pretty(self)}")
 
-        return RetrievalResult(pivot, current)
+        return pivot, current
 
     # TODO: Check indifference: This may return an entry with dummy key y, although a subsequent 
     # leaf may have been expanded to a higher dimension with a dummy key x < y.
     # However, y is the first entry yielded when iterating over the tree.
-    def get_min(self) -> RetrievalResult:
+    def get_min(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Get the minimum entry in the tree. This corresponds to the entry with the dummy item of the maximum dimension in successive first leaf nodes.
         Returns:
-            RetrievalResult: The minimum entry and the next entry (if any).
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (minimum_entry, next_entry)
         """
         if self.is_empty():
-            return RetrievalResult(None, None)
+            return None, None
 
         first_leaf = next(self.iter_leaf_nodes(), None)
         if first_leaf is None:
@@ -344,11 +343,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         return first_leaf.set.get_min()
 
-    def get_max(self) -> RetrievalResult:
+    def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Get the maximum entry in the tree.
         Returns:
-            RetrievalResult: The maximum entry and the next entry (if any).
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (maximum_entry, next_entry)
         """
         max_leaf = self.get_max_leaf()
         return max_leaf.set.get_max()
@@ -467,7 +466,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Case 3: Descend to next level (current rank > rank)
             parent = cur
-            next_entry = node.set.retrieve(x_key).next_entry
+            next_entry = node.set.retrieve(x_key)[1]
             if next_entry:
                 cur = next_entry.left_subtree
             else:
@@ -510,7 +509,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         
         # Unfold intermediate node between parent and current
         # Locate the current node’s pivot and place its replica first in the intermediate node.
-        pivot = cur.node.set.find_pivot().found_entry
+        pivot = cur.node.set.find_pivot()[0]
         pivot_replica = _create_replica(pivot.item.key)
         new_set, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
         new_tree = TreeClass(l_factor=self.l_factor)
@@ -567,7 +566,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Fast path: First iteration without splitting
             if right_parent is None:
                 res = node.set.retrieve(x_key)
-                next_entry = res.next_entry
+                next_entry = res[1]
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 is_gkplus_type = isinstance(node.set, GKPlusTreeBase)
                 insert_entry = x_entry if is_leaf else Entry(replica, subtree)
@@ -619,7 +618,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Complex path: Node splitting required
             # Cache retrieve result to avoid redundant method calls
             res = node.set.retrieve(x_key)
-            next_entry = res.next_entry
+            next_entry = res[1]
 
             # Perform split operation and immediately cache converted results
             left_split, _, right_split = node.set.split_inplace(x_key)
@@ -813,7 +812,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Cache item counts and next entry
             l_count = left_split.item_count()
             r_count = right_split.item_count()
-            next_entry = right_split.retrieve(key).next_entry
+            next_entry = right_split.retrieve(key)[1]
 
             # --- Handle right side of the split ---
             # Determine if we need a new tree for the right split

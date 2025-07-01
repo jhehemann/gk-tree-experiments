@@ -205,7 +205,7 @@ class MerkleGKPlusTreeBase(GKPlusTreeBase):
                 break
 
             # Find child node to traverse
-            next = cur.set.retrieve(key).next_entry
+            next = cur.set.retrieve(key)[1]
             if next is not None:
                 cur = next.left_subtree.node
             else:
@@ -273,13 +273,13 @@ class MerkleGKPlusTreeBase(GKPlusTreeBase):
         # If this is a leaf node, check if we found the item
         if node.rank == 1:
             # If we found it, the proof is complete
-            return res.found_entry is not None
+            return res[0] is not None
             
         # For internal nodes, we need to continue down
         # Add sibling hashes to the proof
         for entry in node.set:
             # Skip the entry for our key
-            if res.found_entry and entry.item.key == res.found_entry.item.key:
+            if res[0] and entry.item.key == res[0].item.key:
                 continue
             
             # Add sibling hashes
@@ -288,7 +288,7 @@ class MerkleGKPlusTreeBase(GKPlusTreeBase):
                     proof.append(entry.left_subtree.node.get_hash())
                 
         # Add the right subtree hash if we're not going that way
-        next_subtree = res.next_entry.left_subtree if res.next_entry else node.right_subtree
+        next_subtree = res[1].left_subtree if res[1] else node.right_subtree
         if node.right_subtree != next_subtree and not node.right_subtree.is_empty():
             if isinstance(node.right_subtree.node, MerkleGKPlusNodeBase):
                 proof.append(node.right_subtree.node.get_hash())

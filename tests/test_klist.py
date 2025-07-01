@@ -340,26 +340,26 @@ class TestKListRetrieve(TestKListBase):
     def assertRetrieval(self, key, found_key, next_key):
         """
         Helper: call retrieve(key) and assert that
-          result.found_entry.item.key == found_key  (or None)
-          result.next_entry.item.key == next_key    (or None)
+          result[0].item.key == found_key  (or None)
+          result[1].item.key == next_key    (or None)
         """
-        res = self.klist.retrieve(key)
+        found_entry, next_entry = self.klist.retrieve(key)
         if found_key is None:
-            self.assertIsNone(res.found_entry, f"Expected no entry for {key}")
+            self.assertIsNone(found_entry, f"Expected no entry for {key}")
         else:
-            self.assertIsNotNone(res.found_entry)
-            self.assertEqual(res.found_entry.item.key, found_key)
+            self.assertIsNotNone(found_entry)
+            self.assertEqual(found_entry.item.key, found_key)
         if next_key is None:
-            self.assertIsNone(res.next_entry, f"Expected no successor for {key}")
+            self.assertIsNone(next_entry, f"Expected no successor for {key}")
         else:
-            self.assertIsNotNone(res.next_entry)
-            self.assertEqual(res.next_entry.item.key, next_key)
+            self.assertIsNotNone(next_entry)
+            self.assertEqual(next_entry.item.key, next_key)
 
     def test_retrieve_empty(self):
         # empty list returns (None, None)
-        res = self.klist.retrieve(123)
-        self.assertIsNone(res.found_entry)
-        self.assertIsNone(res.next_entry)
+        found_entry, next_entry = self.klist.retrieve(123)
+        self.assertIsNone(found_entry)
+        self.assertIsNone(next_entry)
 
     def test_type_error_on_non_int(self):
         with self.assertRaises(TypeError):
@@ -456,16 +456,16 @@ class TestKListRetrieve(TestKListBase):
 
 class TestKlistGetMinMax(TestKListBase):   
     def test_empty(self):
-        # empty list should return N
+        # empty list should return None
         with self.subTest("max"): 
-            res = self.klist.get_max()
-            self.assertIsNone(res.found_entry)
-            self.assertIsNone(res.next_entry)
+            found_entry, next_entry = self.klist.get_max()
+            self.assertIsNone(found_entry)
+            self.assertIsNone(next_entry)
 
         with self.subTest("min"):
-            res = self.klist.get_min()
-            self.assertIsNone(res.found_entry)
-            self.assertIsNone(res.next_entry)
+            found_entry, next_entry = self.klist.get_min()
+            self.assertIsNone(found_entry)
+            self.assertIsNone(next_entry)
 
     def test_single_node_single_entry(self):
         # fill one node with a single entry
@@ -473,14 +473,14 @@ class TestKlistGetMinMax(TestKListBase):
         self.insert_sequence(keys)
         
         with self.subTest("max"):    
-            res = self.klist.get_max()
-            self.assertEqual(res.found_entry.item.key, 10)
-            self.assertIsNone(res.next_entry)
-        
+            found_entry, next_entry = self.klist.get_max()
+            self.assertEqual(found_entry.item.key, 10)
+            self.assertIsNone(next_entry)
+
         with self.subTest("min"):
-            res = self.klist.get_min()
-            self.assertEqual(res.found_entry.item.key, 10)
-            self.assertIsNone(res.next_entry)
+            found_entry, next_entry = self.klist.get_min()
+            self.assertEqual(found_entry.item.key, 10)
+            self.assertIsNone(next_entry)
 
     def test_single_node_cap(self):
         # fill one node up to capacity
@@ -488,14 +488,14 @@ class TestKlistGetMinMax(TestKListBase):
         self.insert_sequence(keys)
         
         with self.subTest("max"):    
-            res = self.klist.get_max()
-            self.assertEqual(res.found_entry.item.key, self.cap - 1)
-            self.assertIsNone(res.next_entry)
-        
+            found_entry, next_entry = self.klist.get_max()
+            self.assertEqual(found_entry.item.key, self.cap - 1)
+            self.assertIsNone(next_entry)
+
         with self.subTest("min"):
-            res = self.klist.get_min()
-            self.assertEqual(res.found_entry.item.key, 0)
-            self.assertEqual(res.next_entry.item.key, 1)
+            found_entry, next_entry = self.klist.get_min()
+            self.assertEqual(found_entry.item.key, 0)
+            self.assertEqual(next_entry.item.key, 1)
 
     def test_multi_nodes(self):
         # fill first node, overflow into second
@@ -503,14 +503,14 @@ class TestKlistGetMinMax(TestKListBase):
         self.insert_sequence(keys)
 
         with self.subTest("max"):
-            res = self.klist.get_max()
-            self.assertEqual(res.found_entry.item.key, self.cap * 3)
-            self.assertIsNone(res.next_entry)
+            found_entry, next_entry = self.klist.get_max()
+            self.assertEqual(found_entry.item.key, self.cap * 3)
+            self.assertIsNone(next_entry)
 
         with self.subTest("min"):
-            res = self.klist.get_min()
-            self.assertEqual(res.found_entry.item.key, 0)
-            self.assertEqual(res.next_entry.item.key, 1)
+            found_entry, next_entry = self.klist.get_min()
+            self.assertEqual(found_entry.item.key, 0)
+            self.assertEqual(next_entry.item.key, 1)
 
 class TestKListIndex(TestKListBase):
     def test_empty_index(self):
@@ -808,7 +808,7 @@ class TestSplitInplace(TestKListBase):
         # Create tree using the factory
         self.TreeClass, _, _, _ = make_gplustree_classes(self.K)
         subtree = self.TreeClass()
-        found = self.klist.retrieve(2).found_entry
+        found = self.klist.retrieve(2)[0]
         self.assertIsNotNone(found)
         found.left_subtree = subtree
         left, st, right = self.klist.split_inplace(2)

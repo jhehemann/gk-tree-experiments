@@ -36,19 +36,20 @@ class TestRetrieveBase(TreeTestCase):
     
     def _assert_retrieval_result(self, result, expected_key=None, expected_next_key=None):
         """Helper method to assert retrieval results"""
+        found_entry, next_entry = result
         if expected_key is None:
-            self.assertIsNone(result.found_entry, "Expected no found entry")
+            self.assertIsNone(found_entry, "Expected no found entry")
         else:
-            self.assertIsNotNone(result.found_entry, f"Expected a found entry {expected_key}")
-            self.assertEqual(result.found_entry.item.key, expected_key, 
-                             f"Expected found key {expected_key}, got {result.found_entry.item.key}")
-        
+            self.assertIsNotNone(found_entry, f"Expected a found entry {expected_key}")
+            self.assertEqual(found_entry.item.key, expected_key, 
+                             f"Expected found key {expected_key}, got {found_entry.item.key}")
+
         if expected_next_key is None:
-            self.assertIsNone(result.next_entry, "Expected no next entry")
+            self.assertIsNone(next_entry, "Expected no next entry")
         else:
-            self.assertIsNotNone(result.next_entry, f"Expected next entry {expected_next_key} for expected key {expected_key}")
-            self.assertEqual(result.next_entry.item.key, expected_next_key, 
-                             f"Expected next key {expected_next_key}, got {result.next_entry.item.key}")
+            self.assertIsNotNone(next_entry, f"Expected next entry {expected_next_key} for expected key {expected_key}")
+            self.assertEqual(next_entry.item.key, expected_next_key, 
+                             f"Expected next key {expected_next_key}, got {next_entry.item.key}")
 
 
 class TestRetrieveEmptyTree(TestRetrieveBase):
@@ -71,8 +72,8 @@ class TestRetrieveSingleNodeTree(TestRetrieveBase):
         result = self.tree.retrieve(3)
         self._assert_retrieval_result(result, 3, None)
         # Verify the value is correct
-        self.assertEqual(result.found_entry.item.value, "value_3")
-    
+        self.assertEqual(result[0].item.value, "value_3")
+
     def test_retrieve_nonexistent_key_less_than_min(self):
         """Test retrieving a key that doesn't exist (less than min)"""
         result = self.tree.retrieve(1)
@@ -104,20 +105,20 @@ class TestRetrieveMultiItemLeafNode(TestRetrieveBase):
         """Test retrieving the first key"""
         result = self.tree.retrieve(1)
         self._assert_retrieval_result(result, 1, 3)
-        self.assertEqual(result.found_entry.item.value, "value_1")
-    
+        self.assertEqual(result[0].item.value, "value_1")
+
     def test_retrieve_middle_key(self):
         """Test retrieving a middle key"""
         result = self.tree.retrieve(3)
         self._assert_retrieval_result(result, 3, 5)
-        self.assertEqual(result.found_entry.item.value, "value_3")
+        self.assertEqual(result[0].item.value, "value_3")
     
     def test_retrieve_last_key(self):
         """Test retrieving the last key"""
         result = self.tree.retrieve(5)
         self._assert_retrieval_result(result, 5, None)
-        self.assertEqual(result.found_entry.item.value, "value_5")
-    
+        self.assertEqual(result[0].item.value, "value_5")
+
     def test_retrieve_nonexistent_key_before_all(self):
         """Test retrieving a key before all existing keys"""
         # Testing for a key before all existing keys
@@ -155,7 +156,7 @@ class TestRetrieveMultiNodeTree(TestRetrieveBase):
         for key in [1, 2, 3, 5, 7]:
             result = self.tree.retrieve(key)
             self._assert_retrieval_result(result, key, None if key == 7 else key + (2 if key == 3 or key == 5 else 1))
-            self.assertEqual(result.found_entry.item.value, f"value_{key}")
+            self.assertEqual(result[0].item.value, f"value_{key}")
     
     def test_retrieve_nonexistent_keys(self):
         """Test retrieving keys that don't exist"""
@@ -186,7 +187,7 @@ class TestRetrieveComplexTree(TestRetrieveBase):
             result = self.tree.retrieve(key)
             expected_next = None if i == len(keys) - 1 else keys[i + 1]
             self._assert_retrieval_result(result, key, expected_next)
-            self.assertEqual(result.found_entry.item.value, f"value_{key}")
+            self.assertEqual(result[0].item.value, f"value_{key}")
     
     def test_retrieve_nonexistent_keys_complex(self):
         """Test retrieving nonexistent keys in a complex tree"""
@@ -228,7 +229,7 @@ class TestRetrieveEdgeCases(TestRetrieveBase):
         # Retrieve and verify the updated value
         result = self.tree.retrieve(1)
         self._assert_retrieval_result(result, 1, None)
-        self.assertEqual(result.found_entry.item.value, "updated_value")
+        self.assertEqual(result[0].item.value, "updated_value")
     
     def test_retrieve_with_duplicate_keys(self):
         """Test retrieving with duplicate keys (should update, not duplicate)"""
@@ -244,7 +245,7 @@ class TestRetrieveEdgeCases(TestRetrieveBase):
         # Verify the item was updated, not duplicated
         result = self.tree.retrieve(2)
         self._assert_retrieval_result(result, 2, 3)
-        self.assertEqual(result.found_entry.item.value, "duplicate_value")
+        self.assertEqual(result[0].item.value, "duplicate_value")
         
         # Ensure the total count of items is still 3
         leaf_keys = collect_leaf_keys(self.tree)

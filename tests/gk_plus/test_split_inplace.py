@@ -289,7 +289,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 rank = 2 if key == 200 else 3
                 subtree = create_gkplus_tree(K=4, dimension=dim)
                 subtree, _ = subtree.insert(Item(key - 50, "subtree_val"), rank=rank)
-                entry = tree.retrieve(key).found_entry
+                entry = tree.retrieve(key)[0]
                 entry.left_subtree = subtree
                 self.validate_tree(tree)
             
@@ -301,12 +301,12 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.validate_tree(right, [-1, 300, 400, 500])
             
             # Check that left subtrees were preserved
-            subtree_200 = left.retrieve(200).found_entry.left_subtree
+            subtree_200 = left.retrieve(200)[0].left_subtree
             # self.assertIsNotNone(subtree_200, "Left subtree for key 200 should not be None")
             self.assertFalse(subtree_200.is_empty(), "Left subtree for key 200 should not be empty")
             exp_keys_200 = [-2, 150]
             self.validate_tree(subtree_200, exp_keys_200)
-            subtree_400 = right.retrieve(400).found_entry.left_subtree
+            subtree_400 = right.retrieve(400)[0].left_subtree
             self.assertIsNotNone(subtree_400, "Left subtree for key 400 should not be None")
             self.assertFalse(subtree_400.is_empty(), "Left subtree for key 400 should not be empty")
             exp_keys_400 = [-3, 350]
@@ -317,7 +317,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             subtree = create_gkplus_tree(K=k, dimension=type(tree).DIM + 1)
             subtree, _ = subtree.insert(Item(250, "subtree_val"), rank=1)
             subtree, _ = subtree.insert(Item(275, "subtree_val"), rank=1)
-            entry = tree.retrieve(300).found_entry
+            entry = tree.retrieve(300)[0]
             entry.left_subtree = subtree
             self.validate_tree(tree)
             

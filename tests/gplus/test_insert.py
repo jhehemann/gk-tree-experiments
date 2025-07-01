@@ -1825,12 +1825,10 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         self.expected_item_count = 6    # currently incl. replicas & dummys
         self.expected_leaf_keys = [1, 2, 3]
 
-        result = self.tree.node.set.retrieve(2)
-        found_entry = result.found_entry
+        found_entry, _ = self.tree.node.set.retrieve(2)
         self.assertTrue(found_entry is not None, "Item 'b' should be present in root")
         self.assertEqual(found_entry.left_subtree.node.rank, 1, "New node rank should be 2")
-        result = found_entry.left_subtree.node.set.retrieve(1)
-        found_entry = result.found_entry
+        found_entry, _ = found_entry.left_subtree.node.set.retrieve(1)
         self.assertTrue(found_entry is not None, "Item 'a' should be present in new node")
         
     def test_insert_duplicate_key_updates_value(self):
@@ -1845,8 +1843,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         self.expected_item_count = 2    # currently incl. replicas & dummys
         self.expected_leaf_keys = [1]
         # Check items
-        result = self.tree.node.set.retrieve(1)
-        found_entry = result.found_entry
+        found_entry, _ = self.tree.node.set.retrieve(1)
         self.assertTrue(found_entry is not None, "'a' should be in root")
         self.assertEqual(found_entry.item.value, 100,
                          "'a' value should be updated to 100")
@@ -1870,7 +1867,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)  # Create an Entry instance
             tree, _ = tree._insert_empty(entry, rank)
-            inserted_entry = tree.retrieve(key).found_entry
+            inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
             self.assertIs(inserted_entry.item, item,
@@ -1881,7 +1878,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)
             tree, _ = tree._insert_empty(entry, rank)
-            inserted_entry = tree.retrieve(key).found_entry
+            inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
             self.assertIs(inserted_entry.item, item,
@@ -1906,7 +1903,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, None)
                 tree, _ = tree._insert_non_empty(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,
@@ -1921,7 +1918,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
                 tree, _ = tree._insert_non_empty(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,

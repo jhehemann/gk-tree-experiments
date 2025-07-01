@@ -5,7 +5,6 @@ from bisect import bisect_left, insort_left
 from gplus_trees.base import (
     Item,
     AbstractSetDataStructure,
-    RetrievalResult,
     Entry
 )
 if TYPE_CHECKING:
@@ -474,23 +473,28 @@ class KListBase(AbstractSetDataStructure):
         self._rebuild_index()
         return self
     
-    def retrieve(self, key: int) -> RetrievalResult:
+    def retrieve(self, key: int) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Search for `key` using linear search on the list or binary search O(log l + log k) on the index, based on the number of entries in the node.
+        
+        Returns:
+            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
+                - found_entry: The entry with the matching key if found, otherwise None
+                - next_entry: The subsequent entry in sorted order, or None if no next entry exists
         """
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
         
         # Empty list case
         if not self._bounds:
-            return RetrievalResult(found_entry=None, next_entry=None)
+            return None, None
         
         # Find node that might contain key using binary search on max keys
         node_idx = bisect_left(self._bounds, key)
         
         # Case: key > max of any node
         if node_idx >= len(self._nodes):
-            return RetrievalResult(found_entry=None, next_entry=None)
+            return None, None
         
         # Get the target node
         node = self._nodes[node_idx]
@@ -498,11 +502,11 @@ class KListBase(AbstractSetDataStructure):
         
         # Empty node (shouldn't happen if index is maintained)
         if not entries:
-            return RetrievalResult(found_entry=None, next_entry=None)
+            return None, None
         
         # Case: key < first entry in this node
         if key < entries[0].item.key:
-            return RetrievalResult(found_entry=None, next_entry=entries[0])
+            return None, entries[0]
         
         if len(entries) < 8:
             # Linear search for very small lists
@@ -516,14 +520,14 @@ class KListBase(AbstractSetDataStructure):
                             succ = entries[i+1]
                         else:
                             succ = (node.next.entries[0] if node.next and node.next.entries else None)
-                        return RetrievalResult(found_entry=found, next_entry=succ)
+                        return found, succ
                     # Not found, but we know the successor
-                    return RetrievalResult(found_entry=None, next_entry=entry)
+                    return None, entry
             
             # Fell off the end of this node
             if node.next and node.next.entries:
-                return RetrievalResult(found_entry=None, next_entry=node.next.entries[0])
-            return RetrievalResult(found_entry=None, next_entry=None)
+                return None, node.next.entries[0]
+            return None, None
         else:
             # Binary search for larger lists
             # TODO: Store keys in a separate list for O(log k) search
@@ -538,27 +542,27 @@ class KListBase(AbstractSetDataStructure):
                 succ = entries[i+1]
             else:
                 succ = (node.next.entries[0] if node.next and node.next.entries else None)
-            return RetrievalResult(found_entry=found, next_entry=succ)
+            return found, succ
         
         # Not found, but we know the successor
         if i < len(entries):
-            return RetrievalResult(found_entry=None, next_entry=entries[i])
+            return None, entries[i]
         
         # Check next node for successor if we fell off the end of this node
         if node.next and node.next.entries:
-            return RetrievalResult(found_entry=None, next_entry=node.next.entries[0])
+            return None, node.next.entries[0]
         
         # No successor found
-        return RetrievalResult(found_entry=None, next_entry=None)
+        return None, None
     
-    def find_pivot(self) -> RetrievalResult:
+    def find_pivot(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Find the pivot entry (minimum entry) in the KList."""
         return self.get_min()
 
-    def get_min(self) -> RetrievalResult:
+    def get_min(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Retrieve the minimum entry from the sorted KList."""
         if not self._prefix_counts_tot:
-            return RetrievalResult(found_entry=None, next_entry=None)
+            return None, None
         node = self.head
         entry, in_node_succ, needs_next = node.get_by_offset(0)
         if needs_next:
@@ -569,17 +573,17 @@ class KListBase(AbstractSetDataStructure):
         else:
             next_entry = in_node_succ
 
-        return RetrievalResult(found_entry=entry, next_entry=next_entry)
+        return entry, next_entry
     
-    def get_max(self) -> RetrievalResult:
+    def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Retrieve the maximum entry from the sorted KList."""
         if not self._prefix_counts_tot:
-            return RetrievalResult(found_entry=None, next_entry=None)
+            return None, None
         node = self.tail
         entries = node.entries
         entry, in_node_succ, _ = node.get_by_offset(len(entries) - 1)
 
-        return RetrievalResult(found_entry=entry, next_entry=in_node_succ)
+        return entry, in_node_succ
 
     def split_inplace(
         self, key: int

@@ -192,7 +192,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         self.validate_tree(new_tree, full_exp_keys, msg)
         
         # Verify the entry was properly inserted
-        retrieved_entry = new_tree.retrieve(insert_key).found_entry
+        retrieved_entry = new_tree.retrieve(insert_key)[0]
         self.assertIs(retrieved_entry, insert_entry,
                       f"Inserted entry should match the original entry: {insert_entry}")
         self.assertEqual(retrieved_entry, insert_entry,
@@ -207,7 +207,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)
             tree, _ = tree.insert_entry(entry, rank)
-            inserted_entry = tree.retrieve(key).found_entry
+            inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
             self.assertIs(inserted_entry.item, item,
@@ -218,7 +218,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)
             tree, _ = tree.insert_entry(entry, rank)
-            inserted_entry = tree.retrieve(key).found_entry
+            inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
             self.assertIs(inserted_entry.item, item,
@@ -243,7 +243,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, None)
                 tree, _ = tree.insert_entry(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,
@@ -258,7 +258,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
                 tree, _ = tree.insert_entry(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,
@@ -445,7 +445,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, None)
                 tree, _ = tree.insert_entry(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,
@@ -460,7 +460,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 item = Item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
                 tree, _ = tree.insert_entry(entry, rank)
-                inserted_entry = tree.retrieve(insert_key).found_entry
+                inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
                 self.assertIs(inserted_entry.item, item,
