@@ -195,6 +195,10 @@ class KListBase(AbstractSetDataStructure):
 
     def __lt__(self, other):
         return self.key < other.key
+    
+    def __bool__(self) -> bool:
+        # return False when empty, True when non-empty
+        return not self.is_empty()
 
     def _rebuild_index(self):
         """Rebuild the node list and prefix-sum of entry counts."""
