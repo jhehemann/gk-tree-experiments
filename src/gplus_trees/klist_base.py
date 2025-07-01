@@ -53,9 +53,6 @@ class KListNodeBase:
         x_key = entry.item.key
         is_dummy = x_key < 0
 
-
-        # logger.debug(f"NODE INSERT {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
-
         # Empty list case
         if not entries:
             entries.append(entry)
@@ -112,17 +109,13 @@ class KListNodeBase:
                     insort_left(real_keys, x_key)
 
         # Handle overflow
-        # logger.debug(f"ENTRY INSERTED {x_key}: entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
         if len(entries) > self.__class__.CAPACITY:
             pop_entry = entries.pop()
             # logger.debug(f"POP ENTRY {pop_entry.item.key}")
             keys.pop()
-            # logger.debug(f"NODE after POP: entries={[e.item.key for e in entries]}, keys={keys}")
             if pop_entry.item.key >= 0:
                 real_keys.pop()
-            # logger.debug(f"REAL KEYS after POP: real_keys={real_keys}")
             return pop_entry, True
-        # logger.debug(f"ENTRY INSERTED {x_key} (POP none): entries={[e.item.key for e in entries]}, keys={keys}, real_keys={real_keys}")
         return None, True
      
     def retrieve_entry(
@@ -262,62 +255,6 @@ class KListBase(AbstractSetDataStructure):
             node = node.next
         # print(f"Klist Height: {height}")
         return height
-    
-    # def insert(
-    #         self, 
-    #         item: Item,
-    #         left_subtree: Optional['GPlusTreeBase'] = None
-    # ) -> 'KListBase':
-    #     """
-    #     Inserts an item with an optional left subtree into the k-list.
-    #     It is stored as an Entry(item, left_subtree).
-
-    #     The insertion ensures that the keys are kept in lexicographic order.
-    #     If a node overflows (more than k entries), the extra entry is recursively inserted into the next node.
-
-    #     Parameters:
-    #         item (Item): The item to insert.
-    #         left_subtree (GPlusTreeBase or None): Optional G+-tree to attach as the left subtree.
-    #     """
-    #     entry = Entry(item, left_subtree)
-        
-    #     # If the k-list is empty, create a new node.
-    #     if self.head is None:
-    #         node = self.KListNodeClass()
-    #         self.head = self.tail = node
-    #     else:
-    #         # Fast-Path: If the new key > the last key in the tail, insert there.
-    #         if self.tail.entries and item.key > self.tail.entries[-1].item.key:
-    #             node = self.tail
-    #         else:
-    #             # linear search from the head
-    #             node = self.head
-    #             while node.next is not None and node.entries and item.key > node.entries[-1].item.key:
-    #                 node = node.next
-        
-    #     overflow = node.insert_entry(entry)
-
-    #     if node is self.tail and overflow is None:
-    #         self._rebuild_index()
-    #         return self
-
-    #     MAX_OVERFLOW_DEPTH = 10000
-    #     depth = 0
-
-    #     # Propagate overflow if needed.
-    #     while overflow is not None:
-    #         if node.next is None:
-    #             node.next = self.KListNodeClass()
-    #             self.tail = node.next
-    #         node = node.next
-    #         overflow = node.insert_entry(overflow)
-    #         depth += 1
-    #         if depth > MAX_OVERFLOW_DEPTH:
-    #             raise RuntimeError("KList insert overflowed too deeply – likely infinite loop.")
-            
-    #     self._rebuild_index()
-
-        # return self
 
     def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
         """
@@ -351,8 +288,6 @@ class KListBase(AbstractSetDataStructure):
                 # Using bisect_left to find the insertion node (key >= split key)
                 node_idx = bisect_left(self._bounds, key)
                 node = self._nodes[node_idx]
-                # while node.next is not None and node.entries and key > node.entries[-1].item.key:
-                #     node = node.next
         
         overflow, inserted = node.insert_entry(entry)
 
