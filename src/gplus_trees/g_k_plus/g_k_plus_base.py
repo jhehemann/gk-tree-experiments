@@ -1,7 +1,7 @@
 """GKPlusTree base implementation"""
 
 from __future__ import annotations
-from typing import Optional, Type, TypeVar, Tuple, List
+from typing import Optional, Type, TypeVar, Tuple, List, Union
 from itertools import islice, chain
 
 import copy
@@ -32,20 +32,18 @@ from gplus_trees.g_k_plus.utils import (
 
 class RankData:
     """Consolidated data structure for each rank level in bulk tree creation."""
-    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'add_boundary', 'pivot_key')
+    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'pivot_key')
     
     def __init__(self, 
                  entries: Optional[list[Entry]] = None,
                  child_indices: Optional[list[int]] = None,
                  next_child_idx: int = 0,
                  boundaries: Optional[list[int]] = None,
-                 add_boundary: bool = True,
                  pivot_key: Optional[int] = None):
         self.entries = entries
         self.child_indices = child_indices
         self.next_child_idx = next_child_idx
         self.boundaries = boundaries
-        self.add_boundary = add_boundary
         self.pivot_key = pivot_key
 
 t = TypeVar('t', bound='GKPlusTreeBase')
@@ -1163,45 +1161,12 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
     Returns:
         A new GKPlusTree containing all items from the KList
     """
-    # Use cached import for performance
-    create_gkplus_tree = _get_create_gkplus_tree()
-    
-    # Raise an error if klist is not a KListBase instance
     if not isinstance(klist, KListBase):
         raise TypeError("klist must be an instance of KListBase")
     
     if klist.is_empty():
-        return create_gkplus_tree(K, DIM, l_factor)
-
-    entries = [entry for entry in klist]
-    return bulk_create_gkplus_tree(entries, DIM, l_factor, type(klist))
-
-
-def bulk_create_gkplus_tree(
-    entries: list[Entry],
-    DIM: int,
-    l_factor: float,
-    KListClass: type[KListBase],
-) -> GKPlusTreeBase:
-    """
-    Create a GKPlusTree from a list of entries.
-    
-    Args:
-        entries: List of Entry objects to be inserted into the tree
-        DIM: The dimension of the tree
-        l_factor: The threshold factor for conversion
-        KListClass: The KList class to use for creating klists
-        
-    Returns:
-        A new GKPlusTreeBase instance
-    """
-    k = KListClass.KListNodeClass.CAPACITY
-
-    if not entries:
-        tree = _get_create_gkplus_tree()(k, DIM, l_factor)
-        return tree
-
-    return _bulk_create_bottom_up(entries, k, DIM, l_factor, KListClass)
+        return _get_create_gkplus_tree()(K, DIM, l_factor)
+    return bulk_create_gkplus_tree(klist, DIM, l_factor, type(klist))
 
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
@@ -1260,8 +1225,6 @@ def _build_leaf_level_trees(
                     [entry.item.key for entry in node_entries]
                 )
 
-        # Create node set - always use KList for simplicity in bulk creation
-        # This ensures we don't get into recursive loops and maintains correctness
         if len(node_entries) <= threshold:
             node_set = _bulk_create_klist(node_entries, KListClass)
         else:
@@ -1279,9 +1242,9 @@ def _build_leaf_level_trees(
 def _build_internal_levels(
     rank_data_map: dict[int, RankData],
     leaf_trees: list[GKPlusTreeBase],
+    KListClass: type[KListBase],
     TreeClass: type[GKPlusTreeBase],
     NodeClass: type[GKPlusNodeBase],
-    KListClass: type[KListBase],
     threshold: int,
     l_factor: float,
     max_rank: int,
@@ -1365,9 +1328,12 @@ def _build_internal_levels(
             if node_entries_len <= threshold:
                 node_set = bulk_create_klist_fn(node_entries, KListClass)
             else:
-                # If entries exceed threshold, create a GKPlusTree
-                # Extract raw entries as bulk_create_gkplus_tree expects a list of entries, not (Entry, child_idx) tuples
-                node_set = bulk_create_gkplus_tree_fn(node_entries, tree_dim_plus_one, l_factor, KListClass)
+                node_set = bulk_create_gkplus_tree_fn(
+                    node_entries,
+                    tree_dim_plus_one,
+                    l_factor,
+                    KListClass
+                )
 
             # Create tree node with right subtree
             prev_child_idx += 1
@@ -1393,9 +1359,8 @@ def _build_internal_levels(
     return sub_trees[0] 
 
 
-def _bulk_create_bottom_up(
-    entries: list[Entry],
-    k: int,
+def bulk_create_gkplus_tree(
+    entries: Union[list[Entry], KListBase[Entry]],
     DIM: int,
     l_factor: float,
     KListClass: type[KListBase],
@@ -1411,7 +1376,7 @@ def _bulk_create_bottom_up(
     5. Entries are already sorted from KList iteration
     
     Args:
-        entries: A list of Entry objects to insert into the tree
+        entries: KList or Python List of Entry objects to be inserted into the tree
         k: The capacity parameter for the tree
         DIM: The dimension of the tree
         l_factor: The threshold factor for conversion
@@ -1419,24 +1384,26 @@ def _bulk_create_bottom_up(
     Returns:
         A new GKPlusTreeBase instance containing the entries
     """
-    create_gkplus_tree_fn = _get_create_gkplus_tree()
-    sample_tree = create_gkplus_tree_fn(k, DIM, l_factor)
+    if not entries:
+        raise ValueError("entries must be a non-empty list or KListBase")
+
+    k = KListClass.KListNodeClass.CAPACITY
+    sample_tree = _get_create_gkplus_tree()(k, DIM, l_factor)
     
     # Pre-cache all constants and frequently used objects
     NodeClass = sample_tree.NodeClass
     TreeClass = type(sample_tree)
     create_replica_fn = _create_replica
-    group_size = calculate_group_size(k)
     threshold = int(k * l_factor)
     dummy = Entry(get_dummy(DIM), None)
     dummy_key = dummy.item.key
     
     # Consolidated rank data structure  
     rank_data_map: dict[int, RankData] = {}
-
     max_rank = 1
+    
     for entry in entries:
-        insert_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+        insert_rank = calc_rank_from_group_size(entry.item.key, calculate_group_size(k), DIM)
         entry_key = entry.item.key
         
         # Update max_rank early to avoid repeated comparisons
@@ -1454,20 +1421,16 @@ def _bulk_create_bottom_up(
             # Cache all values for this rank
             rank_entries = rank_data.entries
             boundaries = rank_data.boundaries
-            add_boundary = rank_data.add_boundary
             child_indices = rank_data.child_indices
             pivot_key = rank_data.pivot_key
             next_child_idx = rank_data.next_child_idx
-
-            is_insert_or_leaf_rank = (rank == insert_rank or rank == 1)
             
-            if is_insert_or_leaf_rank:
-                # Create entry once and reuse
+            if rank == insert_rank or rank == 1:
+                # Handle insert rank and leaf rank
                 insert_entry = entry if rank == 1 else Entry(create_replica_fn(entry_key), None)
 
                 # Entry insertion
                 if rank_entries is not None:
-                    # Direct insertion - no temporary lists needed
                     if pivot_key is not None:
                         rank_entries.append(Entry(create_replica_fn(pivot_key), None))
                         if child_indices is not None:
@@ -1482,15 +1445,13 @@ def _bulk_create_bottom_up(
                         next_child_idx += 1
                         rank_data.next_child_idx = next_child_idx
                 else:
-                    # Initialize new rank with pre-sized lists
-                    if rank == 1:
-                        # For rank 1 (leaf level), always start with dummy
-                        new_entries = [dummy, insert_entry]
-                        pivot_key = dummy_key
-                    elif rank == max_rank or pivot_key is None:
+                    # Initialize new entries list for this rank
+                    if rank == 1 or rank == max_rank or pivot_key is None:
+                        # For leaf and root level or when there is no pivot flag, start with dummy
                         new_entries = [dummy, insert_entry]
                         pivot_key = dummy_key
                     else:
+                        # For internal nodes with pivot, start with pivot entry
                         pivot_entry = Entry(create_replica_fn(pivot_key), None)
                         new_entries = [pivot_entry, insert_entry]
                     
@@ -1502,37 +1463,31 @@ def _bulk_create_bottom_up(
                         next_child_idx += 1
                         rank_data.next_child_idx = next_child_idx
 
+                # At least two entries have been added (dummy and insert_entry)
+                rank_entries_len = len(rank_entries) if rank_entries else 2
+
                 # Boundary management
                 if rank == insert_rank:
-                    # Handle special case for rank 1 initialization
-                    if rank == 1 and len(rank_data.entries) == 2:
-                        rank_data.boundaries = [0]
-                    elif add_boundary:
-                        # Pre-calculate boundary position
-                        rank_entries_len = len(rank_entries) if rank_entries else 2
+                    if pivot_key is not None:
+                        # A non-None pivot key indicates a node boundary
                         boundary_pos = rank_entries_len - (2 if pivot_key is not None else 1)
-                        
                         if boundaries is not None:
                             boundaries.append(boundary_pos)
                         else:
                             rank_data.boundaries = [boundary_pos]
                 else:
-                    # Simplified boundary updates
-                    rank_entries_len = len(rank_entries) if rank_entries else 2
+                    # We are at rank 1 ≠ insert_rank: set boundary at the end of entries
                     boundary_pos = rank_entries_len - 1
-                    
                     if boundaries is not None:
                         boundaries.append(boundary_pos)
                     else:
                         rank_data.boundaries = [0, boundary_pos]
                 
-                rank_data.add_boundary = False
+                # Always reset pivot key after insertion
                 rank_data.pivot_key = None
             else:
-                # Handle non-insert/non-leaf ranks: set boundary flag for lower ranks
-                if not add_boundary:
-                    rank_data.add_boundary = True
-
+                # Handle non-insert/non-leaf ranks
+                # Set the variables indicating a node boundary for lower ranks
                 rank_data.pivot_key = entry_key
                 rank_data.next_child_idx = next_child_idx + 1
 
@@ -1549,8 +1504,14 @@ def _bulk_create_bottom_up(
     )
 
     root_tree = _build_internal_levels(
-        rank_data_map, leaf_trees,
-        TreeClass, NodeClass, KListClass, threshold, l_factor, max_rank
+        rank_data_map,
+        leaf_trees,
+        KListClass,
+        TreeClass,
+        NodeClass,
+        threshold,
+        l_factor,
+        max_rank
     )
 
     return root_tree
