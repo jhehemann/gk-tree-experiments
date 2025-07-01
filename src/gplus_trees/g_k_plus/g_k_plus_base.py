@@ -740,7 +740,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Cache node reference and minimize repeated attribute access
             node = cur.node
             cur._invalidate_tree_size()
-            is_leaf = node.rank == 1
+            node_rank = node.rank
+            is_leaf = node_rank == 1
 
             # Split node at key - cache results immediately
             left_split, key_subtree, right_split = node.set.split_inplace(key)
@@ -759,19 +760,20 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 
                 if is_gkplus_type:
                     # Calculate the new rank for the item in the next dimension - use cached values
-                    new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
+                    new_rank = calc_rank_for_dim(
+                        dummy_key,
+                        KListNodeCapacity,
+                        dim=tree_dim_plus_one
+                    )
                     right_split, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                     right_split._invalidate_tree_size()
                     # TODO: Check why we need to invalidate size and why it is not done in insert_entry. Check it also for insert_entry()
                 else:
                     right_split, _ = right_split.insert_entry(Entry(dummy, None))
-                
                 right_split = check_and_convert_set(right_split)
 
                 # Cache node references for performance
-                node_rank = node.rank
-                node_right_subtree = node.right_subtree
-                right_node = NodeClass(node_rank, right_split, node_right_subtree)
+                right_node = NodeClass(node_rank, right_split, node.right_subtree)
 
                 if right_parent is None:
                     # Create a root node for right return tree
@@ -823,7 +825,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     else:
                         right_parent.node.right_subtree = new_tree
 
-                    # Link leaf nodes - use cached node reference
+                    # Link leaf nodes
                     new_tree.node.next = node.next
                     next_right_parent = new_tree
                 else:
@@ -897,16 +899,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     next_left_parent = left_parent
                 else:
                     # Determine new subtree efficiently
-                    if key_subtree:
+                    if key_subtree is not None:
                         # Highest node containing split key found
                         # All entries in its left subtree are less than key and
                         # are part of the left return tree
                         new_subtree = key_subtree
                         seen_key_subtree = key_subtree
-                    elif next_entry:
-                        new_subtree = next_entry.left_subtree
                     else:
-                        new_subtree = node.right_subtree # Should not happen
+                        # There must be a next entry, since nodes have at least two entries. 
+                        # l_count <= 1 and we have not found the split key (not key_subtree)
+                        new_subtree = next_entry.left_subtree
 
                     if left_parent and not key_node_found:
                         left_parent.node.right_subtree = new_subtree
