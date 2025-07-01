@@ -158,16 +158,14 @@ class GPlusTreeBase(AbstractSetDataStructure):
         while True:
             node = cur.node
             # Attempt to retrieve from this node's set
-            found_entry, next_entry = node.set.retrieve(key)
+            is_leaf = node.rank == 1
+            flag = True if not is_leaf else with_next
+            found_entry, next_entry = node.set.retrieve(key, with_next=flag)
 
-            if node.rank == 1:
+            if is_leaf:
                 # We've reached a leaf node
                 if not with_next:
-                    found_entry, _ = node.set.retrieve(key, with_next=False)
                     return found_entry, None
-
-                # Get the entry and next from this leaf node
-                found_entry, next_entry = node.set.retrieve(key, with_next=True)
 
                 # If no next entry found in current node, check linked leaf nodes
                 if next_entry is None and node.next is not None:
