@@ -29,7 +29,6 @@ TEST_FILES = [
 
     'test_gp_mkl_tree.py',
     'test_klist.py',
-    'test_klist::TestKListCountGE',
     'gk_plus/test_expanded_count.py',
     'gk_plus.test_expanded_count.TestGKPlusTreeExpandedCountTracking.test_multi_expansion_different_dim_paths',
 

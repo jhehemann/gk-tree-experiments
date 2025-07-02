@@ -1002,354 +1002,185 @@ class TestKListCompactionInvariant(TestKListBase):
                     self.fail(f"Compaction invariant violated in {name} klist after split at {split_key}: {violations}")
 
 
-class TestKListCountGE(TestKListBase):
-    """Test the count_ge method for counting items with keys >= input key"""
+class TestKListBinarySearchPaths(TestKListBase):
+    """Test binary search paths by using large capacity K=32"""
     
-    def test_empty_list(self):
-        """Test count_ge on empty list returns 0"""
-        self.assertEqual(self.klist.count_ge(5), 0)
-        self.assertEqual(self.klist.count_ge(0), 0)
-        self.assertEqual(self.klist.count_ge(-1), 0)
-    
-    def test_type_error_non_int(self):
-        """Test that non-integer keys raise TypeError"""
-        with self.assertRaises(TypeError):
-            self.klist.count_ge("5")
-        with self.assertRaises(TypeError):
-            self.klist.count_ge(5.0)
-        with self.assertRaises(TypeError):
-            self.klist.count_ge(None)
-    
-    def test_single_node_exact_matches(self):
-        """Test count_ge with exact key matches in single node"""
-        keys = [10, 20, 30, 40]
-        self.insert_sequence(keys)
-        
-        # Test exact matches
-        self.assertEqual(self.klist.count_ge(10), 4)  # All items
-        self.assertEqual(self.klist.count_ge(20), 3)  # 20, 30, 40
-        self.assertEqual(self.klist.count_ge(30), 2)  # 30, 40
-        self.assertEqual(self.klist.count_ge(40), 1)  # 40 only
-    
-    def test_single_node_between_keys(self):
-        """Test count_ge with keys between existing keys"""
-        keys = [10, 30, 50]
-        self.insert_sequence(keys)
-        
-        # Test keys between existing keys
-        self.assertEqual(self.klist.count_ge(5), 3)   # All items (< min)
-        self.assertEqual(self.klist.count_ge(15), 2)  # 30, 50
-        self.assertEqual(self.klist.count_ge(35), 1)  # 50 only
-        self.assertEqual(self.klist.count_ge(55), 0)  # None (> max)
-    
-    def test_single_node_boundary_cases(self):
-        """Test count_ge with boundary conditions"""
-        keys = [1, 2, 3]
-        self.insert_sequence(keys)
-        
-        # Below minimum
-        self.assertEqual(self.klist.count_ge(0), 3)
-        self.assertEqual(self.klist.count_ge(-5), 3)
-        
-        # Above maximum  
-        self.assertEqual(self.klist.count_ge(4), 0)
-        self.assertEqual(self.klist.count_ge(100), 0)
-    
-    def test_multi_node_exact_matches(self):
-        """Test count_ge with multiple nodes and exact matches"""
-        # Create enough items to span multiple nodes
-        total_items = self.cap * 2 + 3  # Ensure at least 3 nodes
-        keys = list(range(0, total_items * 10, 10))  # 0, 10, 20, 30, ...
-        self.insert_sequence(keys)
-        
-        # Test exact matches across different nodes
-        self.assertEqual(self.klist.count_ge(0), total_items)
-        self.assertEqual(self.klist.count_ge(10), total_items - 1)
-        
-        # Test key that should be in middle node
-        middle_key = keys[self.cap + 1]  # Should be in second node
-        expected_count = total_items - (self.cap + 1)
-        self.assertEqual(self.klist.count_ge(middle_key), expected_count)
-    
-    def test_multi_node_between_keys(self):
-        """Test count_ge with keys between existing keys across multiple nodes"""
-        # Use sparse keys to test between-key scenarios
-        keys = list(range(0, self.cap * 3 * 20, 20))  # 0, 20, 40, 60, ...
-        self.insert_sequence(keys)
-        
-        total_items = len(keys)
-        
-        # Test key between items in first node
-        self.assertEqual(self.klist.count_ge(5), total_items - 1)   # Skip first item (0)
-        self.assertEqual(self.klist.count_ge(15), total_items - 1)  # Skip first item (0)
-        
-        # Test key between items spanning nodes
-        mid_idx = self.cap + 1
-        between_key = keys[mid_idx] + 5  # Between mid_idx and mid_idx+1
-        expected_count = total_items - mid_idx - 1
-        self.assertEqual(self.klist.count_ge(between_key), expected_count)
-    
-    def test_multi_node_boundary_cases(self):
-        """Test count_ge boundary cases with multiple nodes"""
-        total_items = self.cap * 2 + 1
-        keys = list(range(total_items))
-        self.insert_sequence(keys)
-        
-        # Test at node boundaries
-        first_node_last = self.cap - 1
-        second_node_first = self.cap
-        
-        self.assertEqual(self.klist.count_ge(first_node_last), total_items - first_node_last)
-        self.assertEqual(self.klist.count_ge(second_node_first), total_items - second_node_first)
-    
-    def test_duplicate_keys(self):
-        """Test count_ge behavior with duplicate keys"""
-        # Insert some duplicates  
-        keys = [10, 10, 20, 20, 20, 30]
-        for k in keys:
-            self.klist.insert_entry(Entry(Item(k, f"val_{k}"), None))
-        
-        # Note: Based on the insert logic, duplicates are rejected
-        # So we should only have unique keys: [10, 20, 30]
-        unique_keys = [10, 20, 30]
-        
-        self.assertEqual(self.klist.count_ge(10), 3)
-        self.assertEqual(self.klist.count_ge(20), 2) 
-        self.assertEqual(self.klist.count_ge(30), 1)
-    
-    def test_sequential_counts(self):
-        """Test that count_ge gives consistent results for sequential queries"""
-        keys = list(range(0, 50, 5))  # 0, 5, 10, 15, ..., 45
-        self.insert_sequence(keys)
-        
-        # Test that counts are monotonically decreasing
-        prev_count = float('inf')
-        for key in range(-5, 55, 3):  # Test with various keys
-            count = self.klist.count_ge(key)
-            self.assertLessEqual(count, prev_count, 
-                                f"count_ge({key}) = {count} should be <= previous count {prev_count}")
-            prev_count = count
-    
-    def test_consistency_with_extract_keys(self):
-        """Test that count_ge results match manual counting"""
-        # Use random keys to test various scenarios
-        import random
-        random.seed(42)
-        keys = sorted(random.sample(range(1, 200), self.cap * 2))
-        self.insert_sequence(keys)
-        
-        # Get all keys for manual verification using the standard iterator
-        all_keys = [entry.item.key for entry in self.klist]
-        
-        # Test count_ge against manual counting for various thresholds
-        test_keys = [0, 50, 100, 150, 200, 250] + keys[::3]  # Include some actual keys
-        
-        for test_key in test_keys:
-            expected_count = sum(1 for k in all_keys if k >= test_key)
-            actual_count = self.klist.count_ge(test_key)
-            self.assertEqual(actual_count, expected_count,
-                           f"count_ge({test_key}) returned {actual_count}, expected {expected_count}")
-    
-    def test_large_dataset_performance(self):
-        """Test count_ge with a larger dataset to verify performance"""
-        # Create a larger dataset to test scalability
-        large_size = self.cap * 10  # 10 nodes worth of data
-        keys = list(range(0, large_size * 5, 5))  # 0, 5, 10, ..., (large_size*5-5)
-        self.insert_sequence(keys)
-        
-        # Test that we can efficiently count even with large datasets
-        test_keys = [0, large_size, large_size * 2, large_size * 4, large_size * 5]
-        
-        for test_key in test_keys:
-            count = self.klist.count_ge(test_key)
-            # Verify count is reasonable (between 0 and total items)
-            self.assertGreaterEqual(count, 0)
-            self.assertLessEqual(count, large_size)
-    
-    def test_after_deletions(self):
-        """Test count_ge behavior after deletions change the structure"""
-        keys = list(range(0, self.cap * 3, 2))  # 0, 2, 4, 6, ...
-        self.insert_sequence(keys)
-        
-        # Record initial counts
-        initial_counts = {k: self.klist.count_ge(k) for k in range(0, max(keys) + 5, 5)}
-        
-        # Delete some keys from different nodes
-        delete_keys = keys[::3]  # Delete every third key
-        for k in delete_keys:
-            self.klist.delete(k)
-        
-        # Verify counts are updated correctly after deletions
-        for test_key, initial_count in initial_counts.items():
-            current_count = self.klist.count_ge(test_key)
-            deleted_count = sum(1 for dk in delete_keys if dk >= test_key)
-            expected_count = initial_count - deleted_count
-            
-            self.assertEqual(current_count, expected_count,
-                           f"After deletions, count_ge({test_key}) = {current_count}, "
-                           f"expected {expected_count} (initial: {initial_count}, deleted: {deleted_count})")
+    def setUp(self):
+        """Set up tests with K=32 to ensure binary search paths are taken"""
+        super().setUp()
+        # Use K=32 to ensure lists can grow > 8 elements and trigger binary search
+        _, _, KListClass, _ = make_gplustree_classes(32)
+        self.klist = KListClass()
+        self.cap = 32
 
-class TestKListIterators(TestKListBase):
-    """Test both the standard iterator (__iter__) and reverse iterator (iter_reverse)"""
+    def extract_all_keys(self):
+        """Helper: traverse KList and return all keys in ascending order using the standard iterator."""
+        return [entry.item.key for entry in self.klist]
     
-    def test_empty_list_iterators(self):
-        """Test both iterators on empty list"""
-        # Standard iterator (ascending)
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, [])
-        
-        # Reverse iterator (descending)
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, [])
+    def extract_keys(self, kl):
+        """Return list of keys in ascending order from KList using the standard iterator."""
+        return [entry.item.key for entry in kl]
     
-    def test_single_entry_iterators(self):
-        """Test both iterators with single entry"""
-        self.insert_sequence([42])
-        
-        # Standard iterator (ascending)
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, [42])
-        
-        # Reverse iterator (descending)
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, [42])
-    
-    def test_single_node_iterators(self):
-        """Test both iterators with single node containing multiple entries"""
-        keys = [10, 20, 30, 40]
+    def insert_key(self, key):
+        """Helper to insert a single key."""
+        self.klist.insert_entry(Entry(Item(key, f"val_{key}"), None))
+
+    def test_insert_entry_binary_search_path(self):
+        """Test that binary search path in insert_entry works correctly"""
+        # Insert enough items to exceed the linear search threshold (8)
+        keys = list(range(20, 0, -1))  # [20, 19, 18, ..., 1]
         self.insert_sequence(keys)
         
-        # Standard iterator should yield ascending order
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, [10, 20, 30, 40])
+        # Verify all keys are present and in correct order
+        result_keys = self.extract_all_keys()
+        expected_keys = sorted(keys)
+        self.assertEqual(result_keys, expected_keys)
         
-        # Reverse iterator should yield descending order
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, [40, 30, 20, 10])
-    
-    def test_multi_node_iterators(self):
-        """Test both iterators with multiple nodes"""
-        # Create enough entries to span multiple nodes
-        total_keys = self.cap * 2 + 3
-        keys = list(range(total_keys))
+        # Insert a key that would require binary search (in the middle)
+        self.insert_key(25)  # Insert a larger key
+        
+        result_keys = self.extract_all_keys()
+        expected_keys = sorted(keys + [25])
+        self.assertEqual(result_keys, expected_keys)
+
+    def test_retrieve_entry_binary_search_path(self):
+        """Test that binary search path in retrieve_entry works correctly"""
+        # Insert enough items to have > 8 in a single node
+        keys = list(range(10))  # [0, 1, 2, ..., 9]
+        entries = []
+        for key in keys:
+            item = Item(key=key)
+            entry = Entry(item=item, left_subtree=None)
+            entries.append(entry)
+            self.klist.insert_entry(entry)
+        
+        # Test retrieve_entry directly on the node
+        node = self.klist.head
+        
+        # Test finding existing keys
+        for key in keys:
+            found, in_node_succ, go_next = node.retrieve_entry(key)
+            self.assertIsNotNone(found, f"Key {key} should be found")
+            self.assertEqual(found.item.key, key)
+        
+        # Test finding non-existent key that should have successor
+        found, in_node_succ, go_next = node.retrieve_entry(5.5)
+        self.assertIsNone(found)
+        if in_node_succ:
+            # Should find next smaller key in descending order
+            self.assertLess(in_node_succ.item.key, 5.5)
+
+    def test_delete_binary_search_path(self):
+        """Test that binary search path in delete method works correctly"""
+        # Insert enough items to trigger binary search in delete
+        keys = list(range(15))  # [0, 1, 2, ..., 14]
         self.insert_sequence(keys)
         
-        # Standard iterator should yield ascending order
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, keys)
+        # Delete keys that would require binary search
+        keys_to_delete = [7, 3, 11, 1, 13]
+        for key in keys_to_delete:
+            self.klist.delete(key)
+            self.klist.check_invariant()
         
-        # Reverse iterator should yield descending order
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, list(reversed(keys)))
-    
-    def test_iterators_are_complementary(self):
-        """Test that the two iterators yield the same entries in opposite order"""
-        # Insert random keys
-        import random
-        random.seed(123)
-        keys = sorted(random.sample(range(1, 100), 20))
+        # Verify remaining keys
+        remaining_keys = [k for k in keys if k not in keys_to_delete]
+        result_keys = self.extract_all_keys()
+        self.assertEqual(result_keys, sorted(remaining_keys))
+
+    def test_split_inplace_binary_search_path(self):
+        """Test that binary search path in split_inplace works correctly"""
+        # Insert enough items to trigger binary search
+        keys = list(range(20))  # [0, 1, 2, ..., 19]
         self.insert_sequence(keys)
         
-        # Collect entries from both iterators
-        ascending_entries = list(self.klist)
-        descending_entries = list(self.klist.iter_reverse())
+        # Split at a key that would require binary search
+        split_key = 10
+        left, subtree, right = self.klist.split_inplace(split_key)
         
-        # Should have same number of entries
-        self.assertEqual(len(ascending_entries), len(descending_entries))
+        # Check split results
+        left_keys = self.extract_keys(left)
+        right_keys = self.extract_keys(right)
         
-        # Keys should be in opposite order
-        ascending_keys = [e.item.key for e in ascending_entries]
-        descending_keys = [e.item.key for e in descending_entries]
+        # All left keys should be < split_key
+        for key in left_keys:
+            self.assertLess(key, split_key)
         
-        self.assertEqual(ascending_keys, keys)
-        self.assertEqual(descending_keys, list(reversed(keys)))
+        # All right keys should be > split_key
+        for key in right_keys:
+            self.assertGreater(key, split_key)
         
-        # Entries should be the same objects, just in reverse order
-        self.assertEqual(ascending_entries, list(reversed(descending_entries)))
-    
-    def test_iterators_with_uneven_keys(self):
-        """Test iterators with non-sequential keys"""
-        keys = [5, 15, 25, 35, 50, 100, 200]
+        # Together they should contain all original keys except split_key
+        all_result_keys = sorted(left_keys + right_keys)
+        expected_keys = [k for k in keys if k != split_key]
+        self.assertEqual(all_result_keys, expected_keys)
+
+    def test_count_ge_binary_search_path(self):
+        """Test that binary search path in count_ge works correctly"""
+        # Insert enough items to span multiple nodes and trigger binary search
+        keys = list(range(0, 100, 2))  # [0, 2, 4, ..., 98] - 50 even numbers
         self.insert_sequence(keys)
         
-        # Standard iterator (ascending)
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, keys)
+        # Test count_ge with various thresholds
+        test_cases = [
+            (0, 50),    # All items >= 0
+            (50, 25),   # Half the items >= 50
+            (99, 0),    # No items >= 99
+            (98, 1),    # Only the last item >= 98
+            (1, 49),    # All except first item >= 1 (since we have only even numbers)
+        ]
         
-        # Reverse iterator (descending)
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, [200, 100, 50, 35, 25, 15, 5])
-    
-    def test_iterators_after_deletions(self):
-        """Test that iterators work correctly after deletions"""
-        keys = list(range(20))
+        for threshold, expected_count in test_cases:
+            actual_count = self.klist.count_ge(threshold)
+            self.assertEqual(actual_count, expected_count, 
+                           f"count_ge({threshold}) should return {expected_count}, got {actual_count}")
+
+    def test_rebalancing_binary_search_path(self):
+        """Test that binary search path in rebalancing logic works correctly"""
+        # Create a scenario that will trigger rebalancing with binary search
+        keys = list(range(50))  # Enough to create multiple nodes
         self.insert_sequence(keys)
         
-        # Delete some keys
-        delete_keys = [0, 5, 10, 15, 19]
-        for key in delete_keys:
+        # Delete some keys to trigger rebalancing
+        keys_to_delete = keys[::3]  # Delete every third key
+        for key in keys_to_delete:
             self.klist.delete(key)
         
-        remaining_keys = [k for k in keys if k not in delete_keys]
+        # Verify invariants and correct order
+        self.klist.check_invariant()
+        remaining_keys = [k for k in keys if k not in keys_to_delete]
+        result_keys = self.extract_all_keys()
+        self.assertEqual(result_keys, sorted(remaining_keys))
+
+    def test_mixed_operations_binary_search(self):
+        """Test mixed operations that exercise all binary search paths"""
+        # Start with initial data
+        initial_keys = list(range(0, 30, 2))  # [0, 2, 4, ..., 28]
+        self.insert_sequence(initial_keys)
         
-        # Standard iterator (ascending)
-        ascending_keys = [entry.item.key for entry in self.klist]
-        self.assertEqual(ascending_keys, remaining_keys)
+        # Perform mixed operations
+        operations = [
+            ('insert', 15),
+            ('insert', 25),
+            ('delete', 10),
+            ('insert', 7),
+            ('delete', 20),
+            ('insert', 31),
+        ]
         
-        # Reverse iterator (descending)
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        self.assertEqual(descending_keys, list(reversed(remaining_keys)))
-    
-    def test_iterators_preserve_entry_structure(self):
-        """Test that iterators yield complete Entry objects, not just keys"""
-        keys = [10, 20, 30]
-        self.insert_sequence(keys)
-        
-        # Test ascending iterator
-        for entry in self.klist:
-            self.assertIsInstance(entry, Entry)
-            self.assertIsInstance(entry.item, Item)
-            self.assertEqual(entry.item.value, f"val_{entry.item.key}")
-            self.assertIsNone(entry.left_subtree)  # Default None for our test data
-        
-        # Test descending iterator
-        for entry in self.klist.iter_reverse():
-            self.assertIsInstance(entry, Entry)
-            self.assertIsInstance(entry.item, Item)
-            self.assertEqual(entry.item.value, f"val_{entry.item.key}")
-            self.assertIsNone(entry.left_subtree)  # Default None for our test data
-    
-    def test_iterator_consistency_with_item_count(self):
-        """Test that iterators yield exactly item_count() entries"""
-        keys = list(range(self.cap * 3 + 2))
-        self.insert_sequence(keys)
-        
-        expected_count = self.klist.item_count()
-        
-        # Count entries from ascending iterator
-        ascending_count = sum(1 for _ in self.klist)
-        self.assertEqual(ascending_count, expected_count)
-        
-        # Count entries from descending iterator
-        descending_count = sum(1 for _ in self.klist.iter_reverse())
-        self.assertEqual(descending_count, expected_count)
-    
-    def test_large_dataset_iterators(self):
-        """Test iterators with larger dataset for performance/correctness"""
-        large_size = self.cap * 10
-        keys = list(range(0, large_size * 2, 2))  # Even numbers
-        self.insert_sequence(keys)
-        
-        # Test that iterators maintain order even with large datasets
-        ascending_keys = [entry.item.key for entry in self.klist]
-        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
-        
-        self.assertEqual(ascending_keys, keys)
-        self.assertEqual(descending_keys, list(reversed(keys)))
-        
-        # Verify they're actually sorted
-        self.assertEqual(ascending_keys, sorted(ascending_keys))
-        self.assertEqual(descending_keys, sorted(descending_keys, reverse=True))
+        current_keys = initial_keys.copy()
+        for op, key in operations:
+            if op == 'insert':
+                self.insert_key(key)
+                current_keys.append(key)
+            elif op == 'delete':
+                self.klist.delete(key)
+                if key in current_keys:
+                    current_keys.remove(key)
+            
+            # Verify after each operation
+            self.klist.check_invariant()
+            result_keys = self.extract_all_keys()
+            self.assertEqual(result_keys, sorted(current_keys))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """K-list implementation"""
 from typing import TYPE_CHECKING, Optional, Tuple, Type
+from bisect import bisect_left, insort_left
 
 from gplus_trees.base import (
     Item,
@@ -60,18 +61,19 @@ class KListNodeBase:
                 real_keys.append(x_key)
             return None, True
 
-        # Fast path: Insert at beginning (largest key goes first)
-        if x_key > entries[0].item.key:
-            entries.insert(0, entry)
-            keys.insert(0, x_key)
-            if not is_dummy:
-                real_keys.insert(0, x_key)
+        
         # Fast path: Append at end (smallest key goes last)
-        elif x_key < entries[-1].item.key:
+        if x_key < entries[-1].item.key:
             entries.append(entry)
             keys.append(x_key)
             if not is_dummy:
                 real_keys.append(x_key)
+        # Fast path: Insert at beginning (largest key goes first)
+        elif x_key > entries[0].item.key:
+            entries.insert(0, entry)
+            keys.insert(0, x_key)
+            if not is_dummy:
+                real_keys.insert(0, x_key)
         else:
             # Choose algorithm based on list length
             entries_len = len(entries)
@@ -88,16 +90,7 @@ class KListNodeBase:
                         return None, False
             else:
                 # Binary search for larger lists using reverse bisect
-                # Since keys are in descending order, we need custom logic
-                left, right = 0, len(keys)
-                while left < right:
-                    mid = (left + right) // 2
-                    if keys[mid] > x_key:
-                        left = mid + 1
-                    else:
-                        right = mid
-                i = left
-                
+                i = bisect_left(keys, -x_key, key=lambda v: -v)
                 if i < len(entries) and keys[i] == x_key:
                     return None, False
                 entries.insert(i, entry)
@@ -105,27 +98,20 @@ class KListNodeBase:
 
             if not is_dummy:
                 # Insert into real_keys in descending order
+                # Fast path: if real_keys is empty or x_key < smallest element, append
                 real_keys_len = len(real_keys)
-                if real_keys_len < 8:
-                    # Linear search for very small lists (descending order)
-                    inserted = False
-                    for i in range(real_keys_len):
-                        if x_key > real_keys[i]:
-                            real_keys.insert(i, x_key)
-                            inserted = True
-                            break
-                    if not inserted:
-                        real_keys.append(x_key)
+                if real_keys_len == 0 or x_key < real_keys[-1]:
+                    real_keys.append(x_key)
                 else:
-                    # Binary search for larger lists (descending order)
-                    left, right = 0, len(real_keys)
-                    while left < right:
-                        mid = (left + right) // 2
-                        if real_keys[mid] > x_key:
-                            left = mid + 1
-                        else:
-                            right = mid
-                    real_keys.insert(left, x_key)
+                    if real_keys_len < 8:
+                        # Linear search for very small lists (descending order)
+                        for i in range(real_keys_len):
+                            if x_key > real_keys[i]:
+                                real_keys.insert(i, x_key)
+                                break
+                    else:
+                        # Binary search for larger lists (descending order)
+                        insort_left(real_keys, x_key, key=lambda v: -v)
 
         # Handle overflow - pop the smallest (last) entry
         if len(entries) > self.__class__.CAPACITY:
@@ -138,7 +124,7 @@ class KListNodeBase:
         return None, True
      
     def retrieve_entry(
-        self, key: int
+        self, x_key: int
     ) -> Tuple[Optional[Entry], Optional[Entry], bool]:
         """
         Returns (found, in_node_successor, go_next):
@@ -157,17 +143,10 @@ class KListNodeBase:
         keys = self.keys
         
         # Binary search in descending order
-        left, right = 0, len(keys)
-        while left < right:
-            mid = (left + right) // 2
-            if keys[mid] > key:
-                left = mid + 1
-            else:
-                right = mid
-        i = left
+        i = bisect_left(keys, -x_key, key=lambda v: -v)
 
         # Case A: found exact
-        if i < len(entries) and keys[i] == key:
+        if i < len(entries) and keys[i] == x_key:
             found = entries[i]
             # if not last in this node, return node-local successor (next smaller)
             if i + 1 < len(entries):
@@ -316,15 +295,10 @@ class KListBase(AbstractSetDataStructure):
             if self.tail.entries and key < self.tail.entries[-1].item.key:
                 node = self.tail
             else:
-                # Binary search to find the appropriate node using bounds (minimum keys)
+                # Use bisect to find the appropriate node using bounds (minimum keys)
                 # We need to find the first node where key >= min_key of that node
-                left, right = 0, len(self._bounds)
-                while left < right:
-                    mid = (left + right) // 2
-                    if key >= self._bounds[mid]:  # key >= min_key of node
-                        right = mid
-                    else:
-                        left = mid + 1
+                # Since bounds are in descending order, we search for -key
+                left = bisect_left(self._bounds, -key, key=lambda v: -v)
                 
                 if left < len(self._nodes):
                     node = self._nodes[left]
@@ -364,16 +338,11 @@ class KListBase(AbstractSetDataStructure):
 
         # 1) Find and remove the entry.
         while node:
-            # Search within the node using binary search (descending order)
+            # Search within the node using bisect (descending order)
             keys = node.keys
             if keys:
-                left, right = 0, len(keys)
-                while left < right:
-                    mid = (left + right) // 2
-                    if keys[mid] > key:
-                        left = mid + 1
-                    else:
-                        right = mid
+                # Use bisect to find the key position
+                left = bisect_left(keys, -key, key=lambda v: -v)
                 
                 if left < len(keys) and keys[left] == key:
                     # Found the key
@@ -382,13 +351,7 @@ class KListBase(AbstractSetDataStructure):
                     if key >= 0:  # Only remove from real_keys if it's not a dummy key
                         # Find the key in real_keys and remove it (also in descending order)
                         real_keys = node.real_keys
-                        left_rk, right_rk = 0, len(real_keys)
-                        while left_rk < right_rk:
-                            mid = (left_rk + right_rk) // 2
-                            if real_keys[mid] > key:
-                                left_rk = mid + 1
-                            else:
-                                right_rk = mid
+                        left_rk = bisect_left(real_keys, -key, key=lambda v: -v)
                         if left_rk < len(real_keys) and real_keys[left_rk] == key:
                             del node.real_keys[left_rk]
                     found = True
@@ -466,16 +429,10 @@ class KListBase(AbstractSetDataStructure):
                         current.entries.append(shifted)
                         current.keys.append(shifted_key)
                     else:
-                        # Binary search to find correct position in descending order
-                        left, right = 0, len(current.keys)
-                        while left < right:
-                            mid = (left + right) // 2
-                            if current.keys[mid] > shifted_key:
-                                left = mid + 1
-                            else:
-                                right = mid
-                        current.entries.insert(left, shifted)
-                        current.keys.insert(left, shifted_key)
+                        # Use bisect to find correct position in descending order
+                        pos = bisect_left(current.keys, -shifted_key, key=lambda v: -v)
+                        current.entries.insert(pos, shifted)
+                        current.keys.insert(pos, shifted_key)
                     
                     # Move from real_keys if it's not a dummy key
                     if shifted_key >= 0:
@@ -491,15 +448,9 @@ class KListBase(AbstractSetDataStructure):
                         elif shifted_key <= current.real_keys[-1]:
                             current.real_keys.append(shifted_key)
                         else:
-                            # Binary search for real_keys
-                            left, right = 0, len(current.real_keys)
-                            while left < right:
-                                mid = (left + right) // 2
-                                if current.real_keys[mid] > shifted_key:
-                                    left = mid + 1
-                                else:
-                                    right = mid
-                            current.real_keys.insert(left, shifted_key)
+                            # Use bisect for real_keys insertion
+                            pos = bisect_left(current.real_keys, -shifted_key, key=lambda v: -v)
+                            current.real_keys.insert(pos, shifted_key)
                     
                     # If next_node became empty, splice it out and restart rebalancing
                     if not next_node.entries:
@@ -632,15 +583,7 @@ class KListBase(AbstractSetDataStructure):
         node_keys = split_node.keys
 
         # Binary search in descending order
-        left_bs, right_bs = 0, len(node_keys)
-        while left_bs < right_bs:
-            mid = (left_bs + right_bs) // 2
-            if node_keys[mid] > key:
-                left_bs = mid + 1
-            else:
-                right_bs = mid
-        i = left_bs
-        
+        i = bisect_left(node_keys, -key, key=lambda v: -v)
         exact = i < len(node_keys) and node_keys[i] == key
 
         # In reverse order: entries with keys > split_key go to greater_part, <= split_key go to lesser_part
@@ -652,15 +595,8 @@ class KListBase(AbstractSetDataStructure):
         lesser_keys = node_keys[i + 1 if exact else i :]
 
         real_keys = split_node.real_keys
-        # Find position in real_keys (also in descending order)
-        left_rk, right_rk = 0, len(real_keys)
-        while left_rk < right_rk:
-            mid = (left_rk + right_rk) // 2
-            if real_keys[mid] > key:
-                left_rk = mid + 1
-            else:
-                right_rk = mid
-        j = left_rk
+        # Find position in real_keys using bisect (also in descending order)
+        j = bisect_left(real_keys, -key, key=lambda v: -v)
         
         greater_real_keys = real_keys[:j]
         lesser_real_keys = real_keys[j + 1 if exact else j :]
@@ -930,13 +866,8 @@ class KListBase(AbstractSetDataStructure):
         
         # Find the first node that might contain keys >= key
         # We need to find the first node where key >= min_key
-        left, right = 0, len(self._bounds)
-        while left < right:
-            mid = (left + right) // 2
-            if key >= self._bounds[mid]:  # key >= min_key of node
-                right = mid
-            else:
-                left = mid + 1
+        # Since _bounds contains minimum keys in descending order, search for -key
+        left = bisect_left(self._bounds, -key, key=lambda v: -v)
         
         # If key is smaller than all minimum keys, count all items
         if left >= len(self._nodes):
