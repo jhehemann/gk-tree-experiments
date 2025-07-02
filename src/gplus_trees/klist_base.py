@@ -61,7 +61,6 @@ class KListNodeBase:
                 real_keys.append(x_key)
             return None, True
 
-        
         # Fast path: Append at end (smallest key goes last)
         if x_key < entries[-1].item.key:
             entries.append(entry)
@@ -286,22 +285,21 @@ class KListBase(AbstractSetDataStructure):
         
         key = entry.item.key
         # If the k-list is empty, create a new node.
-        if self.head is None:
+        if self.is_empty():
             node = self.KListNodeClass()
             self.head = self.tail = node
         else:
             # Fast-Path: If the new key < the last key in the tail (minimum), insert there.
             # This achieves O(1) minimum key inserts!
-            if self.tail.entries and key < self.tail.entries[-1].item.key:
+            if key < self._bounds[-1]:
                 node = self.tail
             else:
                 # Use bisect to find the appropriate node using bounds (minimum keys)
                 # We need to find the first node where key >= min_key of that node
                 # Since bounds are in descending order, we search for -key
-                left = bisect_left(self._bounds, -key, key=lambda v: -v)
-                
-                if left < len(self._nodes):
-                    node = self._nodes[left]
+                i = bisect_left(self._bounds, -key, key=lambda v: -v)
+                if i < len(self._nodes):
+                    node = self._nodes[i]
                 else:
                     # Key is smaller than all minimum keys, use the last node
                     node = self.tail
