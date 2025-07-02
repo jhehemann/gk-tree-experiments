@@ -1,6 +1,5 @@
 """K-list implementation"""
 from typing import TYPE_CHECKING, Optional, Tuple, Type
-from bisect import bisect_left, insort_left
 
 from gplus_trees.base import (
     Item,
@@ -38,7 +37,7 @@ class KListNodeBase:
             entry: Entry,
     ) -> Optional[Entry]:
         """
-        Inserts an entry into a sorted KListNode by key.
+        Inserts an entry into a reverse-sorted KListNode by key (descending order).
         If capacity exceeds, last entry is returned for further processing.
         
         Attributes:
@@ -61,25 +60,25 @@ class KListNodeBase:
                 real_keys.append(x_key)
             return None, True
 
-        # Fast path: Append at end
-        if x_key > entries[-1].item.key:
-            entries.append(entry)
-            keys.append(x_key)
-            if not is_dummy:
-                real_keys.append(x_key)
-        # Fast path: Insert at beginning
-        elif x_key < entries[0].item.key:
+        # Fast path: Insert at beginning (largest key goes first)
+        if x_key > entries[0].item.key:
             entries.insert(0, entry)
             keys.insert(0, x_key)
             if not is_dummy:
                 real_keys.insert(0, x_key)
+        # Fast path: Append at end (smallest key goes last)
+        elif x_key < entries[-1].item.key:
+            entries.append(entry)
+            keys.append(x_key)
+            if not is_dummy:
+                real_keys.append(x_key)
         else:
             # Choose algorithm based on list length
             entries_len = len(entries)
             if entries_len < 8:
-                # Linear search for very small lists
+                # Linear search for very small lists (descending order)
                 for i in range(entries_len):
-                    if x_key < entries[i].item.key:
+                    if x_key > entries[i].item.key:
                         entries.insert(i, entry)
                         keys.insert(i, x_key)
                         break
@@ -88,27 +87,47 @@ class KListNodeBase:
                         # Here we choose to ignore the insertion if the key already exists
                         return None, False
             else:
-                # Binary search for larger lists - more efficient with higher capacities
-                i = bisect_left(keys, x_key)
+                # Binary search for larger lists using reverse bisect
+                # Since keys are in descending order, we need custom logic
+                left, right = 0, len(keys)
+                while left < right:
+                    mid = (left + right) // 2
+                    if keys[mid] > x_key:
+                        left = mid + 1
+                    else:
+                        right = mid
+                i = left
+                
                 if i < len(entries) and keys[i] == x_key:
                     return None, False
                 entries.insert(i, entry)
                 keys.insert(i, x_key)
 
             if not is_dummy:
-                # Insert into real_keys only if it's not a dummy key
+                # Insert into real_keys in descending order
                 real_keys_len = len(real_keys)
                 if real_keys_len < 8:
-                    # Linear search for very small lists
+                    # Linear search for very small lists (descending order)
+                    inserted = False
                     for i in range(real_keys_len):
-                        if x_key < real_keys[i]:
+                        if x_key > real_keys[i]:
                             real_keys.insert(i, x_key)
+                            inserted = True
                             break
+                    if not inserted:
+                        real_keys.append(x_key)
                 else:
-                    # Binary search for larger lists
-                    insort_left(real_keys, x_key)
+                    # Binary search for larger lists (descending order)
+                    left, right = 0, len(real_keys)
+                    while left < right:
+                        mid = (left + right) // 2
+                        if real_keys[mid] > x_key:
+                            left = mid + 1
+                        else:
+                            right = mid
+                    real_keys.insert(left, x_key)
 
-        # Handle overflow
+        # Handle overflow - pop the smallest (last) entry
         if len(entries) > self.__class__.CAPACITY:
             pop_entry = entries.pop()
             # logger.debug(f"POP ENTRY {pop_entry.item.key}")
@@ -124,32 +143,43 @@ class KListNodeBase:
         """
         Returns (found, in_node_successor, go_next):
          - found: the Entry with .item.key == key, or None
-         - in_node_successor: the next Entry *within this node* if key < max_key
+         - in_node_successor: the next Entry *within this node* if key exists
                               else None
-         - go_next: True if key > max_key OR (found at max_key) → caller should
+         - go_next: True if key < min_key OR (found at min_key) → caller should
                     continue into next node to find the true successor.
+        
+        Note: Since entries are in descending order, the successor is the next smaller key.
         """
         entries = self.entries
         if not entries:
             return None, None, True
 
         keys = self.keys
-        i = bisect_left(keys, key)
+        
+        # Binary search in descending order
+        left, right = 0, len(keys)
+        while left < right:
+            mid = (left + right) // 2
+            if keys[mid] > key:
+                left = mid + 1
+            else:
+                right = mid
+        i = left
 
         # Case A: found exact
         if i < len(entries) and keys[i] == key:
             found = entries[i]
-            # if not last in this node, return node-local successor
+            # if not last in this node, return node-local successor (next smaller)
             if i + 1 < len(entries):
                 return found, entries[i+1], False
             # otherwise we must scan next node
             return found, None, True
 
-        # Case B: i < len → this entries[i] is the in-node successor
+        # Case B: i < len → this entries[i] is the in-node successor (next smaller)
         if i < len(entries):
             return None, entries[i], False
 
-        # Case C: key > max_key in this node → skip to next
+        # Case C: key < min_key in this node → skip to next
         return None, None, True
     
     def get_by_offset(self, offset: int) -> Tuple[Entry, Optional[Entry], bool]:
@@ -208,9 +238,9 @@ class KListBase(AbstractSetDataStructure):
             real += len(real_keys)
             self._prefix_counts_real.append(real)
 
-            # Add the maximum key in this node to bounds
+            # Add the minimum key in this node to bounds (since entries are in descending order)
             if entries:
-                self._bounds.append(entries[-1].item.key)
+                self._bounds.append(entries[-1].item.key)  # Last entry has minimum key
             
             node = node.next
     
@@ -260,8 +290,10 @@ class KListBase(AbstractSetDataStructure):
         """
         Inserts an existing Entry object into the k-list, preserving the Entry object's identity.
 
-        The insertion ensures that the keys are kept in lexicographic order.
+        The insertion ensures that the keys are kept in reverse lexicographic order (descending).
         If a node overflows (more than k entries), the extra entry is recursively inserted into the next node.
+        
+        Optimized for O(1) minimum key inserts using tail fast-path.
 
         Parameters:
             entry (Entry): The Entry object to insert (containing item and left_subtree).
@@ -270,8 +302,8 @@ class KListBase(AbstractSetDataStructure):
         Returns:
             KListBase: The updated k-list.
         """
-        if not isinstance(entry, Entry):
-            raise TypeError(f"insert_entry(): expected Entry, got {type(entry).__name__}")
+        if not hasattr(entry, 'item') or not hasattr(entry.item, 'key'):
+            raise TypeError(f"insert_entry(): expected Entry-like object with item.key, got {type(entry).__name__}")
         
         key = entry.item.key
         # If the k-list is empty, create a new node.
@@ -279,15 +311,26 @@ class KListBase(AbstractSetDataStructure):
             node = self.KListNodeClass()
             self.head = self.tail = node
         else:
-            # Fast-Path: If the new key > the last key in the tail, insert there.
-            if self.tail.entries and key > self.tail.entries[-1].item.key:
+            # Fast-Path: If the new key < the last key in the tail (minimum), insert there.
+            # This achieves O(1) minimum key inserts!
+            if self.tail.entries and key < self.tail.entries[-1].item.key:
                 node = self.tail
             else:
-                # linear search from the head
-                node = self.head
-                # Using bisect_left to find the insertion node (key >= split key)
-                node_idx = bisect_left(self._bounds, key)
-                node = self._nodes[node_idx]
+                # Binary search to find the appropriate node using bounds (minimum keys)
+                # We need to find the first node where key >= min_key of that node
+                left, right = 0, len(self._bounds)
+                while left < right:
+                    mid = (left + right) // 2
+                    if key >= self._bounds[mid]:  # key >= min_key of node
+                        right = mid
+                    else:
+                        left = mid + 1
+                
+                if left < len(self._nodes):
+                    node = self._nodes[left]
+                else:
+                    # Key is smaller than all minimum keys, use the last node
+                    node = self.tail
         
         overflow, inserted = node.insert_entry(entry)
 
@@ -299,11 +342,12 @@ class KListBase(AbstractSetDataStructure):
             MAX_OVERFLOW_DEPTH = 10000
             depth = 0
 
-            # Propagate overflow if needed.
+            # Propagate overflow if needed
             while overflow is not None:
                 if node.next is None:
-                    node.next = self.KListNodeClass()
-                    self.tail = node.next
+                    new_node = self.KListNodeClass()
+                    node.next = new_node
+                    self.tail = new_node
                 node = node.next
                 overflow, inserted = node.insert_entry(overflow)
                 depth += 1
@@ -316,212 +360,234 @@ class KListBase(AbstractSetDataStructure):
 
     def delete(self, key: int) -> "KListBase":
         node = self.head
-        prev = None
         found = False
 
         # 1) Find and remove the entry.
         while node:
-            for i, entry in enumerate(node.entries):
-                if entry.item.key == key:
-                    del node.entries[i]
-                    # Also remove from keys and real_keys lists
-                    del node.keys[i]
+            # Search within the node using binary search (descending order)
+            keys = node.keys
+            if keys:
+                left, right = 0, len(keys)
+                while left < right:
+                    mid = (left + right) // 2
+                    if keys[mid] > key:
+                        left = mid + 1
+                    else:
+                        right = mid
+                
+                if left < len(keys) and keys[left] == key:
+                    # Found the key
+                    del node.entries[left]
+                    del node.keys[left]
                     if key >= 0:  # Only remove from real_keys if it's not a dummy key
-                        # Find the key in real_keys and remove it
-                        try:
-                            real_key_idx = node.real_keys.index(key)
-                            del node.real_keys[real_key_idx]
-                        except ValueError:
-                            pass  # Key not in real_keys (shouldn't happen but be safe)
+                        # Find the key in real_keys and remove it (also in descending order)
+                        real_keys = node.real_keys
+                        left_rk, right_rk = 0, len(real_keys)
+                        while left_rk < right_rk:
+                            mid = (left_rk + right_rk) // 2
+                            if real_keys[mid] > key:
+                                left_rk = mid + 1
+                            else:
+                                right_rk = mid
+                        if left_rk < len(real_keys) and real_keys[left_rk] == key:
+                            del node.real_keys[left_rk]
                     found = True
                     break
-            if found:
-                break
-            prev, node = node, node.next
+            
+            node = node.next
 
         if not found:
             self._rebuild_index()
             return self
 
-        # 2) If head is now empty, advance head.
+        # 2) If head is now empty, advance head
         if node is self.head and not node.entries:
             self.head = node.next
-            if self.head is None:
+            if not self.head:
                 # list became empty
                 self.tail = None
-                self._rebuild_index()
-                return self
-            # reset for possible rebalance, but prev stays None
-            node = self.head
-
-        # 3) If *any other* node is now empty, splice it out immediately.
-        elif not node.entries:
-            # remove node from chain
-            prev.next = node.next
-            # if we removed the tail, update it
-            if prev.next is None:
-                self.tail = prev
             self._rebuild_index()
             return self
 
-        # 4) Start a rebalancing pass through the entire list
-        current = node
+        # 3) Remove any empty nodes first
+        current = self.head
+        prev = None
+        while current:
+            if not current.entries:
+                # Remove this empty node
+                if prev:
+                    prev.next = current.next
+                else:
+                    self.head = current.next
+                if current is self.tail:
+                    self.tail = prev
+                current = current.next
+            else:
+                prev = current
+                current = current.next
+        
+        # If list is now empty, we're done
+        if not self.head:
+            self.tail = None
+            self._rebuild_index()
+            return self
+
+        # 4) Start a comprehensive rebalancing pass through the entire list
+        # We need to ensure that all non-tail nodes are at capacity
         capacity = self.KListNodeClass.CAPACITY
         
-        # Rebalance all nodes starting from the node where deletion occurred
-        while current and current.next:
-            next_node = current.next
+        restart_rebalancing = True
+        while restart_rebalancing:
+            restart_rebalancing = False
+            current = self.head
             
-            # Continue moving items from next_node to current until current is at capacity
-            # or next_node is empty
+            while current and current.next:
+                next_node = current.next
+                
+                # Continue moving items from next_node to current until current is at capacity
+                # or next_node is empty
 
-            while len(current.entries) < capacity and next_node.entries:
-                # Move an item from next_node to current
-                shifted = next_node.entries.pop(0)
-                current.entries.append(shifted)
+                while len(current.entries) < capacity and next_node.entries:
+                    # Move the largest item from next_node (from the beginning) to current
+                    shifted = next_node.entries.pop(0)  # Pop from beginning (largest key)
+                    shifted_key = next_node.keys.pop(0)   # Pop from beginning (largest key)
+                    
+                    # Insert into current in the correct position to maintain descending order
+                    if not current.entries:
+                        # Empty current, just append
+                        current.entries.append(shifted)
+                        current.keys.append(shifted_key)
+                    elif shifted_key >= current.entries[0].item.key:
+                        # Insert at beginning (largest position)
+                        current.entries.insert(0, shifted)
+                        current.keys.insert(0, shifted_key)
+                    elif shifted_key <= current.entries[-1].item.key:
+                        # Insert at end (smallest position)
+                        current.entries.append(shifted)
+                        current.keys.append(shifted_key)
+                    else:
+                        # Binary search to find correct position in descending order
+                        left, right = 0, len(current.keys)
+                        while left < right:
+                            mid = (left + right) // 2
+                            if current.keys[mid] > shifted_key:
+                                left = mid + 1
+                            else:
+                                right = mid
+                        current.entries.insert(left, shifted)
+                        current.keys.insert(left, shifted_key)
+                    
+                    # Move from real_keys if it's not a dummy key
+                    if shifted_key >= 0:
+                        # Remove from next_node real_keys if present
+                        if next_node.real_keys and next_node.real_keys[0] == shifted_key:
+                            next_node.real_keys.pop(0)
+                        
+                        # Insert into current real_keys in descending order
+                        if not current.real_keys:
+                            current.real_keys.append(shifted_key)
+                        elif shifted_key >= current.real_keys[0]:
+                            current.real_keys.insert(0, shifted_key)
+                        elif shifted_key <= current.real_keys[-1]:
+                            current.real_keys.append(shifted_key)
+                        else:
+                            # Binary search for real_keys
+                            left, right = 0, len(current.real_keys)
+                            while left < right:
+                                mid = (left + right) // 2
+                                if current.real_keys[mid] > shifted_key:
+                                    left = mid + 1
+                                else:
+                                    right = mid
+                            current.real_keys.insert(left, shifted_key)
+                    
+                    # If next_node became empty, splice it out and restart rebalancing
+                    if not next_node.entries:
+                        current.next = next_node.next
+                        if next_node is self.tail:
+                            self.tail = current
+                        # Restart rebalancing from the beginning to ensure compaction
+                        restart_rebalancing = True
+                        break
                 
-                # Also move the corresponding key from next_node to current
-                shifted_key = next_node.keys.pop(0)
-                current.keys.append(shifted_key)
-                
-                # Move from real_keys if it's not a dummy key
-                if shifted_key >= 0 and next_node.real_keys and next_node.real_keys[0] == shifted_key:
-                    shifted_real_key = next_node.real_keys.pop(0)
-                    current.real_keys.append(shifted_real_key)
-                
-                # If next_node became empty, splice it out and update tail if needed
-                if not next_node.entries:
-                    current.next = next_node.next
-                    if current.next is None:
-                        self.tail = current
-                    # Exit inner loop as we've emptied next_node
+                if restart_rebalancing:
                     break
-            
-            # Move to next node for the next iteration
-            current = current.next
+                    
+                # Move to next node for the next iteration
+                current = current.next
         
         self._rebuild_index()
         return self
 
     def retrieve(self, key: int, with_next: bool = True) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
-        Search for `key` using linear search on the list or binary search O(log l + log k) on the index, based on the number of entries in the node.
+        Search for `key` and return the found entry and its successor.
         
         Returns:
             Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
                 - found_entry: The entry with the matching key if found, otherwise None
-                - next_entry: The subsequent entry in sorted order, or None if no next entry exists
+                - next_entry: The subsequent entry in logical ascending order (next larger key), or None if no next entry exists
         """
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
         
-        # Empty list case
-        if not self._bounds:
-            return None, None
+        found_entry = None
+        next_entry = None
         
-        # Find node that might contain key using binary search on max keys
-        node_idx = bisect_left(self._bounds, key)
-        
-        # Case: key > max of any node
-        if node_idx >= len(self._nodes):
-            return None, None
-        
-        # Get the target node
-        node = self._nodes[node_idx]
-        entries = node.entries
-        keys = node.keys
-        
-        # Empty node (shouldn't happen if index is maintained)
-        if not entries:
-            return None, None
-        
-        # Case: key < first entry in this node
-        if key < entries[0].item.key:
-            return None, entries[0]
-        
-        if len(entries) < 8:
-            # Linear search for very small lists
-            for i, entry in enumerate(entries):
-                if key <= entry.item.key:
-                    # Exact match?
-                    if entry.item.key == key:
-                        found = entry
-                        
-                        # Early return if we don't need the next entry
-                        if not with_next:
-                            return found, None
-                        
-                        # Find successor
-                        if i + 1 < len(entries):
-                            succ = entries[i+1]
-                        else:
-                            succ = (node.next.entries[0] if node.next and node.next.entries else None)
-                        return found, succ
-                    # Not found, but we know the successor
-                    return None, entry
+        # Iterate through all entries in ascending order
+        prev_entry = None
+        for entry in self:
+            if entry.item.key == key:
+                found_entry = entry
+                # Continue to find next entry
+            elif entry.item.key > key:
+                next_entry = entry
+                break
+            prev_entry = entry
             
-            # Fell off the end of this node
-            if node.next and node.next.entries:
-                return None, node.next.entries[0]
-            return None, None
-        else:
-            # Binary search for larger lists
-            i = bisect_left(keys, key)
-        
-        # Exact match?
-        if i < len(entries) and entries[i].item.key == key:
-            found = entries[i]
+        if not with_next:
+            return found_entry, None
             
-            if not with_next:
-                return found, None
-            
-            # Find successor (in-node or from next node)
-            if i + 1 < len(entries):
-                succ = entries[i+1]
-            else:
-                succ = (node.next.entries[0] if node.next and node.next.entries else None)
-            return found, succ
-        
-        # Not found, but we know the successor
-        if i < len(entries):
-            return None, entries[i]
-        
-        # Check next node for successor if we fell off the end of this node
-        if node.next and node.next.entries:
-            return None, node.next.entries[0]
-        
-        # No successor found
-        return None, None
+        return found_entry, next_entry
     
     def find_pivot(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Find the pivot entry (minimum entry) in the KList."""
         return self.get_min()
 
     def get_min(self) -> Tuple[Optional[Entry], Optional[Entry]]:
-        """Retrieve the minimum entry from the sorted KList."""
-        if not self._prefix_counts_tot:
-            return None, None
-        node = self.head
-        entry, in_node_succ, needs_next = node.get_by_offset(0)
-        if needs_next:
-            if node.next and node.next.entries:
-                next_entry = node.next.entries[0]
-            else:
-                next_entry = None
-        else:
-            next_entry = in_node_succ
-
-        return entry, next_entry
-    
-    def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
-        """Retrieve the maximum entry from the sorted KList."""
+        """Retrieve the minimum entry from the reverse-sorted KList (last entry of tail node)."""
         if not self._prefix_counts_tot:
             return None, None
         node = self.tail
         entries = node.entries
-        entry, in_node_succ, _ = node.get_by_offset(len(entries) - 1)
-
-        return entry, in_node_succ
+        if not entries:
+            return None, None
+        
+        # In reverse order, minimum is the last entry
+        min_entry = entries[-1]
+        
+        # Find successor (next larger entry) - iterate through all entries to find it
+        next_entry = None
+        for entry in self:
+            if entry.item.key > min_entry.item.key:
+                next_entry = entry
+                break
+        
+        return min_entry, next_entry
+    
+    def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
+        """Retrieve the maximum entry from the reverse-sorted KList (first entry of head node)."""
+        if not self._prefix_counts_tot:
+            return None, None
+        node = self.head
+        entries = node.entries
+        if not entries:
+            return None, None
+        
+        # In reverse order, maximum is the first entry
+        max_entry = entries[0]
+        # Maximum has no successor
+        return max_entry, None
 
     def split_inplace(
         self, key: int
@@ -536,86 +602,122 @@ class KListBase(AbstractSetDataStructure):
             return self, None, right
 
         # --- locate split node ------------------------------------------------
-        # Using bisect_left to find the first node that contains a key >= split key
-        node_idx = bisect_left(self._bounds, key)
+        # Find the first node where key >= min_key (using reverse order bounds)
+        left_search, right_search = 0, len(self._bounds)
+        while left_search < right_search:
+            mid = (left_search + right_search) // 2
+            if key >= self._bounds[mid]:  # key >= min_key of node
+                right_search = mid
+            else:
+                left_search = mid + 1
         
-        # If key is greater than any key in the list
-        if node_idx >= len(self._nodes):             # ··· (2) key > max
-            right = type(self)()
-            return self, None, right
+        # If key is smaller than any key in the list, all entries have keys > key
+        # Interface expects: left (keys < key), right (keys > key)
+        if left_search >= len(self._nodes):         # ··· (2) key < min
+            empty_klist = type(self)()  # Empty klist for keys < key
+            return empty_klist, None, self  # Empty left, all entries go to right
 
+        # If key is larger than the maximum key, all entries have keys < key  
+        if self._nodes and key > self._nodes[0].entries[0].item.key:  # key > max
+            empty_klist = type(self)()  # Empty klist for keys > key
+            return self, None, empty_klist  # All entries go to left, empty right
+
+        node_idx = left_search
         split_node = self._nodes[node_idx]
         prev_node = self._nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
 
-        # --- bisect inside that node -----------------------------------------
+        # --- bisect inside that node (reverse order) -------------------------
         node_entries = split_node.entries
         node_keys = split_node.keys
 
-        i = bisect_left(node_keys, key)
+        # Binary search in descending order
+        left_bs, right_bs = 0, len(node_keys)
+        while left_bs < right_bs:
+            mid = (left_bs + right_bs) // 2
+            if node_keys[mid] > key:
+                left_bs = mid + 1
+            else:
+                right_bs = mid
+        i = left_bs
+        
         exact = i < len(node_keys) and node_keys[i] == key
 
-        left_entries = node_entries[:i]
-        right_entries = node_entries[i + 1 if exact else i :]
+        # In reverse order: entries with keys > split_key go to greater_part, <= split_key go to lesser_part
+        greater_entries = node_entries[:i]  # Keys > split_key -> will become interface RIGHT
+        lesser_entries = node_entries[i + 1 if exact else i :]  # Keys < split_key -> will become interface LEFT
         left_subtree = node_entries[i].left_subtree if exact else None
 
-        left_keys = node_keys[:i]
-        right_keys = node_keys[i + 1 if exact else i :]
+        greater_keys = node_keys[:i]
+        lesser_keys = node_keys[i + 1 if exact else i :]
 
         real_keys = split_node.real_keys
-        j = bisect_left(real_keys, key)
-        left_real_keys = real_keys[:j]
-        right_real_keys = real_keys[j + 1 if exact else j :]
+        # Find position in real_keys (also in descending order)
+        left_rk, right_rk = 0, len(real_keys)
+        while left_rk < right_rk:
+            mid = (left_rk + right_rk) // 2
+            if real_keys[mid] > key:
+                left_rk = mid + 1
+            else:
+                right_rk = mid
+        j = left_rk
+        
+        greater_real_keys = real_keys[:j]
+        lesser_real_keys = real_keys[j + 1 if exact else j :]
 
-        # ------------- build LEFT --------------------------------------------
-        # left = type(self)()
-        if left_entries:                          # reuse split_node
-            split_node.entries = left_entries
-            split_node.keys = left_keys
+        # ------------- build GREATER PART (keys > split_key) -> INTERFACE RIGHT ------------
+        interface_right = type(self)()
+        if greater_entries:                          # reuse split_node
+            split_node.entries = greater_entries
+            split_node.keys = greater_keys
             split_node.next    = None
-            self.tail = split_node              
-            split_node.real_keys = left_real_keys
-        else:                                        # nothing in split node
-            if prev_node:                            # skip it
+            split_node.real_keys = greater_real_keys
+            
+            # Build the right part: previous nodes + split_node
+            interface_right.head = self.head
+            interface_right.tail = split_node
+            if prev_node:
+                prev_node.next = split_node
+            else:
+                interface_right.head = split_node
+        else:                                        # nothing in greater part
+            if prev_node:                            # just the previous nodes
                 prev_node.next = None
-                self.tail = prev_node
-            else:                                    # key at very first entry
-                self.head = self.tail = None
+                interface_right.head = self.head
+                interface_right.tail = prev_node
+            else:                                    # empty greater part
+                interface_right.head = interface_right.tail = None
 
-        # ------------- build RIGHT -------------------------------------------
-        right = type(self)()
-        if right_entries:
-            if left_entries:                         # both halves non-empty
-                new_node = self.KListNodeClass()
-                new_node.entries   = right_entries
-                new_node.keys      = right_keys
-                new_node.real_keys = right_real_keys
-                new_node.next      = original_next
-                right.head         = new_node
-            else:                                    # left empty → reuse split_node
-                split_node.entries   = right_entries
-                split_node.keys      = right_keys
-                split_node.real_keys = right_real_keys
-                split_node.next      = original_next
-                right.head           = split_node
-        else:                                        # no right_entries
-            right.head = original_next
+        # ------------- build LESSER PART (keys < split_key) -> INTERFACE LEFT ------------
+        interface_left = type(self)()
+        if lesser_entries:
+            new_node = self.KListNodeClass()
+            new_node.entries   = lesser_entries
+            new_node.keys      = lesser_keys
+            new_node.real_keys = lesser_real_keys
+            new_node.next      = original_next
+            interface_left.head = new_node
+        else:                                        # no lesser_entries
+            interface_left.head = original_next
 
-        # find right.tail
-        tail = right.head
+        # find interface_left.tail
+        tail = interface_left.head
         while tail and tail.next:
             tail = tail.next
-        right.tail = tail
+        interface_left.tail = tail
 
-        # Rebalance right list for compaction
-        if right.head:
-            self._rebalance_for_compaction(right)
+        # Rebalance both lists for compaction
+        if interface_left.head:
+            self._rebalance_for_compaction(interface_left)
+        if interface_right.head:
+            self._rebalance_for_compaction(interface_right)
         
         # ------------- rebuild indexes ---------------------------------------
-        self._rebuild_index()
-        right._rebuild_index()
+        interface_left._rebuild_index()
+        interface_right._rebuild_index()
 
-        return self, left_subtree, right
+        # Return in interface order: left (keys < split_key), subtree, right (keys > split_key)
+        return interface_left, left_subtree, interface_right
         
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
         """
@@ -644,10 +746,10 @@ class KListBase(AbstractSetDataStructure):
                     shifted_real_key = next_node.real_keys.pop(0)
                     current.real_keys.append(shifted_real_key)
                 
-                # If next_node became empty, splice it out and update tail if needed
+                # If next_node became empty, splice it out and update tail
                 if not next_node.entries:
                     current.next = next_node.next
-                    if current.next is None:
+                    if next_node is klist.tail:
                         klist.tail = current
                     # Exit inner loop as we've emptied next_node
                     break
@@ -687,14 +789,39 @@ class KListBase(AbstractSetDataStructure):
 
     def __iter__(self):
         """
-        Yields each entry of the k-list in order.
+        Yields each entry of the k-list in ascending order of keys.
         Each entry is of the form (item, left_subtree).
+        
+        Uses efficient backward traversal via auxiliary index: since internally we store 
+        in descending order, we traverse from last node to first node via self._nodes,
+        and reverse entries within each node, giving O(n) performance.
         """
-        node = self.head
-        while node:
+        if not self._nodes:
+            return
+            
+        # Traverse from last node to first node (ascending order of minimum keys per node)
+        for i in range(len(self._nodes) - 1, -1, -1):
+            node = self._nodes[i]
+            # Within each node, entries are in descending order, so reverse them
+            for entry in reversed(node.entries):
+                yield entry
+
+    def iter_reverse(self):
+        """
+        Yields each entry of the k-list in descending order of keys (highest to lowest).
+        Each entry is of the form (item, left_subtree).
+        
+        Uses forward traversal: since internally we store in descending order,
+        we traverse from first node to last node, yielding entries directly, giving O(n) performance.
+        """
+        if not self._nodes:
+            return
+            
+        # Traverse from first node to last node (descending order of minimum keys per node)
+        for node in self._nodes:
+            # Within each node, entries are already in descending order
             for entry in node.entries:
                 yield entry
-            node = node.next
 
     def __str__(self):
         """
@@ -712,9 +839,9 @@ class KListBase(AbstractSetDataStructure):
     def check_invariant(self) -> None:
         """
         Verifies that:
-          1) Each KListNode.entries is internally sorted by item.key.
+          1) Each KListNode.entries is internally sorted by item.key in descending order.
           2) For each consecutive pair of nodes, 
-             last_key(node_i) < first_key(node_{i+1}).
+             first_key(node_i) > last_key(node_{i+1}) (since we store in reverse order).
           3) self.tail.next is always None (tail really is the last node).
           4) All nodes except the last one must be at full capacity (have k items).
 
@@ -738,21 +865,21 @@ class KListBase(AbstractSetDataStructure):
             nodes_seen += 1
             is_last_node = (node.next is None)
             
-            # 2a) Entries within this node are sorted
+            # 2a) Entries within this node are sorted in descending order
             for i in range(1, len(node.entries)):
                 k0 = node.entries[i-1].item.key
                 k1 = node.entries[i].item.key
-                assert k0 <= k1, (
-                    f"Intra-node sort order violated in node {node}: "
-                    f"{k0} > {k1}"
+                assert k0 >= k1, (
+                    f"Intra-node reverse sort order violated in node {node}: "
+                    f"{k0} < {k1} (should be descending)"
                 )
 
-            # 2b) Boundary with the previous node
+            # 2b) Boundary with the previous node (reverse order)
             if previous_last_key is not None and node.entries:
                 first_key = node.entries[0].item.key
-                assert previous_last_key < first_key, (
-                    f"Inter-node invariant violated between nodes: "
-                    f"{previous_last_key} >= {first_key}"
+                assert previous_last_key > first_key, (
+                    f"Inter-node reverse invariant violated between nodes: "
+                    f"{previous_last_key} <= {first_key} (should be strictly decreasing)"
                 )
                 
             # 2c) All non-tail nodes must be at full capacity
@@ -762,7 +889,7 @@ class KListBase(AbstractSetDataStructure):
                     f"but should have {node.__class__.CAPACITY} (compaction invariant violated)"
                 )
 
-            # Update for the next iteration
+            # Update for the next iteration (in reverse order, track the last key which is minimum)
             if node.entries:
                 previous_last_key = node.entries[-1].item.key
 
@@ -774,6 +901,8 @@ class KListBase(AbstractSetDataStructure):
         
         This method leverages the existing index system for O(log l + log k) performance,
         where l is the number of nodes and k is the capacity per node.
+        
+        Since entries are stored in descending order, we count from the beginning.
         
         Args:
             key (int): The key threshold
@@ -791,43 +920,49 @@ class KListBase(AbstractSetDataStructure):
         if not self._prefix_counts_tot:
             return 0
         
-        total_items = self._prefix_counts_tot[-1]
-        
-        # If key is greater than the maximum key, return 0
-        if key > self._bounds[-1]:
+        # If key is greater than the maximum key (first entry), return 0
+        if self.head and key > self.head.entries[0].item.key:
             return 0
             
-        # If key is less than or equal to the minimum key, return total count
-        if self.head and key <= self.head.entries[0].item.key:
-            return total_items
+        # If key is less than or equal to the minimum key (last entry), return total count
+        if key <= self._bounds[-1]:  # _bounds contains minimum keys
+            return self._prefix_counts_tot[-1]
         
         # Find the first node that might contain keys >= key
-        # Use binary search on _bounds to find the node
-        node_idx = bisect_left(self._bounds, key)
+        # We need to find the first node where key >= min_key
+        left, right = 0, len(self._bounds)
+        while left < right:
+            mid = (left + right) // 2
+            if key >= self._bounds[mid]:  # key >= min_key of node
+                right = mid
+            else:
+                left = mid + 1
         
-        # If all bounds are less than key, no items >= key
-        if node_idx >= len(self._nodes):
-            return 0
+        # If key is smaller than all minimum keys, count all items
+        if left >= len(self._nodes):
+            return self._prefix_counts_tot[-1]
             
         count = 0
         
-        # Count items in the target node and all subsequent nodes
-        for i in range(node_idx, len(self._nodes)):
-            node = self._nodes[i]
+        # Count items from the beginning up to but not including the target node
+        if left > 0:
+            count = self._prefix_counts_tot[left - 1]
+        
+        # Count items in the target node that are >= key
+        node = self._nodes[left]
+        node_keys = node.keys
+        if node_keys:
+            # Binary search within the node to find first position >= key (in descending order)
+            left_bs, right_bs = 0, len(node_keys)
+            while left_bs < right_bs:
+                mid = (left_bs + right_bs) // 2
+                if node_keys[mid] >= key:
+                    left_bs = mid + 1
+                else:
+                    right_bs = mid
             
-            if i == node_idx:
-                # For the first node, we need to find the first key >= target key
-                node_keys = node.keys
-                if not node_keys:
-                    continue
-                    
-                # Binary search within the node to find first position >= key
-                first_ge_idx = bisect_left(node_keys, key)
-                items_in_node = len(node_keys) - first_ge_idx
-                count += items_in_node
-            else:
-                # For subsequent nodes, all items are >= key (since nodes are sorted)
-                count += len(node.entries)
+            # In descending order, all items from 0 to left_bs-1 are >= key
+            count += left_bs
         
         return count
 

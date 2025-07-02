@@ -7,6 +7,7 @@ import random
 # Import factory function instead of concrete classes
 from gplus_trees.base import Item, Entry
 from gplus_trees.factory import make_gplustree_classes
+from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import BaseTestCase
 import logging
 
@@ -57,8 +58,6 @@ class TestKListBase(BaseTestCase):
         _, _, self.KListClass, self.KListNodeClass = make_gplustree_classes(self.K)
         self.klist = self.KListClass()
         self.cap = self.K  # Use factory-defined capacity
-        # logger.debug(f"Created KList test with K={self.K}, using class {self.KListClass.__name__}")
-        # logger.debug(f"Created KListNode test with K={self.K}, using class {self.KListNodeClass.__name__}")
     
     def tearDown(self):
         # Verify invariants after each test
@@ -110,13 +109,8 @@ class TestKList(TestKListBase):
 
 class TestKListInsert(TestKListBase):
     def extract_all_keys(self):
-        """Traverse the KList and collect all item keys in order."""
-        keys = []
-        node = self.klist.head
-        while node:
-            keys.extend(e.item.key for e in node.entries)
-            node = node.next
-        return keys
+        """Traverse the KList and collect all item keys in ascending order using the standard iterator."""
+        return [entry.item.key for entry in self.klist]
 
     def test_insert_into_empty(self):
         # Inserting into an empty list should set head and tail
@@ -156,10 +150,13 @@ class TestKListInsert(TestKListBase):
         self.assertEqual(self.klist.item_count(), len(all_keys))
 
         # First node must have cap entries, second node the overflow
+        # NOTE: Internal storage is in descending order, so when we insert key 4 into a full node
+        # with [3, 2, 1, 0], it becomes [4, 3, 2, 1, 0], then the smallest (0) overflows
         node = self.klist.head
-        self.assertEqual([e.item.key for e in node.entries], keys)
+        expected_first_node = [self.cap] + list(reversed(keys[1:]))  # [4, 3, 2, 1]
+        self.assertEqual([e.item.key for e in node.entries], expected_first_node)
         self.assertIsNotNone(node.next)
-        self.assertEqual([e.item.key for e in node.next.entries], [extra])
+        self.assertEqual([e.item.key for e in node.next.entries], [keys[0]])  # [0] overflowed
         self.assertIs(self.klist.tail, node.next)
 
     def test_multiple_node_overflows(self):
@@ -225,13 +222,8 @@ class TestKListDelete(TestKListBase):
         self.klist.check_invariant()
 
     def extract_all_keys(self):
-        """Helper: traverse KList and return all keys in order."""
-        keys = []
-        node = self.klist.head
-        while node:
-            keys.extend(e.item.key for e in node.entries)
-            node = node.next
-        return keys
+        """Helper: traverse KList and return all keys in ascending order using the standard iterator."""
+        return [entry.item.key for entry in self.klist]
 
     def test_delete_on_empty_list(self):
         # deleting from an empty KList should do nothing
@@ -702,13 +694,8 @@ class TestKListIndex(TestKListBase):
 
 class TestSplitInplace(TestKListBase):
     def extract_keys(self, kl):
-        """Return list of keys in order from KList."""
-        keys = []
-        node = kl.head
-        while node:
-            keys.extend(entry.item.key for entry in node.entries)
-            node = node.next
-        return keys
+        """Return list of keys in ascending order from KList using the standard iterator."""
+        return [entry.item.key for entry in kl]
 
     def test_empty_split(self):
         left, subtree, right = self.klist.split_inplace(5)
@@ -1151,12 +1138,8 @@ class TestKListCountGE(TestKListBase):
         keys = sorted(random.sample(range(1, 200), self.cap * 2))
         self.insert_sequence(keys)
         
-        # Get all keys for manual verification
-        all_keys = []
-        node = self.klist.head
-        while node:
-            all_keys.extend(e.item.key for e in node.entries)
-            node = node.next
+        # Get all keys for manual verification using the standard iterator
+        all_keys = [entry.item.key for entry in self.klist]
         
         # Test count_ge against manual counting for various thresholds
         test_keys = [0, 50, 100, 150, 200, 250] + keys[::3]  # Include some actual keys
@@ -1205,6 +1188,168 @@ class TestKListCountGE(TestKListBase):
             self.assertEqual(current_count, expected_count,
                            f"After deletions, count_ge({test_key}) = {current_count}, "
                            f"expected {expected_count} (initial: {initial_count}, deleted: {deleted_count})")
+
+class TestKListIterators(TestKListBase):
+    """Test both the standard iterator (__iter__) and reverse iterator (iter_reverse)"""
+    
+    def test_empty_list_iterators(self):
+        """Test both iterators on empty list"""
+        # Standard iterator (ascending)
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, [])
+        
+        # Reverse iterator (descending)
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, [])
+    
+    def test_single_entry_iterators(self):
+        """Test both iterators with single entry"""
+        self.insert_sequence([42])
+        
+        # Standard iterator (ascending)
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, [42])
+        
+        # Reverse iterator (descending)
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, [42])
+    
+    def test_single_node_iterators(self):
+        """Test both iterators with single node containing multiple entries"""
+        keys = [10, 20, 30, 40]
+        self.insert_sequence(keys)
+        
+        # Standard iterator should yield ascending order
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, [10, 20, 30, 40])
+        
+        # Reverse iterator should yield descending order
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, [40, 30, 20, 10])
+    
+    def test_multi_node_iterators(self):
+        """Test both iterators with multiple nodes"""
+        # Create enough entries to span multiple nodes
+        total_keys = self.cap * 2 + 3
+        keys = list(range(total_keys))
+        self.insert_sequence(keys)
+        
+        # Standard iterator should yield ascending order
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, keys)
+        
+        # Reverse iterator should yield descending order
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, list(reversed(keys)))
+    
+    def test_iterators_are_complementary(self):
+        """Test that the two iterators yield the same entries in opposite order"""
+        # Insert random keys
+        import random
+        random.seed(123)
+        keys = sorted(random.sample(range(1, 100), 20))
+        self.insert_sequence(keys)
+        
+        # Collect entries from both iterators
+        ascending_entries = list(self.klist)
+        descending_entries = list(self.klist.iter_reverse())
+        
+        # Should have same number of entries
+        self.assertEqual(len(ascending_entries), len(descending_entries))
+        
+        # Keys should be in opposite order
+        ascending_keys = [e.item.key for e in ascending_entries]
+        descending_keys = [e.item.key for e in descending_entries]
+        
+        self.assertEqual(ascending_keys, keys)
+        self.assertEqual(descending_keys, list(reversed(keys)))
+        
+        # Entries should be the same objects, just in reverse order
+        self.assertEqual(ascending_entries, list(reversed(descending_entries)))
+    
+    def test_iterators_with_uneven_keys(self):
+        """Test iterators with non-sequential keys"""
+        keys = [5, 15, 25, 35, 50, 100, 200]
+        self.insert_sequence(keys)
+        
+        # Standard iterator (ascending)
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, keys)
+        
+        # Reverse iterator (descending)
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, [200, 100, 50, 35, 25, 15, 5])
+    
+    def test_iterators_after_deletions(self):
+        """Test that iterators work correctly after deletions"""
+        keys = list(range(20))
+        self.insert_sequence(keys)
+        
+        # Delete some keys
+        delete_keys = [0, 5, 10, 15, 19]
+        for key in delete_keys:
+            self.klist.delete(key)
+        
+        remaining_keys = [k for k in keys if k not in delete_keys]
+        
+        # Standard iterator (ascending)
+        ascending_keys = [entry.item.key for entry in self.klist]
+        self.assertEqual(ascending_keys, remaining_keys)
+        
+        # Reverse iterator (descending)
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        self.assertEqual(descending_keys, list(reversed(remaining_keys)))
+    
+    def test_iterators_preserve_entry_structure(self):
+        """Test that iterators yield complete Entry objects, not just keys"""
+        keys = [10, 20, 30]
+        self.insert_sequence(keys)
+        
+        # Test ascending iterator
+        for entry in self.klist:
+            self.assertIsInstance(entry, Entry)
+            self.assertIsInstance(entry.item, Item)
+            self.assertEqual(entry.item.value, f"val_{entry.item.key}")
+            self.assertIsNone(entry.left_subtree)  # Default None for our test data
+        
+        # Test descending iterator
+        for entry in self.klist.iter_reverse():
+            self.assertIsInstance(entry, Entry)
+            self.assertIsInstance(entry.item, Item)
+            self.assertEqual(entry.item.value, f"val_{entry.item.key}")
+            self.assertIsNone(entry.left_subtree)  # Default None for our test data
+    
+    def test_iterator_consistency_with_item_count(self):
+        """Test that iterators yield exactly item_count() entries"""
+        keys = list(range(self.cap * 3 + 2))
+        self.insert_sequence(keys)
+        
+        expected_count = self.klist.item_count()
+        
+        # Count entries from ascending iterator
+        ascending_count = sum(1 for _ in self.klist)
+        self.assertEqual(ascending_count, expected_count)
+        
+        # Count entries from descending iterator
+        descending_count = sum(1 for _ in self.klist.iter_reverse())
+        self.assertEqual(descending_count, expected_count)
+    
+    def test_large_dataset_iterators(self):
+        """Test iterators with larger dataset for performance/correctness"""
+        large_size = self.cap * 10
+        keys = list(range(0, large_size * 2, 2))  # Even numbers
+        self.insert_sequence(keys)
+        
+        # Test that iterators maintain order even with large datasets
+        ascending_keys = [entry.item.key for entry in self.klist]
+        descending_keys = [entry.item.key for entry in self.klist.iter_reverse()]
+        
+        self.assertEqual(ascending_keys, keys)
+        self.assertEqual(descending_keys, list(reversed(keys)))
+        
+        # Verify they're actually sorted
+        self.assertEqual(ascending_keys, sorted(ascending_keys))
+        self.assertEqual(descending_keys, sorted(descending_keys, reverse=True))
 
 
 if __name__ == "__main__":
