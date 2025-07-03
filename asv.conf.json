@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "project": "gplustree",
+    "project_url": "https://github.com/jannikhehemann/gplus-trees",
+    "repo": ".",
+    "python": "/Users/jannikhehemann/Library/Caches/pypoetry/virtualenvs/gplustree-5bDNLVEn-py3.11/bin/python",
+    "environment_type": "existing",
+    "matrix": {
+        "numpy":[""]
+    },
+    "benchmark_dir": "benchmarks",
+    "env_dir": ".asv/env",
+    "results_dir": ".asv/results",
+    "html_dir": ".asv/html",
+    "show_commit_url": "https://github.com/jannikhehemann/gplus-trees/commit/",
+    "pythons": ["3.11"],
+    "build_cache_size": 0,
+    "dvcs": "git",
+    "branches": ["HEAD"]
+}

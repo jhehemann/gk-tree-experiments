@@ -38,3 +38,7 @@ src/gplus_trees/archive/*
 debug_print_pretty.py
 debug_insert_entry.py
 **/command.txt
+
+.asv
+BENCHMARK_SUMMARY.md
+benchmarks/README.md

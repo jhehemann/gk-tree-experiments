@@ -16,6 +16,7 @@ python = "<3.12,>=3.10"
 [tool.poetry.group.dev.dependencies]
 numpy = "^2.2.5"
 tqdm = "^4.67.1"
+asv = "^0.6.4"
 
 [build-system]
 requires = ["poetry-core"]
