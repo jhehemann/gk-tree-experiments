@@ -1,6 +1,7 @@
 """K-list implementation"""
 from typing import TYPE_CHECKING, Optional, Tuple, Type
 from bisect import bisect_left, insort_left
+from itertools import chain
 
 from gplus_trees.base import (
     Item,
@@ -284,25 +285,44 @@ class KListBase(AbstractSetDataStructure):
             raise TypeError(f"entry must be Entry, got {type(entry).__name__!r}")
         
         key = entry.item.key
+        bounds = self._bounds
+        nodes = self._nodes
+
+        if bounds and key < bounds[-1]:
+            tail_entries = self.tail.entries
+            if len(tail_entries) >= self.KListNodeClass.CAPACITY:
+                self.tail.next = self.KListNodeClass()
+                self.tail = self.tail.next
+                tail_entries = self.tail.entries
+
+            tail_entries.append(entry)
+            self.tail.keys.append(key)
+            if key >= 0:  # Only add to real_keys if it's not a dummy key
+                self.tail.real_keys.append(key)
+            self._rebuild_index()
+            return self, True
+
+
         # If the k-list is empty, create a new node.
         if self.is_empty():
             node = self.KListNodeClass()
             self.head = self.tail = node
-        else:
+        elif key < self._bounds[-1]:
             # Fast-Path: If the new key < the last key in the tail (minimum), insert there.
             # This achieves O(1) minimum key inserts!
-            if key < self._bounds[-1]:
-                node = self.tail
+            node = self.tail
+        elif key > self._nodes[0].entries[0].item.key:
+            node = self.head
+        else:
+            # Use bisect to find the appropriate node using bounds (minimum keys)
+            # We need to find the first node where key >= min_key of that node
+            # Since bounds are in descending order, we search for -key
+            i = bisect_left(self._bounds, -key, key=lambda v: -v)
+            if i < len(self._nodes):
+                node = self._nodes[i]
             else:
-                # Use bisect to find the appropriate node using bounds (minimum keys)
-                # We need to find the first node where key >= min_key of that node
-                # Since bounds are in descending order, we search for -key
-                i = bisect_left(self._bounds, -key, key=lambda v: -v)
-                if i < len(self._nodes):
-                    node = self._nodes[i]
-                else:
-                    # Key is smaller than all minimum keys, use the last node
-                    node = self.tail
+                # Key is smaller than all minimum keys, use the last node
+                node = self.tail
         
         overflow, inserted = node.insert_entry(entry)
 
@@ -317,9 +337,8 @@ class KListBase(AbstractSetDataStructure):
             # Propagate overflow if needed
             while overflow is not None:
                 if node.next is None:
-                    new_node = self.KListNodeClass()
-                    node.next = new_node
-                    self.tail = new_node
+                    node.next = self.KListNodeClass()
+                    self.tail = node.next
                 node = node.next
                 overflow, inserted = node.insert_entry(overflow)
                 depth += 1
@@ -842,40 +861,16 @@ class KListBase(AbstractSetDataStructure):
         return "\n".join(result)
 
     def __iter__(self):
-        """
-        Yields each entry of the k-list in ascending order of keys.
-        Each entry is of the form (item, left_subtree).
-        
-        Uses efficient backward traversal via auxiliary index: since internally we store 
-        in descending order, we traverse from last node to first node via self._nodes,
-        and reverse entries within each node, giving O(n) performance.
-        """
-        if not self._nodes:
-            return
-            
-        # Traverse from last node to first node (ascending order of minimum keys per node)
-        for i in range(len(self._nodes) - 1, -1, -1):
-            node = self._nodes[i]
-            # Within each node, entries are in descending order, so reverse them
-            for entry in reversed(node.entries):
-                yield entry
+        """Yield each entry of the k-list in ascending order of keys."""
+        for node in reversed(self._nodes):
+            yield from reversed(node.entries)
 
     def iter_reverse(self):
-        """
-        Yields each entry of the k-list in descending order of keys (highest to lowest).
-        Each entry is of the form (item, left_subtree).
-        
-        Uses forward traversal: since internally we store in descending order,
-        we traverse from first node to last node, yielding entries directly, giving O(n) performance.
-        """
-        if not self._nodes:
-            return
-            
-        # Traverse from first node to last node (descending order of minimum keys per node)
+        """Yield each entry of the k-list in descending order of keys."""
         for node in self._nodes:
-            # Within each node, entries are already in descending order
-            for entry in node.entries:
-                yield entry
+            yield from node.entries
+
+        
 
     def __str__(self):
         """
