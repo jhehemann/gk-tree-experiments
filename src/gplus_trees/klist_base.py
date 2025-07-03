@@ -502,36 +502,22 @@ class KListBase(AbstractSetDataStructure):
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
         
-        # Empty list case
-        if not self._bounds:
-            return None, None
-
-        if key > self._nodes[0].entries[0].item.key:
-            # If key is greater than the largest key, return the last entry as next
+        # Fast path: Empty K-List or the key is larger than the largest key
+        if self.is_empty() or key > self._nodes[0].entries[0].item.key:
             return None, None
         
+        # Fast path: Key is smaller than the smallest key in the klist
         if key < self._bounds[-1]:
-            # If key is smaller than the smallest key, return None and the last entry
-            # since all entries have keys > key
             return None, self._nodes[-1].entries[-1]
 
         # Find node that might contain key using binary search on min keys (bounds)
         # Since bounds are in descending order, we search for -key to find the right node
         node_idx = bisect_left(self._bounds, -key, key=lambda v: -v)
         
-        # # If key is smaller than any key in the list, all entries have keys > key
-        # if node_idx >= len(self._nodes):
-        #     # No node contains this key or anything smaller
-        #     return None, self._nodes[-1].entries[-1]
-        
         # Get the target node
         node = self._nodes[node_idx]
         entries = node.entries
         keys = node.keys
-        
-        # Empty node (shouldn't happen if index is maintained)
-        if not entries:
-            return None, None
         
         # Case: key > max key in this node
         if key > entries[0].item.key:
