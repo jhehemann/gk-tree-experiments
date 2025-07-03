@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "project": "gplustree",
+    "project_url": "https://github.com/jannikhehemann/gplus-trees",
+    "repo": ".",
+    "environment_type": "virtualenv",
+    "benchmark_dir": "benchmarks",
+    "env_dir": ".asv/env",
+    "results_dir": ".asv/results",
+    "html_dir": ".asv/html",
+    "show_commit_url": "https://github.com/jannikhehemann/gplus-trees/commit/",
+    "pythons": ["3.11"],
+    "matrix": {
+        "numpy": [""]
+    },
+    "dvcs": "git",
+    "branches": ["HEAD"]
+}
