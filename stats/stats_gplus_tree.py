@@ -11,6 +11,7 @@ from statistics import mean
 from typing import List, Optional, Tuple
 from datetime import datetime
 import numpy as np
+import argparse
 
 # Add the project root to the Python path so we can import from tests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -279,6 +280,23 @@ def repeated_experiment(
     logging.info("Execution time: %.3f seconds", t_all_1)
 
 if __name__ == "__main__":
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="Run statistics experiments for G-Plus Trees.")
+    parser.add_argument('--sizes', type=int, nargs='+', default=[10, 100, 1000, 10_000, 100_000],
+                        help='List of tree sizes to test.')
+    parser.add_argument('--ks', type=int, nargs='+', default=[2, 4, 16, 64],
+                        help='List of K values (target node size) to test.')
+    parser.add_argument('--repetitions', type=int, default=1,
+                        help='Number of repetitions for each experiment.')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Random seed for reproducibility.')
+
+    args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        
     log_dir = os.path.join(os.getcwd(), "stats/logs/gplus_tree_logs")
     os.makedirs(log_dir, exist_ok=True)
 
@@ -297,12 +315,10 @@ if __name__ == "__main__":
     )
 
     # List of tree sizes to test.
-    sizes = [10000]
-    # sizes = [10, 100, 1000, 10_000, 100_000]
+    sizes = args.sizes
     # List of K values for which we want to run experiments.
-    # Ks = [2, 4, 16, 64]
-    Ks = [4]
-    repetitions = 1
+    Ks = args.ks
+    repetitions = args.repetitions
 
     for n in sizes:
         for K in Ks:
