@@ -99,18 +99,26 @@ Examples:
     
     # Generate reports
     if args.report:
-        print("📊 Generating HTML report...")
-        if run_command(['poetry', 'run', 'asv', 'publish'], 
-                      "Publishing results"):
-            print("🌐 Starting web server for report...")
-            run_command(['poetry', 'run', 'asv', 'preview'], 
-                       "Opening report in browser")
+        print("📊 Terminal-based benchmarking is active.")
+        print("💡 HTML reports are not available with existing environment setup.")
+        print("\n📋 Available commands for viewing results:")
+        print("  • View latest: python run_benchmarks.py --show")
+        print("  • Quick test: python run_benchmarks.py --quick")
+        print("  • Compare: poetry run asv compare HEAD~1 HEAD")
+        print("\n� For detailed analysis, use specific benchmark patterns:")
+        print("  • KList only: python run_benchmarks.py --klist")
+        print("  • Insert ops: python run_benchmarks.py --insert")
+        print("  • Retrieve ops: python run_benchmarks.py --retrieve")
         return 0
     
     # Show results
     if args.show:
-        run_command(['poetry', 'run', 'asv', 'show'], 
+        print("📊 Latest Benchmark Results:")
+        print("=" * 50)
+        run_command(['poetry', 'run', 'asv', 'show', 'latest'], 
                    "Showing latest results")
+        print("\n💡 Tip: Results are displayed in terminal format.")
+        print("   Use --quick flag for faster development iterations.")
         return 0
     
     # Build benchmark command
@@ -132,8 +140,11 @@ Examples:
     patterns = []
     
     if args.quick:
+        # For quick mode, run a focused set of benchmarks
+        patterns.extend(['-b', 'KListInsertBenchmarks.time_insert_entry_sequential'])
+        patterns.extend(['-b', 'GKPlusTreeInsertBenchmarks.time_insert_entry_sequential'])
         patterns.append('--quick')
-        description = "Quick development benchmarks"
+        description = "Quick development benchmarks (KList & GKPlusTree inserts)"
     elif args.full:
         description = "Full benchmark suite"
     else:
@@ -167,10 +178,19 @@ Examples:
     
     if success:
         print("\n✅ Benchmarks completed successfully!")
-        print("\n📋 Next steps:")
-        print("  • View results: python run_benchmarks.py --show")
-        print("  • Generate report: python run_benchmarks.py --report")
-        print("  • Compare with previous: poetry run asv compare HEAD HEAD~1")
+        print("\n📋 Terminal Results Summary:")
+        print("  • Results displayed above in tabular format")
+        print("  • Lower times = better performance")
+        print("  • ± values show measurement uncertainty")
+        print("\n📊 Next steps:")
+        print("  • View all results: python run_benchmarks.py --show")
+        print("  • Compare commits: poetry run asv compare HEAD~1 HEAD")
+        print("  • Run specific tests: python run_benchmarks.py --klist --insert")
+        print("  • Performance analysis: Focus on the numeric results above")
+        print("\n💡 Performance Tips:")
+        print("  • Lower capacity = more splits but faster individual operations")
+        print("  • Sequential data often performs best due to locality")
+        print("  • Monitor both insert and retrieve performance together")
     else:
         print("\n❌ Benchmarks failed!")
         return 1

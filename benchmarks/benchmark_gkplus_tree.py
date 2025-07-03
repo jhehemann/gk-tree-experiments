@@ -21,7 +21,7 @@ class GKPlusTreeInsertBenchmarks(BaseBenchmark):
     
     # Test different capacities and data sizes
     params = [
-        [4, 8, 16],  # K values (capacities)
+        [4, 16],  # K values (capacities)
         [1000],  # data sizes
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
@@ -79,9 +79,9 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, and hit ratios
     params = [
-        [4, 8, 16],  # K values (capacities)
+        [4, 16],  # K values (capacities)
         [1000],  # data sizes
-        [0.0, 0.5, 0.8, 1.0],  # hit ratios
+        [0.0, 0.5, 1.0],  # hit ratios
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
     param_names = ['capacity', 'size', 'hit_ratio', 'distribution']
@@ -193,7 +193,7 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
     """Benchmarks for mixed insert/retrieve workloads."""
     
     params = [
-        [8, 16, 32],  # K values
+        [4, 16],  # K values
         [1000],  # sizes
         [0.1, 0.5, 0.9],  # insert ratios
     ]
@@ -321,7 +321,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of GKPlusTree operations."""
     
     params = [
-        [8, 16, 32],  # K values
+        [4, 16],  # K values
         [1000],  # sizes
     ]
     param_names = ['capacity', 'size']
@@ -365,7 +365,7 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         
-        for capacity in [4, 8, 16, 32]:
+        for capacity in [4, 16]:
             GKPlusTreeClass, _, _, _ = make_gkplustree_classes(capacity)
             self.trees[capacity] = GKPlusTreeClass()
             
