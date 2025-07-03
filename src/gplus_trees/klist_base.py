@@ -644,38 +644,26 @@ class KListBase(AbstractSetDataStructure):
 
     def get_min(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Retrieve the minimum entry from the reverse-sorted KList (last entry of tail node)."""
-        if not self._prefix_counts_tot:
-            return None, None
-        node = self.tail
-        entries = node.entries
-        if not entries:
+        if self.is_empty():
             return None, None
         
-        # In reverse order, minimum is the last entry
-        min_entry = entries[-1]
-        
-        # Find successor (next larger entry) - iterate through all entries to find it
-        next_entry = None
-        for entry in self:
-            if entry.item.key > min_entry.item.key:
-                next_entry = entry
-                break
-        
-        return min_entry, next_entry
-    
+        tail_entries = self.tail.entries  
+        min_entry = tail_entries[-1]
+
+        # Find successor (next larger entry)
+        if len(tail_entries) > 1:
+            return min_entry, tail_entries[-2]
+        nodes = self._nodes
+        return min_entry, nodes[-2].entries[-1] if len(nodes) > 1 else None
+
     def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Retrieve the maximum entry from the reverse-sorted KList (first entry of head node)."""
-        if not self._prefix_counts_tot:
-            return None, None
-        node = self.head
-        entries = node.entries
-        if not entries:
+        if self.is_empty():
             return None, None
         
-        # In reverse order, maximum is the first entry
-        max_entry = entries[0]
-        # Maximum has no successor
-        return max_entry, None
+        head_entries = self.head.entries
+        max_entry = head_entries[0]
+        return max_entry, None # Maximum has no successor
 
     def split_inplace(
         self, key: int
