@@ -280,8 +280,8 @@ class KListBase(AbstractSetDataStructure):
         Returns:
             KListBase: The updated k-list.
         """
-        if not hasattr(entry, 'item') or not hasattr(entry.item, 'key'):
-            raise TypeError(f"insert_entry(): expected Entry-like object with item.key, got {type(entry).__name__}")
+        if not isinstance(entry, Entry):
+            raise TypeError(f"entry must be Entry, got {type(entry).__name__!r}")
         
         key = entry.item.key
         # If the k-list is empty, create a new node.
@@ -470,34 +470,154 @@ class KListBase(AbstractSetDataStructure):
 
     def retrieve(self, key: int, with_next: bool = True) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
-        Search for `key` and return the found entry and its successor.
+        Search for `key` and return the found entry and its successor (the next larger key).
+        
+        In a descending-ordered KList, the "next larger key" is actually the predecessor
+        in the physical list order.
         
         Returns:
             Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
                 - found_entry: The entry with the matching key if found, otherwise None
-                - next_entry: The subsequent entry in logical ascending order (next larger key), or None if no next entry exists
+                - next_entry: The next larger key entry, or None if no larger key exists
         """
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
         
-        found_entry = None
-        next_entry = None
+        # Empty list case
+        if not self._bounds:
+            return None, None
+
+        if key > self._nodes[0].entries[0].item.key:
+            # If key is greater than the largest key, return the last entry as next
+            return None, None
         
-        # Iterate through all entries in ascending order
-        prev_entry = None
-        for entry in self:
-            if entry.item.key == key:
-                found_entry = entry
-                # Continue to find next entry
-            elif entry.item.key > key:
-                next_entry = entry
-                break
-            prev_entry = entry
+        if key < self._bounds[-1]:
+            # If key is smaller than the smallest key, return None and the last entry
+            # since all entries have keys > key
+            return None, self._nodes[-1].entries[-1]
+
+        # Find node that might contain key using binary search on min keys (bounds)
+        # Since bounds are in descending order, we search for -key to find the right node
+        node_idx = bisect_left(self._bounds, -key, key=lambda v: -v)
+        
+        # # If key is smaller than any key in the list, all entries have keys > key
+        # if node_idx >= len(self._nodes):
+        #     # No node contains this key or anything smaller
+        #     return None, self._nodes[-1].entries[-1]
+        
+        # Get the target node
+        node = self._nodes[node_idx]
+        entries = node.entries
+        keys = node.keys
+        
+        # Empty node (shouldn't happen if index is maintained)
+        if not entries:
+            return None, None
+        
+        # Case: key > max key in this node
+        if key > entries[0].item.key:
+            # No entry with this key, but first entry is the next smaller key
+            # In our reversed order, we need the *previous* node's last entry
+            # for the next larger key
+            if node_idx > 0:
+                prev_node = self._nodes[node_idx - 1]
+                if prev_node.entries:
+                    # The last entry in the previous node would be the next larger
+                    return None, prev_node.entries[-1]
+            return None, None
+        
+        if len(entries) < 8:
+            # Linear search for very small lists (in descending order)
+            for i, entry in enumerate(entries):
+                entry_key = entry.item.key
+                
+                # Exact match?
+                if entry_key == key:
+                    found = entry
+                    
+                    # Early return if we don't need the next entry
+                    if not with_next:
+                        return found, None
+                    
+                    # Find next larger key (predecessor in the physical list)
+                    # In a descending ordered list, the next larger is the previous entry
+                    if i > 0:
+                        pred = entries[i-1]
+                        return found, pred
+                    elif node_idx > 0:
+                        # Check previous node's last entry if this is the first entry
+                        prev_node = self._nodes[node_idx - 1]
+                        if prev_node.entries:
+                            return found, prev_node.entries[-1]
+                    return found, None
+                
+                # If this key is smaller than our target, we've passed the insertion point
+                # The predecessor (next larger in value) would be the previous entry
+                if entry_key < key:
+                    if i > 0:
+                        return None, entries[i-1]
+                    elif node_idx > 0:
+                        # Check previous node's last entry
+                        prev_node = self._nodes[node_idx - 1]
+                        if prev_node.entries:
+                            return None, prev_node.entries[-1]
+                    return None, None
             
-        if not with_next:
-            return found_entry, None
+            # Key not found and all entries in this node are larger
+            # The next larger key would be in the previous node (if any)
+            if node_idx > 0:
+                prev_node = self._nodes[node_idx - 1]
+                if prev_node.entries:
+                    return None, prev_node.entries[-1]
+            return None, None
+        else:
+            # Binary search for larger lists (descending order)
+            i = bisect_left(keys, -key, key=lambda v: -v)
             
-        return found_entry, next_entry
+            # Exact match?
+            if i < len(entries) and entries[i].item.key == key:
+                found = entries[i]
+                
+                if not with_next:
+                    return found, None
+                
+                # Find next larger key (predecessor in the physical list)
+                if i > 0:
+                    pred = entries[i-1]
+                    return found, pred
+                elif node_idx > 0:
+                    # Check previous node's last entry if this is the first entry
+                    prev_node = self._nodes[node_idx - 1]
+                    if prev_node.entries:
+                        return found, prev_node.entries[-1]
+                return found, None
+            
+            # Not an exact match - check if key would be inserted here
+            if i < len(entries) and entries[i].item.key < key:
+                # The next larger key is the previous entry
+                if i > 0:
+                    return None, entries[i-1]
+                elif node_idx > 0:
+                    # Check previous node's last entry
+                    prev_node = self._nodes[node_idx - 1]
+                    if prev_node.entries:
+                        return None, prev_node.entries[-1]
+                return None, None
+            
+            # All entries in this node are larger than key
+            # Or we reached the end of entries
+            if i == 0:
+                # All entries in this node are smaller than key
+                # The next larger key would be in the previous node (if any)
+                if node_idx > 0:
+                    prev_node = self._nodes[node_idx - 1]
+                    if prev_node.entries:
+                        return None, prev_node.entries[-1]
+            elif i <= len(entries):
+                # There is a larger entry in this node
+                return None, entries[i-1]
+                
+            return None, None
     
     def find_pivot(self) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Find the pivot entry (minimum entry) in the KList."""
