@@ -365,7 +365,7 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         
-        for capacity in [4, 16]:
+        for capacity in [4, 8, 16, 32]:
             GKPlusTreeClass, _, _, _ = make_gkplustree_classes(capacity)
             self.trees[capacity] = GKPlusTreeClass()
             
