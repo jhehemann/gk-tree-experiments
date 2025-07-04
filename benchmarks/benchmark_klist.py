@@ -19,9 +19,15 @@ class KListInsertBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.insert_entry() method."""
     
     # Test different capacities and data sizes
+    # K values (capacities)
+    k_values = [4, 8, 16, 32, 64, 128]
+    # For each K, sizes = [K, 2K, 4K, 8K]
+    size_values = []
+    for k in k_values:
+        size_values.extend([k, 2*k, 4*k, 8*k])
     params = [
-        [4, 8, 32],  # K values (capacities)
-        [1000, 10000],  # data sizes
+        k_values,
+        [k for k in size_values],
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
     param_names = ['capacity', 'size', 'distribution']
@@ -76,9 +82,15 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.retrieve() method."""
     
     # Test different capacities, data sizes, and hit ratios
+    # K values (capacities)
+    k_values = [4, 8, 16, 32, 64, 128]
+    # For each K, sizes = [K, 2K, 4K, 8K]
+    size_values = []
+    for k in k_values:
+        size_values.extend([k, 2*k, 4*k, 8*k])
     params = [
-        [4, 8, 32],  # K values (capacities)
-        [1000, 10000],  # data sizes
+        k_values,
+        [k for k in size_values],
         [0.0, 0.5, 1.0],  # hit ratios (fraction of lookups that find existing keys)
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]

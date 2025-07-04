@@ -99,7 +99,7 @@ git commit -m "Other changes"          # Safe to commit other work
 # Stop running benchmarks
 ./benchmark stop
 
-# Open HTML results in browser
+# Open HTML results in browser (Ctrl+C to stop the server)
 ./benchmark view
 
 # View recent logs

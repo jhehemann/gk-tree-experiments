@@ -330,12 +330,17 @@ fi
         print("🔄 Benchmarks will auto-run on commits to performance-refactor and main branches")
     
     def view_results(self):
-        """Open benchmark results in browser."""
-        html_file = self.benchmark_dir / "html" / "index.html"
+        """Open benchmark results in browser using local web server."""
+        # Check if we have any results
+        if not (self.results_dir / "benchmarks.json").exists():
+            print("❌ No results found. Run benchmarks first.")
+            return
+            
+        html_dir = self.benchmark_dir / "html"
         
-        # If HTML doesn't exist but results do, try to generate HTML
-        if not html_file.exists() and (self.results_dir / "benchmarks.json").exists():
-            print("📊 HTML results not found, generating from existing data...")
+        # If HTML doesn't exist, generate it
+        if not html_dir.exists() or not (html_dir / "index.html").exists():
+            print("📊 Generating HTML results...")
             try:
                 self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
                 print("✅ HTML results generated successfully")
@@ -344,12 +349,26 @@ fi
                 print("💡 Try running: ./benchmark setup to ensure proper environment")
                 return
         
-        if html_file.exists():
-            import webbrowser
-            webbrowser.open(f"file://{html_file}")
-            print(f"🌐 Opening results: {html_file}")
-        else:
-            print("❌ No results found. Run benchmarks first.")
+        # Use ASV preview to start local web server and open browser
+        print("🌐 Starting local web server and opening results in browser...")
+        print("📝 Press Ctrl+C to stop the web server")
+        try:
+            self._run_command(
+                ["poetry", "run", "asv", "preview", "--browser", "--html-dir", str(html_dir)], 
+                cwd=self.repo_dir
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to start preview server: {e}")
+            print("💡 Falling back to opening HTML file directly...")
+            # Fallback to direct file opening
+            html_file = html_dir / "index.html"
+            if html_file.exists():
+                import webbrowser
+                webbrowser.open(f"file://{html_file}")
+                print(f"📂 Opened: {html_file}")
+                print("⚠️  Note: Some features may not work due to browser security restrictions")
+        except KeyboardInterrupt:
+            print("\n🛑 Web server stopped")
     
     def stop_benchmarks(self):
         """Gracefully stop running benchmarks."""
