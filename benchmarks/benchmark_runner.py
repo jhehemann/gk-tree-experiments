@@ -171,20 +171,55 @@ class IsolatedBenchmarkRunner:
             with open(self.status_file, "r") as f:
                 status = json.load(f)
             
-            # Check if the process is still running
+            # Check if the process is still running (only if status is currently "running")
             if status.get("status") == "running" and "pid" in status:
                 try:
                     os.kill(status["pid"], 0)  # Check if process exists
                 except OSError:
-                    # Process is dead, update status
-                    status["status"] = "failed"
-                    status["message"] = "Process terminated unexpectedly"
+                    # Process is dead - check if it completed successfully by examining log
+                    if self._check_benchmark_completion(status.get("timestamp", "")):
+                        status["status"] = "completed"
+                        status["message"] = f"Benchmarks completed successfully for {status.get('commit', 'unknown')}"
+                    else:
+                        status["status"] = "failed"
+                        status["message"] = "Process terminated unexpectedly"
+                    
                     with open(self.status_file, "w") as f:
                         json.dump(status, f, indent=2)
             
             return status
         except:
             return {"status": "unknown", "message": "Could not read status"}
+    
+    def _check_benchmark_completion(self, start_timestamp):
+        """Check if benchmark completed successfully by examining log files."""
+        try:
+            # Find the most recent log file that matches the timestamp
+            log_files = sorted(self.logs_dir.glob("*.log"), key=lambda x: x.stat().st_mtime, reverse=True)
+            
+            if not log_files:
+                return False
+            
+            recent_log = log_files[0]
+            
+            # Check if log file contains completion indicators
+            with open(recent_log, 'r') as f:
+                content = f.read()
+                
+            # Look for ASV completion indicators
+            completion_indicators = [
+                "========== ==========",  # ASV results table end
+                "··· ========== ========= ==========",  # ASV results formatting
+            ]
+            
+            for indicator in completion_indicators:
+                if indicator in content:
+                    return True
+            
+            return False
+            
+        except Exception:
+            return False
     
     def run_benchmarks_background(self, commit_hash, benchmark_filter=None, branch=None):
         """Run benchmarks in background without blocking."""
