@@ -523,6 +523,11 @@ def main():
         runner.view_results()
         
     elif args.run or args.auto_run:
+        # Prevent overlapping benchmark executions
+        current_status = runner.get_status()
+        if current_status.get("status") == "running":
+            print(f"❌ A benchmark is already in progress (PID: {current_status.get('pid')}). Please stop it or wait until it completes.")
+            sys.exit(1)
         commit = args.commit or args.run
         if not commit:
             print("❌ Must specify commit hash")
