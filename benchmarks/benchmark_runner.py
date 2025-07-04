@@ -468,6 +468,18 @@ fi
             print(f"\n📋 Recent Logs:")
             for log_file in log_files[:3]:
                 print(f"  - {log_file.name}")
+        
+        # If benchmarks are running, show recent log output for progress
+        if status.get('status') == 'running' and log_files:
+            recent_log = log_files[0]
+            print(f"\n🖥️  Recent output from {recent_log.name}:")
+            try:
+                with open(recent_log, 'r') as f:
+                    tail_lines = f.readlines()[-5:]
+                for line in tail_lines:
+                    print(f"  {line.rstrip()}")
+            except Exception:
+                pass
 
 def main():
     parser = argparse.ArgumentParser(description="Isolated Background Benchmark Runner")
