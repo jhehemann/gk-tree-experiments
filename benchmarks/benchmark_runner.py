@@ -64,7 +64,7 @@ class IsolatedBenchmarkRunner:
         
         # Ensure all benchmark branches exist locally for ASV
         print("🔄 Setting up local benchmark branches...")
-        benchmark_branches = ["main", "performance-refactor"]
+        benchmark_branches = [] # Will be populated by worker automatically
         for branch in benchmark_branches:
             try:
                 # Check if local branch exists
