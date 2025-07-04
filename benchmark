@@ -35,26 +35,17 @@ case "$1" in
         python "$BENCHMARK_SCRIPT" --status
         ;;
     
+    "stop")
+        echo "🛑 Stopping benchmarks..."
+        python "$BENCHMARK_SCRIPT" --stop
+        ;;
+    
     "view")
         python "$BENCHMARK_SCRIPT" --view
         ;;
     
     "clean")
-        echo "🧹 Cleaning up isolated benchmark environment..."
-        BENCHMARK_DIR="$(dirname "$SCRIPT_DIR")/.isolated-benchmarks"
-        if [ -d "$BENCHMARK_DIR" ]; then
-            rm -rf "$BENCHMARK_DIR"
-            echo "✅ Cleaned up $BENCHMARK_DIR"
-        else
-            echo "ℹ️  No benchmark directory to clean"
-        fi
-        
-        # Remove git hooks
-        HOOK_FILE="$SCRIPT_DIR/.git/hooks/post-commit"
-        if [ -f "$HOOK_FILE" ]; then
-            rm "$HOOK_FILE"
-            echo "✅ Removed git hooks"
-        fi
+        python "$BENCHMARK_SCRIPT" --clean
         ;;
     
     "logs")
@@ -79,7 +70,7 @@ case "$1" in
         ;;
     
     "help"|*)
-        echo "� Isolated Benchmark Runner"
+        echo "🔧 Isolated Benchmark Runner"
         echo ""
         echo "Usage: $0 <command> [options]"
         echo ""
@@ -87,6 +78,7 @@ case "$1" in
         echo "  setup                    - Set up isolated benchmark environment"
         echo "  run <commit> [filter]    - Run benchmarks for specific commit"
         echo "  status                   - Show current benchmark status"
+        echo "  stop                     - Stop running benchmarks"
         echo "  view                     - Open benchmark results in browser"
         echo "  logs [logfile]           - Show recent logs or specific log"
         echo "  clean                    - Clean up benchmark environment"
@@ -95,8 +87,9 @@ case "$1" in
         echo "Examples:"
         echo "  $0 setup                                    # Initial setup"
         echo "  $0 run HEAD                                 # Benchmark current commit"
+        echo "  $0 run \"HEAD^!\"                             # Benchmark latest commit (best practice)"
         echo "  $0 run HEAD GKPlusTreeInsert               # Benchmark specific test"
-        echo "  $0 run performance-refactor                # Benchmark branch"
+        echo "  $0 run \"performance-refactor^!\"            # Benchmark latest on branch"
         echo "  $0 status                                   # Check progress"
         echo "  $0 view                                     # View results"
         echo ""

@@ -45,17 +45,24 @@ class IsolatedBenchmarkRunner:
         """Set up completely isolated repository for benchmarking."""
         print("🔧 Setting up isolated benchmark environment...")
         
+        # Get current branch from working directory
+        current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.working_dir)
+        current_branch = current_branch_result.stdout.strip()
+        print(f"📍 Current branch: {current_branch}")
+        
         if self.repo_dir.exists():
             print("📡 Updating existing isolated repository...")
             self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
-            self._run_command(["git", "reset", "--hard", "origin/main"], cwd=self.repo_dir)
+            # Check out the current branch instead of main
+            self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
+            self._run_command(["git", "reset", "--hard", f"origin/{current_branch}"], cwd=self.repo_dir)
         else:
             print("📥 Cloning repository for isolated benchmarking...")
             # Get remote URL from working directory
             result = self._run_command(["git", "remote", "get-url", "origin"], cwd=self.working_dir)
             repo_url = result.stdout.strip()
             
-            self._run_command(["git", "clone", repo_url, str(self.repo_dir)], cwd=self.benchmark_dir)
+            self._run_command(["git", "clone", "-b", current_branch, repo_url, str(self.repo_dir)], cwd=self.benchmark_dir)
         
         # Create ASV configuration for isolated environment
         asv_config = {
@@ -95,14 +102,42 @@ class IsolatedBenchmarkRunner:
             print(f"Error: {e.stderr if e.stderr else e}")
             raise
     
-    def update_status(self, status, message="", commit=None):
+    def _resolve_commit_reference(self, commit_ref, branch=None):
+        """Resolve commit references like HEAD^!, branch^! to actual commit hashes."""
+        # Handle special syntax like HEAD^!, performance-refactor^!
+        if commit_ref.endswith("^!"):
+            base_ref = commit_ref[:-2]  # Remove ^!
+            
+            # If it's HEAD^!, resolve from working directory
+            if base_ref == "HEAD":
+                result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.working_dir)
+                resolved_commit = result.stdout.strip()
+                print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (current branch HEAD)")
+                return resolved_commit
+            
+            # If it's branch^!, resolve from that branch
+            elif branch or base_ref != "HEAD":
+                target_branch = branch or base_ref
+                try:
+                    result = self._run_command(["git", "rev-parse", f"origin/{target_branch}"], cwd=self.working_dir)
+                    resolved_commit = result.stdout.strip()
+                    print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (latest on {target_branch})")
+                    return resolved_commit
+                except subprocess.CalledProcessError:
+                    print(f"⚠️  Could not resolve {commit_ref}, using as-is")
+                    return commit_ref
+        
+        # For regular commit references (hash, HEAD, branch names), return as-is
+        return commit_ref
+    
+    def update_status(self, status, message="", commit=None, subprocess_pid=None):
         """Update status file for progress tracking."""
         status_data = {
             "status": status,
             "message": message,
             "timestamp": datetime.now().isoformat(),
             "commit": commit,
-            "pid": os.getpid()
+            "pid": subprocess_pid or os.getpid()
         }
         
         with open(self.status_file, "w") as f:
@@ -115,7 +150,20 @@ class IsolatedBenchmarkRunner:
         
         try:
             with open(self.status_file, "r") as f:
-                return json.load(f)
+                status = json.load(f)
+            
+            # Check if the process is still running
+            if status.get("status") == "running" and "pid" in status:
+                try:
+                    os.kill(status["pid"], 0)  # Check if process exists
+                except OSError:
+                    # Process is dead, update status
+                    status["status"] = "failed"
+                    status["message"] = "Process terminated unexpectedly"
+                    with open(self.status_file, "w") as f:
+                        json.dump(status, f, indent=2)
+            
+            return status
         except:
             return {"status": "unknown", "message": "Could not read status"}
     
@@ -124,70 +172,101 @@ class IsolatedBenchmarkRunner:
         
         def benchmark_worker():
             try:
-                self.update_status("running", f"Starting benchmarks for {commit_hash}", commit_hash)
+                # Handle special commit syntax
+                resolved_commit = self._resolve_commit_reference(commit_hash, branch)
+                
+                self.update_status("running", f"Starting benchmarks for {resolved_commit}", resolved_commit)
                 
                 # Update isolated repo
                 print("📡 Updating isolated repository...")
                 self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
                 
-                # Checkout the specific commit
+                # Checkout the specific commit or branch
                 if branch:
+                    print(f"🔄 Switching to branch: {branch}")
                     self._run_command(["git", "checkout", branch], cwd=self.repo_dir)
                     self._run_command(["git", "reset", "--hard", f"origin/{branch}"], cwd=self.repo_dir)
+                else:
+                    # If no branch specified, checkout the commit directly
+                    print(f"🔄 Checking out commit: {resolved_commit}")
+                    self._run_command(["git", "checkout", resolved_commit], cwd=self.repo_dir)
                 
                 # Setup ASV environment
-                self.update_status("running", "Setting up ASV environment...", commit_hash)
+                self.update_status("running", "Setting up ASV environment...", resolved_commit)
                 self._run_command(["poetry", "run", "asv", "machine", "--yes"], cwd=self.repo_dir)
                 
                 # Run benchmarks
-                bench_cmd = ["poetry", "run", "asv", "run", "--quick", "--python=3.11", commit_hash]
+                bench_cmd = ["poetry", "run", "asv", "run", "--quick", "--python=3.11", resolved_commit]
                 if benchmark_filter:
                     bench_cmd.extend(["--bench", benchmark_filter])
                 
-                self.update_status("running", f"Running benchmarks for {commit_hash}...", commit_hash)
+                self.update_status("running", f"Running benchmarks for {resolved_commit}...", resolved_commit)
                 
                 # Create log file for this run
-                log_file = self.logs_dir / f"benchmark_{commit_hash}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+                short_commit = resolved_commit[:8]
+                
+                # Get current branch name for log file
+                try:
+                    branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
+                    current_branch = branch_result.stdout.strip()
+                    if not current_branch:  # Detached HEAD
+                        current_branch = "detached"
+                except:
+                    current_branch = "unknown"
+                
+                log_file = self.logs_dir / f"benchmark_{current_branch}_{short_commit}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
                 
                 with open(log_file, "w") as f:
                     f.write(f"Benchmark run started at {datetime.now()}\n")
-                    f.write(f"Commit: {commit_hash}\n")
+                    f.write(f"Commit: {resolved_commit}\n")
                     f.write(f"Filter: {benchmark_filter or 'All benchmarks'}\n")
                     f.write("="*50 + "\n\n")
                     f.flush()
                     
-                    result = subprocess.run(
+                    # Start ASV process and track its PID
+                    process = subprocess.Popen(
                         bench_cmd,
                         cwd=self.repo_dir,
                         stdout=f,
                         stderr=subprocess.STDOUT,
                         text=True
                     )
+                    
+                    # Update status with subprocess PID
+                    self.update_status("running", f"Running benchmarks for {resolved_commit}...", resolved_commit, process.pid)
+                    
+                    # Wait for completion
+                    result = process.wait()
                 
-                if result.returncode == 0:
+                if result == 0:
                     # Generate HTML report
-                    self.update_status("running", "Generating HTML report...", commit_hash)
+                    self.update_status("running", "Generating HTML report...", resolved_commit)
                     self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
                     
-                    self.update_status("completed", f"Benchmarks completed successfully for {commit_hash}", commit_hash)
-                    print(f"✅ Benchmarks completed for {commit_hash}")
+                    self.update_status("completed", f"Benchmarks completed successfully for {resolved_commit}", resolved_commit)
+                    print(f"✅ Benchmarks completed for {resolved_commit}")
                     print(f"📊 Results: {self.benchmark_dir / 'html' / 'index.html'}")
                     print(f"📋 Log: {log_file}")
                 else:
-                    self.update_status("failed", f"Benchmarks failed for {commit_hash}", commit_hash)
-                    print(f"❌ Benchmarks failed for {commit_hash}")
+                    self.update_status("failed", f"Benchmarks failed for {resolved_commit}", resolved_commit)
+                    print(f"❌ Benchmarks failed for {resolved_commit}")
                     print(f"📋 Check log: {log_file}")
                 
             except Exception as e:
                 error_msg = f"Benchmark error: {str(e)}"
-                self.update_status("failed", error_msg, commit_hash)
+                self.update_status("failed", error_msg, resolved_commit if 'resolved_commit' in locals() else commit_hash)
                 print(f"❌ {error_msg}")
         
         # Start background thread
         thread = Thread(target=benchmark_worker, daemon=True)
         thread.start()
         
-        print(f"🚀 Benchmarks started in background for commit {commit_hash}")
+        # Show resolved commit if it was a special reference
+        if commit_hash.endswith("^!"):
+            resolved = self._resolve_commit_reference(commit_hash, branch)
+            print(f"🚀 Benchmarks started in background for commit {commit_hash} → {resolved[:8]}")
+        else:
+            print(f"🚀 Benchmarks started in background for commit {commit_hash}")
         print(f"📊 Monitor progress: python {__file__} --status")
         print(f"🔍 View results when done: python {__file__} --view")
         
@@ -236,6 +315,86 @@ fi
         else:
             print("❌ No results found. Run benchmarks first.")
     
+    def stop_benchmarks(self):
+        """Gracefully stop running benchmarks."""
+        status = self.get_status()
+        
+        if status["status"] != "running":
+            print(f"ℹ️  No benchmarks currently running (status: {status['status']})")
+            return
+        
+        pid = status.get("pid")
+        if not pid:
+            print("❌ No process ID found in status")
+            return
+        
+        try:
+            # Check if process exists
+            os.kill(pid, 0)
+            print(f"🛑 Stopping benchmark process (PID: {pid})...")
+            
+            # Try graceful termination first (SIGTERM)
+            os.kill(pid, signal.SIGTERM)
+            
+            # Wait a bit to see if it terminates gracefully
+            import time
+            for i in range(10):
+                try:
+                    os.kill(pid, 0)  # Check if still running
+                    time.sleep(0.5)
+                except OSError:
+                    # Process has terminated
+                    break
+            else:
+                # Process still running after 5 seconds, force kill
+                print("⚡ Process did not terminate gracefully, forcing termination...")
+                os.kill(pid, signal.SIGKILL)
+            
+            # Update status
+            self.update_status("stopped", "Benchmark stopped by user", status.get("commit"))
+            print("✅ Benchmark process stopped successfully")
+            
+        except OSError:
+            print("ℹ️  Process was already terminated")
+            self.update_status("stopped", "Process was already terminated", status.get("commit"))
+
+    def clean_benchmarks(self, force=False):
+        """Clean up benchmark environment with confirmation."""
+        if not force:
+            print("⚠️  This will permanently delete:")
+            print("   • All benchmark results and data")
+            print("   • Generated HTML reports")
+            print("   • Benchmark execution logs")
+            print("   • Isolated repository clone")
+            print("   • Git hooks")
+            print()
+            
+            response = input("Are you sure you want to continue? (y/N): ").strip().lower()
+            if response not in ['y', 'yes']:
+                print("❌ Operation cancelled")
+                return False
+        
+        print("🧹 Cleaning up isolated benchmark environment...")
+        
+        # Remove the entire isolated benchmarks directory
+        if self.benchmark_dir.exists():
+            shutil.rmtree(self.benchmark_dir)
+            print(f"✅ Cleaned up {self.benchmark_dir}")
+        else:
+            print("ℹ️  No benchmark directory to clean")
+        
+        # Remove git hooks
+        hooks_dir = self.working_dir / ".git" / "hooks"
+        post_commit_hook = hooks_dir / "post-commit"
+        
+        if post_commit_hook.exists():
+            post_commit_hook.unlink()
+            print("✅ Removed git hooks")
+        else:
+            print("ℹ️  No git hooks to remove")
+        
+        return True
+
     def show_status(self):
         """Show current benchmark status."""
         status = self.get_status()
@@ -263,6 +422,9 @@ def main():
     parser.add_argument("--auto-run", action="store_true", help="Auto-run mode (used by git hooks)")
     parser.add_argument("--commit", help="Commit hash to benchmark")
     parser.add_argument("--status", action="store_true", help="Show benchmark status")
+    parser.add_argument("--stop", action="store_true", help="Stop running benchmarks")
+    parser.add_argument("--clean", action="store_true", help="Clean up benchmark environment")
+    parser.add_argument("--force", action="store_true", help="Force clean without confirmation")
     parser.add_argument("--view", action="store_true", help="View benchmark results")
     parser.add_argument("--working-dir", help="Working directory path")
     
@@ -282,6 +444,12 @@ def main():
         
     elif args.status:
         runner.show_status()
+        
+    elif args.stop:
+        runner.stop_benchmarks()
+        
+    elif args.clean:
+        runner.clean_benchmarks(force=args.force)
         
     elif args.view:
         runner.view_results()

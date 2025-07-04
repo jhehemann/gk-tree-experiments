@@ -19,16 +19,12 @@ This system implements benchmarking for the G+Trees project. All benchmarks run 
 
 # 2. Run benchmarks manually
 ./benchmark run HEAD                    # Benchmark current commit
-./benchmark run 'HEAD^!'                # Benchmark latest commit (best practice)
 ./benchmark run HEAD GKPlusTreeInsert  # Benchmark specific test
 
 # 3. Monitor progress
 ./benchmark status
 
-# 4. Stop running benchmarks (if needed)
-./benchmark stop
-
-# 5. View results
+# 4. View results
 ./benchmark view
 ```
 
@@ -74,17 +70,11 @@ git commit -m "Other changes"          # Safe to commit other work
 # Run all benchmarks for current commit
 ./benchmark run HEAD
 
-# Run benchmarks for latest commit on current branch (best practice)
-./benchmark run 'HEAD^!'
-
 # Run specific benchmark
 ./benchmark run HEAD GKPlusTreeInsert
 
 # Run benchmarks for specific branch
 ./benchmark run performance-refactor
-
-# Run benchmarks for latest commit on specific branch (best practice)
-./benchmark run 'performance-refactor^!'
 
 # Run benchmarks for specific commit hash
 ./benchmark run abc1234
@@ -96,9 +86,6 @@ git commit -m "Other changes"          # Safe to commit other work
 # Show current status
 ./benchmark status
 
-# Stop running benchmarks
-./benchmark stop
-
 # Open HTML results in browser
 ./benchmark view
 
@@ -106,7 +93,7 @@ git commit -m "Other changes"          # Safe to commit other work
 ./benchmark logs
 
 # View specific log
-./benchmark logs benchmark_performance-refactor_b387b538_20250704_120000.log
+./benchmark logs benchmark_abc1234_20250704_120000.log
 ```
 
 ## Cleanup
@@ -156,7 +143,7 @@ ls -la .git/hooks/post-commit
 ./benchmark logs
 
 # View specific log
-./benchmark logs benchmark_performance-refactor_b387b538_20250704_120000.log
+./benchmark logs benchmark_abc1234_20250704_120000.log
 ```
 
 ### Clean Start
