@@ -64,7 +64,7 @@ class IsolatedBenchmarkRunner:
         
         # Ensure all benchmark branches exist locally for ASV
         print("🔄 Setting up local benchmark branches...")
-        benchmark_branches = ["main", "performance-refactor"]
+        benchmark_branches = [] # Will be populated by worker automatically
         for branch in benchmark_branches:
             try:
                 # Check if local branch exists
@@ -134,7 +134,7 @@ class IsolatedBenchmarkRunner:
                 result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.working_dir)
                 resolved_commit = result.stdout.strip()
                 print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (current branch HEAD)")
-                return resolved_commit
+                return resolved_commit, None
             
             # If it's branch^!, resolve from that branch
             elif branch or base_ref != "HEAD":
@@ -143,13 +143,13 @@ class IsolatedBenchmarkRunner:
                     result = self._run_command(["git", "rev-parse", f"origin/{target_branch}"], cwd=self.working_dir)
                     resolved_commit = result.stdout.strip()
                     print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (latest on {target_branch})")
-                    return resolved_commit
+                    return resolved_commit, target_branch
                 except subprocess.CalledProcessError:
                     print(f"⚠️  Could not resolve {commit_ref}, using as-is")
-                    return commit_ref
+                    return commit_ref, None
         
         # For regular commit references (hash, HEAD, branch names), return as-is
-        return commit_ref
+        return commit_ref, None
     
     def update_status(self, status, message="", commit=None, subprocess_pid=None):
         """Update status file for progress tracking."""
@@ -229,7 +229,8 @@ class IsolatedBenchmarkRunner:
         def benchmark_worker():
             try:
                 # Handle special commit syntax
-                resolved_commit = self._resolve_commit_reference(commit_hash, branch)
+                resolved_commit, resolved_branch = self._resolve_commit_reference(commit_hash, branch)
+                effective_branch = branch or resolved_branch
                 
                 self.update_status("running", f"Starting benchmarks for {resolved_commit}", resolved_commit)
                 
@@ -238,14 +239,24 @@ class IsolatedBenchmarkRunner:
                 self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
                 
                 # Checkout the specific commit or branch
-                if branch:
-                    print(f"🔄 Switching to branch: {branch}")
-                    self._run_command(["git", "checkout", branch], cwd=self.repo_dir)
-                    self._run_command(["git", "reset", "--hard", f"origin/{branch}"], cwd=self.repo_dir)
+                if effective_branch:
+                    print(f"🔄 Switching to branch: {effective_branch}")
+                    self._run_command(["git", "checkout", effective_branch], cwd=self.repo_dir)
+                    self._run_command(["git", "reset", "--hard", f"origin/{effective_branch}"], cwd=self.repo_dir)
+                    # Update ASV config to include this branch
+                    self._update_asv_config_for_branch(effective_branch)
                 else:
                     # If no branch specified, checkout the commit directly
                     print(f"🔄 Checking out commit: {resolved_commit}")
                     self._run_command(["git", "checkout", resolved_commit], cwd=self.repo_dir)
+                    # If we're on a specific branch after checkout, add it to ASV config
+                    try:
+                        current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
+                        current_branch = current_branch_result.stdout.strip()
+                        if current_branch:
+                            self._update_asv_config_for_branch(current_branch)
+                    except:
+                        pass  # Detached HEAD state, no branch to add
                 
                 # Setup ASV environment
                 self.update_status("running", "Setting up ASV environment...", resolved_commit)
@@ -324,7 +335,7 @@ class IsolatedBenchmarkRunner:
         
         # Show resolved commit if it was a special reference
         if commit_hash.endswith("^!"):
-            resolved = self._resolve_commit_reference(commit_hash, branch)
+            resolved, _ = self._resolve_commit_reference(commit_hash, branch)
             print(f"🚀 Benchmarks started in background for commit {commit_hash} → {resolved[:8]}")
         else:
             print(f"🚀 Benchmarks started in background for commit {commit_hash}")
@@ -496,6 +507,34 @@ class IsolatedBenchmarkRunner:
                     print(f"  {line.rstrip()}")
             except Exception:
                 pass
+
+    def _update_asv_config_for_branch(self, branch_name):
+        """Update ASV configuration to include the specified branch if not already present."""
+        asv_config_path = self.repo_dir / "asv.conf.json"
+        
+        if not asv_config_path.exists():
+            print("⚠️  ASV config not found, skipping branch update")
+            return
+        
+        try:
+            with open(asv_config_path, 'r') as f:
+                asv_config = json.load(f)
+            
+            current_branches = asv_config.get("branches", [])
+            
+            if branch_name not in current_branches:
+                current_branches.append(branch_name)
+                asv_config["branches"] = current_branches
+                
+                with open(asv_config_path, 'w') as f:
+                    json.dump(asv_config, f, indent=2)
+                
+                print(f"✅ Added '{branch_name}' to ASV branches configuration")
+            else:
+                print(f"✅ Branch '{branch_name}' already in ASV configuration")
+        
+        except Exception as e:
+            print(f"⚠️  Could not update ASV config: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Isolated Background Benchmark Runner")
