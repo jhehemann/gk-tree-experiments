@@ -14,5 +14,5 @@
         "numpy": [""]
     },
     "dvcs": "git",
-    "branches": ["HEAD"]
+    "branches": ["HEAD", "inverse-klist", "performance-refactor"]
 }

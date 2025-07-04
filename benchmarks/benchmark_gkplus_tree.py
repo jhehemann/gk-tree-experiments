@@ -21,8 +21,8 @@ class GKPlusTreeInsertBenchmarks(BaseBenchmark):
     
     # Test different capacities and data sizes
     params = [
-        [4, 16],  # K values (capacities)
-        [1000],  # data sizes
+        [4, 8, 32],  # K values (capacities)
+        [1000, 10000],  # data sizes
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
     param_names = ['capacity', 'size', 'distribution']
@@ -79,8 +79,8 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, and hit ratios
     params = [
-        [4, 16],  # K values (capacities)
-        [1000],  # data sizes
+        [4, 8, 32],  # K values (capacities)
+        [1000, 10000],  # data sizes
         [0.0, 0.5, 1.0],  # hit ratios
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
@@ -193,8 +193,8 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
     """Benchmarks for mixed insert/retrieve workloads."""
     
     params = [
-        [4, 16],  # K values
-        [1000],  # sizes
+        [4, 8, 32],  # K values
+        [1000, 10000],  # sizes
         [0.1, 0.5, 0.9],  # insert ratios
     ]
     param_names = ['capacity', 'size', 'insert_ratio']
@@ -321,8 +321,8 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of GKPlusTree operations."""
     
     params = [
-        [4, 16],  # K values
-        [1000],  # sizes
+        [4, 8, 32],  # K values
+        [1000, 10000],  # sizes
     ]
     param_names = ['capacity', 'size']
     
@@ -351,7 +351,7 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
     """Benchmarks comparing different capacity configurations."""
     
     params = [
-        [1000],  # sizes
+        [1000, 10000],  # sizes
         ['insert', 'retrieve']  # operation types
     ]
     param_names = ['size', 'operation']

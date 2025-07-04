@@ -20,8 +20,8 @@ class KListInsertBenchmarks(BaseBenchmark):
     
     # Test different capacities and data sizes
     params = [
-        [4, 16],  # K values (capacities)
-        [1000],  # data sizes
+        [4, 8, 32],  # K values (capacities)
+        [1000, 10000],  # data sizes
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
     param_names = ['capacity', 'size', 'distribution']
@@ -77,8 +77,8 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, and hit ratios
     params = [
-        [4, 16],  # K values (capacities)
-        [1000],  # data sizes
+        [4, 8, 32],  # K values (capacities)
+        [1000, 10000],  # data sizes
         [0.0, 0.5, 1.0],  # hit ratios (fraction of lookups that find existing keys)
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
@@ -184,8 +184,8 @@ class KListMixedWorkloadBenchmarks(BaseBenchmark):
     """Benchmarks for mixed insert/retrieve workloads."""
     
     params = [
-        [4, 16],  # K values
-        [1000],  # sizes
+        [4, 8, 32],  # K values
+        [1000, 10000],  # sizes
         [0.1, 0.5, 0.9],  # insert ratios (fraction of operations that are inserts)
     ]
     param_names = ['capacity', 'size', 'insert_ratio']
@@ -261,8 +261,8 @@ class KListMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of KList operations."""
     
     params = [
-        [4, 16],  # K values
-        [1000],  # sizes
+        [4, 8, 32],  # K values
+        [1000, 10000],  # sizes
     ]
     param_names = ['capacity', 'size']
     
