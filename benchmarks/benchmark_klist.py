@@ -19,15 +19,16 @@ class KListInsertBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.insert_entry() method."""
     
     # Test different capacities and data sizes
-    # K values (capacities)
+    # Generate proper (capacity, size) combinations: for each K, sizes = [K, 2K, 4K, 8K]
     k_values = [4, 8, 16, 32, 64, 128]
-    # For each K, sizes = [K, 2K, 4K, 8K]
-    size_values = []
+    capacity_size_pairs = []
     for k in k_values:
-        size_values.extend([k, 2*k, 4*k, 8*k])
+        for multiplier in [1, 2, 4, 8]:
+            capacity_size_pairs.append((k, k * multiplier))
+    
     params = [
-        k_values,
-        [k for k in size_values],
+        [pair[0] for pair in capacity_size_pairs],  # capacities
+        [pair[1] for pair in capacity_size_pairs],  # corresponding sizes
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
     param_names = ['capacity', 'size', 'distribution']
@@ -82,15 +83,16 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.retrieve() method."""
     
     # Test different capacities, data sizes, and hit ratios
-    # K values (capacities)
+    # Generate proper (capacity, size) combinations: for each K, sizes = [K, 2K, 4K, 8K]
     k_values = [4, 8, 16, 32, 64, 128]
-    # For each K, sizes = [K, 2K, 4K, 8K]
-    size_values = []
+    capacity_size_pairs = []
     for k in k_values:
-        size_values.extend([k, 2*k, 4*k, 8*k])
+        for multiplier in [1, 2, 4, 8]:
+            capacity_size_pairs.append((k, k * multiplier))
+    
     params = [
-        k_values,
-        [k for k in size_values],
+        [pair[0] for pair in capacity_size_pairs],  # capacities
+        [pair[1] for pair in capacity_size_pairs],  # corresponding sizes
         [0.0, 0.5, 1.0],  # hit ratios (fraction of lookups that find existing keys)
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
