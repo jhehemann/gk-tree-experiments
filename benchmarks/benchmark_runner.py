@@ -64,6 +64,25 @@ class IsolatedBenchmarkRunner:
             
             self._run_command(["git", "clone", "-b", current_branch, repo_url, str(self.repo_dir)], cwd=self.benchmark_dir)
         
+        # Ensure all benchmark branches exist locally for ASV
+        print("🔄 Setting up local benchmark branches...")
+        benchmark_branches = ["main", "performance-refactor"]
+        for branch in benchmark_branches:
+            try:
+                # Check if local branch exists
+                self._run_command(["git", "show-ref", "--verify", f"refs/heads/{branch}"], cwd=self.repo_dir)
+                print(f"✅ Local branch '{branch}' already exists")
+            except subprocess.CalledProcessError:
+                # Branch doesn't exist locally, create it from remote
+                try:
+                    self._run_command(["git", "checkout", "-b", branch, f"origin/{branch}"], cwd=self.repo_dir)
+                    print(f"✅ Created local branch '{branch}' from origin/{branch}")
+                except subprocess.CalledProcessError:
+                    print(f"⚠️  Could not create local branch '{branch}' - remote may not exist")
+        
+        # Switch back to the current branch
+        self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
+        
         # Create ASV configuration for isolated environment
         asv_config = {
             "version": 1,
@@ -308,6 +327,18 @@ fi
     def view_results(self):
         """Open benchmark results in browser."""
         html_file = self.benchmark_dir / "html" / "index.html"
+        
+        # If HTML doesn't exist but results do, try to generate HTML
+        if not html_file.exists() and (self.results_dir / "benchmarks.json").exists():
+            print("📊 HTML results not found, generating from existing data...")
+            try:
+                self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
+                print("✅ HTML results generated successfully")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Failed to generate HTML results: {e}")
+                print("💡 Try running: ./benchmark setup to ensure proper environment")
+                return
+        
         if html_file.exists():
             import webbrowser
             webbrowser.open(f"file://{html_file}")
@@ -367,6 +398,7 @@ fi
             print("   • Benchmark execution logs")
             print("   • Isolated repository clone")
             print("   • Git hooks")
+            print("After cleanup, you will need to re-run setup to create a new environment.")
             print()
             
             response = input("Are you sure you want to continue? (y/N): ").strip().lower()

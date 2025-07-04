@@ -7,7 +7,7 @@
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BENCHMARK_SCRIPT="$SCRIPT_DIR/benchmarks/isolated_benchmark_runner.py"
+BENCHMARK_SCRIPT="$SCRIPT_DIR/benchmarks/benchmark_runner.py"
 
 case "$1" in
     "setup")
