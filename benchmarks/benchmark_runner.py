@@ -215,7 +215,12 @@ class IsolatedBenchmarkRunner:
                 self._run_command(["poetry", "run", "asv", "machine", "--yes"], cwd=self.repo_dir)
                 
                 # Run benchmarks
-                bench_cmd = ["poetry", "run", "asv", "run", "--quick", "--python=3.11", resolved_commit]
+                # Only use commit^! format if the original commit_hash ended with ^!
+                if commit_hash.endswith("^!"):
+                    commit_spec = f"{resolved_commit}^!"
+                else:
+                    commit_spec = resolved_commit
+                bench_cmd = ["poetry", "run", "asv", "run", "--quick", "--python=3.11", commit_spec]
                 if benchmark_filter:
                     bench_cmd.extend(["--bench", benchmark_filter])
                 
