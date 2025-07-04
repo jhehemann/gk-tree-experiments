@@ -131,14 +131,9 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             self.tree.retrieve(key)
     
     def time_retrieve_with_next(self, capacity, size, hit_ratio, distribution, l_factor):
-        """Benchmark retrieve operations with next entry (full retrieve)."""
+        """Benchmark retrieve operations (with next entry - default behavior)."""
         for key in self.lookup_keys:
-            self.tree.retrieve(key, with_next=True)
-    
-    def time_retrieve_without_next(self, capacity, size, hit_ratio, distribution, l_factor):
-        """Benchmark retrieve operations without next entry (faster path)."""
-        for key in self.lookup_keys:
-            self.tree.retrieve(key, with_next=False)
+            self.tree.retrieve(key)
 
 
 # class GKPlusTreeScalabilityBenchmarks(BaseBenchmark):
