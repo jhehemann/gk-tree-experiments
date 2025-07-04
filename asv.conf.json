@@ -2,7 +2,7 @@
     "version": 1,
     "project": "gplustree",
     "project_url": "https://github.com/jannikhehemann/gplus-trees",
-    "repo": ".",
+    "repo": "https://github.com/jannikhehemann/gplus-trees.git",
     "environment_type": "virtualenv",
     "benchmark_dir": "benchmarks",
     "env_dir": ".asv/env",
