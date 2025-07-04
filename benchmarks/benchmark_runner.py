@@ -78,6 +78,10 @@ class IsolatedBenchmarkRunner:
                 except subprocess.CalledProcessError:
                     print(f"⚠️  Could not create local branch '{branch}' - remote may not exist")
         
+        # Ensure current branch is included in ASV benchmarks
+        if current_branch not in benchmark_branches:
+            benchmark_branches.append(current_branch)
+
         # Switch back to the current branch
         self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
         
@@ -95,7 +99,7 @@ class IsolatedBenchmarkRunner:
             "pythons": ["3.11"],
             "matrix": {"numpy": [""]},
             "dvcs": "git",
-            "branches": ["performance-refactor", "main"]
+            "branches": benchmark_branches
         }
         
         with open(self.repo_dir / "asv.conf.json", "w") as f:
