@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# Isolated Benchmark Management Script
+#
+# Simple bash wrapper for common benchmark operations.
+# Provides convenient commands for managing isolated benchmarks.
+#
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BENCHMARK_SCRIPT="$SCRIPT_DIR/benchmarks/isolated_benchmark_runner.py"
+
+case "$1" in
+    "setup")
+        echo "🔧 Setting up isolated benchmark environment..."
+        python "$BENCHMARK_SCRIPT" --setup
+        ;;
+    
+    "run")
+        if [ -z "$2" ]; then
+            echo "❌ Usage: $0 run <commit> [benchmark_filter]"
+            echo "Example: $0 run HEAD GKPlusTreeInsert"
+            exit 1
+        fi
+        
+        BENCH_FILTER=""
+        if [ ! -z "$3" ]; then
+            BENCH_FILTER="--bench $3"
+        fi
+        
+        echo "🚀 Running isolated benchmarks for $2..."
+        python "$BENCHMARK_SCRIPT" --run "$2" $BENCH_FILTER
+        ;;
+    
+    "status")
+        python "$BENCHMARK_SCRIPT" --status
+        ;;
+    
+    "view")
+        python "$BENCHMARK_SCRIPT" --view
+        ;;
+    
+    "clean")
+        echo "🧹 Cleaning up isolated benchmark environment..."
+        BENCHMARK_DIR="$(dirname "$SCRIPT_DIR")/.isolated-benchmarks"
+        if [ -d "$BENCHMARK_DIR" ]; then
+            rm -rf "$BENCHMARK_DIR"
+            echo "✅ Cleaned up $BENCHMARK_DIR"
+        else
+            echo "ℹ️  No benchmark directory to clean"
+        fi
+        
+        # Remove git hooks
+        HOOK_FILE="$SCRIPT_DIR/.git/hooks/post-commit"
+        if [ -f "$HOOK_FILE" ]; then
+            rm "$HOOK_FILE"
+            echo "✅ Removed git hooks"
+        fi
+        ;;
+    
+    "logs")
+        BENCHMARK_DIR="$(dirname "$SCRIPT_DIR")/.isolated-benchmarks"
+        LOG_DIR="$BENCHMARK_DIR/logs"
+        
+        if [ -d "$LOG_DIR" ]; then
+            echo "📋 Recent benchmark logs:"
+            ls -lt "$LOG_DIR"/*.log 2>/dev/null | head -5
+            
+            if [ ! -z "$2" ]; then
+                echo -e "\n📄 Showing log: $2"
+                if [ -f "$LOG_DIR/$2" ]; then
+                    cat "$LOG_DIR/$2"
+                else
+                    echo "❌ Log file not found: $2"
+                fi
+            fi
+        else
+            echo "❌ No log directory found"
+        fi
+        ;;
+    
+    "help"|*)
+        echo "� Isolated Benchmark Runner"
+        echo ""
+        echo "Usage: $0 <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  setup                    - Set up isolated benchmark environment"
+        echo "  run <commit> [filter]    - Run benchmarks for specific commit"
+        echo "  status                   - Show current benchmark status"
+        echo "  view                     - Open benchmark results in browser"
+        echo "  logs [logfile]           - Show recent logs or specific log"
+        echo "  clean                    - Clean up benchmark environment"
+        echo "  help                     - Show this help"
+        echo ""
+        echo "Examples:"
+        echo "  $0 setup                                    # Initial setup"
+        echo "  $0 run HEAD                                 # Benchmark current commit"
+        echo "  $0 run HEAD GKPlusTreeInsert               # Benchmark specific test"
+        echo "  $0 run performance-refactor                # Benchmark branch"
+        echo "  $0 status                                   # Check progress"
+        echo "  $0 view                                     # View results"
+        echo ""
+        echo "Features:"
+        echo "  ✅ Complete isolation from working directory"
+        echo "  ✅ Background execution (non-blocking)"
+        echo "  ✅ Automatic git hooks for commits"
+        echo "  ✅ Local storage"
+        echo "  ✅ Progress tracking and logging"
+        ;;
+esac
