@@ -18,28 +18,27 @@ from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, RobustTime
 class KListInsertBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.insert_entry() method."""
     
-    # Test different capacities and data sizes
-    # Generate proper (capacity, size) combinations: for each K, sizes = [K, 2K, 4K, 8K]
-    k_values = [4, 8, 16, 32, 64, 128]
+    # Test insert_entry() with properly paired (capacity, size) combinations
+    # For each K in [4, 8, 16, 32, 64, 128], test sizes = [K, 2K, 4K, 8K]
     capacity_size_pairs = []
-    for k in k_values:
+    for k in [4, 8, 16, 32, 64, 128]:
         for multiplier in [1, 2, 4, 8]:
             capacity_size_pairs.append((k, k * multiplier))
     
     params = [
-        [pair[0] for pair in capacity_size_pairs],  # capacities
-        [pair[1] for pair in capacity_size_pairs],  # corresponding sizes
+        capacity_size_pairs,  # list of (capacity, size) tuples  
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
-    param_names = ['capacity', 'size', 'distribution']
+    param_names = ['capacity_size', 'distribution']
     
     # Timing configuration for robust measurements
     number = 1  # Run once per measurement
     repeat = 5  # Repeat 5 times and take median
     min_run_count = 3
     
-    def setup(self, capacity, size, distribution):
+    def setup(self, capacity_size, distribution):
         """Setup KList and test data for benchmarking."""
+        capacity, size = capacity_size
         super().setup(capacity, size, distribution)
         
         # Create KList class with specified capacity
@@ -53,7 +52,7 @@ class KListInsertBenchmarks(BaseBenchmark):
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
     
-    def time_insert_entry_sequential(self, capacity, size, distribution):
+    def time_insert_entry_sequential(self, capacity_size, distribution):
         """Benchmark sequential insertions into an empty KList."""
         klist = self.KListClass()
         
@@ -61,7 +60,7 @@ class KListInsertBenchmarks(BaseBenchmark):
         for entry in self.entries:
             klist.insert_entry(entry)
     
-    def time_insert_entry_batch_construction(self, capacity, size, distribution):
+    def time_insert_entry_batch_construction(self, capacity_size, distribution):
         """Benchmark batch construction by inserting all entries."""
         klist = self.KListClass()
         
@@ -69,7 +68,7 @@ class KListInsertBenchmarks(BaseBenchmark):
         for entry in self.entries:
             klist.insert_entry(entry)
     
-    def peakmem_insert_entry_sequential(self, capacity, size, distribution):
+    def peakmem_insert_entry_sequential(self, capacity_size, distribution):
         """Measure peak memory usage during sequential insertions."""
         klist = self.KListClass()
         
@@ -82,28 +81,27 @@ class KListInsertBenchmarks(BaseBenchmark):
 class KListRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.retrieve() method."""
     
-    # Test different capacities, data sizes, and hit ratios
-    # Generate proper (capacity, size) combinations: for each K, sizes = [K, 2K, 4K, 8K]
-    k_values = [4, 8, 16, 32, 64, 128]
+    # Test retrieve() with properly paired (capacity, size) combinations  
+    # For each K in [4, 8, 16, 32, 64, 128], test sizes = [K, 2K, 4K, 8K]
     capacity_size_pairs = []
-    for k in k_values:
+    for k in [4, 8, 16, 32, 64, 128]:
         for multiplier in [1, 2, 4, 8]:
             capacity_size_pairs.append((k, k * multiplier))
     
     params = [
-        [pair[0] for pair in capacity_size_pairs],  # capacities
-        [pair[1] for pair in capacity_size_pairs],  # corresponding sizes
+        capacity_size_pairs,  # list of (capacity, size) tuples
         [0.0, 0.5, 1.0],  # hit ratios (fraction of lookups that find existing keys)
         ['uniform', 'sequential', 'clustered']  # data distributions
     ]
-    param_names = ['capacity', 'size', 'hit_ratio', 'distribution']
+    param_names = ['capacity_size', 'hit_ratio', 'distribution']
     
     number = 1
     repeat = 5
     min_run_count = 3
     
-    def setup(self, capacity, size, hit_ratio, distribution):
+    def setup(self, capacity_size, hit_ratio, distribution):
         """Setup populated KList and lookup keys for benchmarking."""
+        capacity, size = capacity_size
         super().setup(capacity, size, hit_ratio, distribution)
         
         # Create and populate KList
@@ -129,12 +127,12 @@ class KListRetrieveBenchmarks(BaseBenchmark):
             seed=base_seed + 1000
         )
     
-    def time_retrieve_sequential(self, capacity, size, hit_ratio, distribution):
+    def time_retrieve_sequential(self, capacity_size, hit_ratio, distribution):
         """Benchmark sequential retrieve operations."""
         for key in self.lookup_keys:
             self.klist.retrieve(key)
     
-    def time_retrieve_with_next(self, capacity, size, hit_ratio, distribution):
+    def time_retrieve_with_next(self, capacity_size, hit_ratio, distribution):
         """Benchmark retrieve operations (with next entry - default behavior)."""
         for key in self.lookup_keys:
             self.klist.retrieve(key)
