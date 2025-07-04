@@ -96,7 +96,6 @@ case "$1" in
         echo "Features:"
         echo "  ✅ Complete isolation from working directory"
         echo "  ✅ Background execution (non-blocking)"
-        echo "  ✅ Automatic git hooks for commits"
         echo "  ✅ Local storage"
         echo "  ✅ Progress tracking and logging"
         ;;

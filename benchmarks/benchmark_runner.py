@@ -5,13 +5,11 @@ Isolated Background Benchmark Runner
 This script implements benchmarking by:
 1. Running benchmarks in a completely isolated directory
 2. Working in the background without blocking development
-3. Automatically triggering on commits to benchmark branches
-4. Never interfering with the working directory
+3. Never interfering with the working directory
 
 Features:
 - Complete isolation from working directory
 - Background execution with progress tracking
-- Automatic git hook integration
 - Local result storage and viewing
 """
 
@@ -331,38 +329,17 @@ class IsolatedBenchmarkRunner:
         
         return thread
     
-    def install_git_hooks(self):
-        """Install git hooks for automatic benchmarking."""
+    def remove_git_hooks(self):
+        """Remove git hooks to disable automatic benchmarking."""
         hooks_dir = self.working_dir / ".git" / "hooks"
         post_commit_hook = hooks_dir / "post-commit"
         
-        hook_content = f"""#!/bin/bash
-# Isolated benchmark automation hook
-# Auto-triggers benchmarks for specific branches
-
-BRANCH=$(git branch --show-current)
-COMMIT=$(git rev-parse HEAD)
-BENCHMARK_BRANCHES=("performance-refactor" "main")
-
-# Check if current branch should trigger benchmarks
-if [[ " ${{BENCHMARK_BRANCHES[@]}} " =~ " ${{BRANCH}} " ]]; then
-    echo "🚀 Triggering isolated benchmarks for $BRANCH ($COMMIT)"
-    
-    # Run benchmarks in background (non-blocking)
-    nohup python "{__file__}" --auto-run --commit "$COMMIT" --branch "$BRANCH" >/dev/null 2>&1 &
-    
-    echo "📊 Benchmarks started in background. Monitor with: python {__file__} --status"
-fi
-"""
-        
-        with open(post_commit_hook, "w") as f:
-            f.write(hook_content)
-        
-        # Make executable
-        os.chmod(post_commit_hook, 0o755)
-        
-        print(f"✅ Git hooks installed at {post_commit_hook}")
-        print("🔄 Benchmarks will auto-run on commits to performance-refactor and main branches")
+        # Remove any existing post-commit hook to disable auto benchmarks
+        if post_commit_hook.exists():
+            post_commit_hook.unlink()
+            print("🗑️  Removed existing post-commit git hook (auto benchmarks on commit disabled)")
+        else:
+            print("ℹ️  No post-commit git hook to remove (auto benchmarks on commit already disabled)")
     
     def view_results(self):
         """Open benchmark results in browser using local web server."""
@@ -518,11 +495,10 @@ fi
 
 def main():
     parser = argparse.ArgumentParser(description="Isolated Background Benchmark Runner")
-    parser.add_argument("--setup", action="store_true", help="Setup isolated environment and git hooks")
+    parser.add_argument("--setup", action="store_true", help="Setup isolated environment")
     parser.add_argument("--run", help="Run benchmarks for specific commit")
     parser.add_argument("--bench", help="Filter to specific benchmark")
     parser.add_argument("--branch", help="Specify branch for benchmarking")
-    parser.add_argument("--auto-run", action="store_true", help="Auto-run mode (used by git hooks)")
     parser.add_argument("--commit", help="Commit hash to benchmark")
     parser.add_argument("--status", action="store_true", help="Show benchmark status")
     parser.add_argument("--stop", action="store_true", help="Stop running benchmarks")
@@ -537,13 +513,12 @@ def main():
     
     if args.setup:
         runner.setup_isolated_repo()
-        runner.install_git_hooks()
+        runner.remove_git_hooks()
         print("\n🎉 Isolated benchmark environment ready!")
         print("📝 Usage:")
         print(f"  - Run manually: python {__file__} --run HEAD --bench GKPlusTreeInsert")
         print(f"  - Check status: python {__file__} --status")
         print(f"  - View results: python {__file__} --view")
-        print("  - Auto-runs on commits to benchmark branches!")
         
     elif args.status:
         runner.show_status()
@@ -557,7 +532,7 @@ def main():
     elif args.view:
         runner.view_results()
         
-    elif args.run or args.auto_run:
+    elif args.run:
         # Prevent overlapping benchmark executions
         current_status = runner.get_status()
         if current_status.get("status") == "running":
@@ -575,10 +550,9 @@ def main():
         
         runner.run_benchmarks_background(commit, args.bench, args.branch)
         
-        # If not auto-run, wait a bit to show initial status
-        if not args.auto_run:
-            time.sleep(2)
-            runner.show_status()
+        # Wait a bit to show initial status
+        time.sleep(2)
+        runner.show_status()
     
     else:
         parser.print_help()

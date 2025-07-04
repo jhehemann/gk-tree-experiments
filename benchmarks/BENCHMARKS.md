@@ -8,7 +8,6 @@ This system implements benchmarking for the G+Trees project. All benchmarks run 
 - **Local Development**: Workflow without external dependencies
 - **Background Execution**: Does not block development work
 - **Non-Interference**: Switch branches, commit, modify files during benchmark execution
-- **Automatic Triggers**: Auto-runs on commits to benchmark branches
 - **Progress Tracking**: Monitor benchmark status without interruption
 
 ## Quick Start
@@ -39,8 +38,7 @@ project-root/                          # Working directory (untouched)
 ├── benchmarks/
 │   ├── isolated_benchmark_runner.py   # Main benchmark script
 │   └── ISOLATED_BENCHMARKS.md         # This documentation
-├── benchmark                          # Convenience wrapper
-└── .git/hooks/post-commit             # Auto-trigger hook
+└── benchmark                          # Convenience wrapper
 
 ../.isolated-benchmarks/                # Isolated benchmark environment
 ├── gplus-trees/                       # Separate clone for benchmarking
@@ -48,24 +46,6 @@ project-root/                          # Working directory (untouched)
 ├── html/                              # Generated HTML reports
 ├── logs/                              # Benchmark execution logs
 └── status.json                        # Current benchmark status
-```
-
-## Automatic Benchmarking
-
-The system automatically runs benchmarks when committing to:
-- `performance-refactor` branch
-- `main` branch
-
-```bash
-# This will auto-trigger benchmarks in background
-git commit -m "Performance improvements"
-# Development work can continue immediately
-
-git checkout other-branch              # Safe to switch branches
-git commit -m "Other changes"          # Safe to commit other work
-
-# Check if benchmarks are still running
-./benchmark status
 ```
 
 ## Manual Benchmarking
@@ -112,7 +92,7 @@ git commit -m "Other changes"          # Safe to commit other work
 ## Cleanup
 
 ```bash
-# Remove all benchmark data and git hooks
+# Remove all benchmark data
 ./benchmark clean
 ```
 
@@ -135,19 +115,10 @@ All benchmark executions are logged:
 
 ## Troubleshooting
 
-### Benchmarks Not Auto-Running
-```bash
-# Re-install git hooks
-./benchmark setup
-```
-
 ### Check Isolation
 ```bash
 # Verify separate directory exists
 ls -la ../.isolated-benchmarks/
-
-# Check git hook is installed
-ls -la .git/hooks/post-commit
 ```
 
 ### View Detailed Logs
