@@ -198,29 +198,32 @@ class KListBase(AbstractSetDataStructure):
 
     def _rebuild_index(self):
         """Rebuild the node list and prefix-sum of entry counts."""
-        self._nodes.clear()
-        self._prefix_counts_tot.clear()
-        self._prefix_counts_real.clear()
-        self._bounds.clear()
+        nodes = self._nodes
+        prefix_counts_tot = self._prefix_counts_tot
+        prefix_counts_real = self._prefix_counts_real
+        bounds = self._bounds
         
+        nodes.clear()
+        prefix_counts_tot.clear()
+        prefix_counts_real.clear()
+        bounds.clear()
+
         total = 0
         real = 0
         node = self.head
         while node:
-            self._nodes.append(node)
+            nodes.append(node)
             entries = node.entries
-            keys = node.keys
-            real_keys = node.real_keys
 
             total += len(entries)
-            self._prefix_counts_tot.append(total)
-            real += len(real_keys)
-            self._prefix_counts_real.append(real)
+            prefix_counts_tot.append(total)
+            real += len(node.real_keys)
+            prefix_counts_real.append(real)
 
             # Add the minimum key in this node to bounds (since entries are in descending order)
             if entries:
-                self._bounds.append(entries[-1].item.key)  # Last entry has minimum key
-            
+                bounds.append(entries[-1].item.key)  # Last entry has minimum key
+
             node = node.next
     
     def is_empty(self) -> bool:
