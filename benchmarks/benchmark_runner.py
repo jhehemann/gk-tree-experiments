@@ -369,13 +369,15 @@ class IsolatedBenchmarkRunner:
         if not html_dir.exists() or not (html_dir / "index.html").exists():
             print("📊 Generating HTML results...")
             try:
+                # Ensure we include all branches when generating HTML
+                self._ensure_all_branches_in_html_generation()
                 self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
                 print("✅ HTML results generated successfully")
             except subprocess.CalledProcessError as e:
                 print(f"❌ Failed to generate HTML results: {e}")
                 print("💡 Try running: ./benchmark setup to ensure proper environment")
                 return
-
+        
         # Use ASV preview to start local web server and open browser at port 8081
         print("🌐 Starting local web server at port 8081 and opening results in browser...")
         print("📝 Press Ctrl+C to stop the web server")
@@ -532,6 +534,93 @@ class IsolatedBenchmarkRunner:
                 print(f"✅ Added '{branch_name}' to ASV branches configuration")
             else:
                 print(f"✅ Branch '{branch_name}' already in ASV configuration")
+        
+        except Exception as e:
+            print(f"⚠️  Could not update ASV config: {e}")
+    
+    def _ensure_all_branches_in_html_generation(self):
+        """Ensure ASV includes results from all branches when generating HTML."""
+        print("🔍 Ensuring all branches are included in HTML generation...")
+        
+        # Get all branches that have results by checking the results files
+        results_files = list(self.results_dir.glob("MacBookPro.fritz.box/*.json"))
+        if not results_files:
+            print("⚠️  No machine-specific results found")
+            return
+        
+        # Read all commit hashes from result files 
+        branches_with_results = set()
+        commit_hashes = set()
+        
+        for result_file in results_files:
+            if result_file.name == "machine.json":
+                continue
+                
+            try:
+                with open(result_file, 'r') as f:
+                    result_data = json.load(f)
+                    commit_hash = result_data.get("commit_hash")
+                    if commit_hash:
+                        commit_hashes.add(commit_hash)
+                        
+                        # Try to find which branch this commit belongs to
+                        try:
+                            branch_result = self._run_command(
+                                ["git", "branch", "--contains", commit_hash], 
+                                cwd=self.repo_dir
+                            )
+                            # Parse branch names from output (remove * and whitespace)
+                            branch_lines = [line.strip().lstrip('* ') for line in branch_result.stdout.strip().split('\n')]
+                            for branch in branch_lines:
+                                if branch and not branch.startswith('('):  # Skip detached HEAD
+                                    branches_with_results.add(branch)
+                        except subprocess.CalledProcessError:
+                            print(f"⚠️  Could not find branch for commit {commit_hash[:8]}")
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"⚠️  Could not read {result_file.name}: {e}")
+        
+        print(f"📊 Found results for {len(commit_hashes)} commits across {len(branches_with_results)} branches")
+        
+        if branches_with_results:
+            # Update ASV config to include all branches with results
+            self._update_asv_config_with_all_branches(branches_with_results)
+            
+            # Force ASV to rebuild its internal data structures to include all branches
+            print("🔄 Rebuilding ASV data to include all branches...")
+            try:
+                # Use 'asv publish --no-build' to regenerate HTML without re-running benchmarks
+                self._run_command(["poetry", "run", "asv", "publish", "--no-build"], cwd=self.repo_dir)
+            except subprocess.CalledProcessError:
+                # If that fails, try a regular publish
+                print("⚠️  Fallback to regular publish...")
+        else:
+            print("⚠️  No branches found with results")
+
+    def _update_asv_config_with_all_branches(self, branches_with_results):
+        """Update ASV configuration to include all branches that have results."""
+        asv_config_path = self.repo_dir / "asv.conf.json"
+        
+        if not asv_config_path.exists():
+            print("⚠️  ASV config not found, skipping all-branches update")
+            return
+        
+        try:
+            with open(asv_config_path, 'r') as f:
+                asv_config = json.load(f)
+            
+            current_branches = set(asv_config.get("branches", []))
+            all_branches = current_branches.union(branches_with_results)
+            
+            if all_branches != current_branches:
+                asv_config["branches"] = sorted(list(all_branches))
+                
+                with open(asv_config_path, 'w') as f:
+                    json.dump(asv_config, f, indent=2)
+                
+                added_branches = all_branches - current_branches
+                print(f"✅ Updated ASV config to include {len(added_branches)} additional branches: {', '.join(sorted(added_branches))}")
+            else:
+                print("✅ ASV config already includes all branches with results")
         
         except Exception as e:
             print(f"⚠️  Could not update ASV config: {e}")
