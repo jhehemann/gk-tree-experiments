@@ -286,10 +286,19 @@ class KListBase(AbstractSetDataStructure):
         
         key = entry.item.key
         bounds = self._bounds
-        nodes = self._nodes
         tail = self.tail
 
-        if bounds and key < bounds[-1]:
+        # If the k-list is empty, create a new node.
+        if self.head is None:
+            node = self.KListNodeClass()
+            node.entries.append(entry)
+            node.keys.append(key)
+            if key >= 0: # Only add to real_keys if it's not a dummy key
+                node.real_keys.append(key)
+            self.head = self.tail = node
+            self._rebuild_index()
+            return self, True
+        elif key < bounds[-1]:
             tail_entries = tail.entries
             if len(tail_entries) >= self.KListNodeClass.CAPACITY:
                 tail.next = self.KListNodeClass()
@@ -303,16 +312,6 @@ class KListBase(AbstractSetDataStructure):
                 tail.real_keys.append(key)
             self._rebuild_index()
             return self, True
-
-
-        # If the k-list is empty, create a new node.
-        if self.is_empty():
-            node = self.KListNodeClass()
-            self.head = self.tail = node
-        elif key < self._bounds[-1]:
-            # Fast-Path: If the new key < the last key in the tail (minimum), insert there.
-            # This achieves O(1) minimum key inserts!
-            node = tail
         elif key > self._nodes[0].entries[0].item.key:
             node = self.head
         else:
@@ -358,8 +357,6 @@ class KListBase(AbstractSetDataStructure):
         self._rebuild_index()
         return self, True
         
-        
-
     def delete(self, key: int) -> "KListBase":
         node = self.head
         found = False
