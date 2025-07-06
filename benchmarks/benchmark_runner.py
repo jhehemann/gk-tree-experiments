@@ -375,14 +375,14 @@ class IsolatedBenchmarkRunner:
                 print(f"❌ Failed to generate HTML results: {e}")
                 print("💡 Try running: ./benchmark setup to ensure proper environment")
                 return
-        
-        # Use ASV preview to start local web server and open browser
-        print("🌐 Starting local web server and opening results in browser...")
+
+        # Use ASV preview to start local web server and open browser at port 8081
+        print("🌐 Starting local web server at port 8081 and opening results in browser...")
         print("📝 Press Ctrl+C to stop the web server")
         try:
             self._run_command(
-                ["poetry", "run", "asv", "preview", "--browser", "--html-dir", str(html_dir)], 
-                cwd=self.repo_dir
+            ["poetry", "run", "asv", "preview", "--browser", "--port", "8081", "--html-dir", str(html_dir)],
+            cwd=self.repo_dir
             )
         except subprocess.CalledProcessError as e:
             print(f"❌ Failed to start preview server: {e}")
