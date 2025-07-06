@@ -223,7 +223,7 @@ class IsolatedBenchmarkRunner:
         except Exception:
             return False
     
-    def run_benchmarks_background(self, commit_hash, benchmark_filter=None, branch=None):
+    def run_benchmarks_background(self, commit_hash, benchmark_filter=None, branch=None, quick=False):
         """Run benchmarks in background without blocking."""
         
         def benchmark_worker():
@@ -268,7 +268,11 @@ class IsolatedBenchmarkRunner:
                     commit_spec = f"{resolved_commit}^!"
                 else:
                     commit_spec = resolved_commit
-                bench_cmd = ["poetry", "run", "asv", "run", "--quick", "--python=3.11", commit_spec]
+                bench_cmd = ["poetry", "run", "asv", "run"]
+                # Include quick mode if requested
+                if quick:
+                    bench_cmd.append("--quick")
+                bench_cmd.extend(["--python=3.11", commit_spec])
                 if benchmark_filter:
                     bench_cmd.extend(["--bench", benchmark_filter])
                 
@@ -637,6 +641,7 @@ def main():
     parser.add_argument("--clean", action="store_true", help="Clean up benchmark environment")
     parser.add_argument("--force", action="store_true", help="Force clean without confirmation")
     parser.add_argument("--view", action="store_true", help="View benchmark results")
+    parser.add_argument("--quick", action="store_true", help="Run benchmarks in quick mode")
     parser.add_argument("--working-dir", help="Working directory path")
     
     args = parser.parse_args()
@@ -674,14 +679,15 @@ def main():
         if not commit:
             print("❌ Must specify commit hash")
             sys.exit(1)
-        
+
         # Ensure environment is set up
         if not runner.repo_dir.exists():
             print("🔧 Setting up environment first...")
             runner.setup_isolated_repo()
-        
-        runner.run_benchmarks_background(commit, args.bench, args.branch)
-        
+
+        # Run benchmarks, pass quick flag
+        runner.run_benchmarks_background(commit, args.bench, args.branch, quick=args.quick)
+
         # Wait a bit to show initial status
         time.sleep(2)
         runner.show_status()
