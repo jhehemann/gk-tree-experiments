@@ -16,19 +16,27 @@ case "$1" in
         ;;
     
     "run")
+        # Detect optional quick mode flag
+        QUICK_FLAG=""
+        if [ "$2" = "--quick" ]; then
+            QUICK_FLAG="--quick"
+            shift
+        fi
+        
         if [ -z "$2" ]; then
-            echo "❌ Usage: $0 run <commit> [benchmark_filter]"
-            echo "Example: $0 run HEAD GKPlusTreeInsert"
+            echo "❌ Usage: $0 run [--quick] <commit> [benchmark_filter]"
+            echo "Example: $0 run --quick HEAD GKPlusTreeInsert"
             exit 1
         fi
         
+        COMMIT="$2"
         BENCH_FILTER=""
         if [ ! -z "$3" ]; then
             BENCH_FILTER="--bench $3"
         fi
         
-        echo "🚀 Running isolated benchmarks for $2..."
-        python "$BENCHMARK_SCRIPT" --run "$2" $BENCH_FILTER
+        echo "🚀 Running isolated benchmarks for $COMMIT${QUICK_FLAG:+ (quick mode)}..."
+        python "$BENCHMARK_SCRIPT" --run "$COMMIT" $BENCH_FILTER $QUICK_FLAG
         ;;
     
     "status")
