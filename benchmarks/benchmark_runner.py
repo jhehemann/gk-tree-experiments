@@ -62,9 +62,24 @@ class IsolatedBenchmarkRunner:
             
             self._run_command(["git", "clone", "-b", current_branch, repo_url, str(self.repo_dir)], cwd=self.benchmark_dir)
         
-        # Ensure all benchmark branches exist locally for ASV
+        # Discover and set up all relevant benchmark branches
         print("🔄 Setting up local benchmark branches...")
-        benchmark_branches = [] # Will be populated by worker automatically
+        
+        # Get list of remote branches that might be relevant for benchmarking
+        remote_branches_result = self._run_command(["git", "branch", "-r"], cwd=self.repo_dir)
+        remote_branches = []
+        for line in remote_branches_result.stdout.strip().split('\n'):
+            branch = line.strip()
+            if '->' not in branch and branch.startswith('origin/'):
+                branch_name = branch.replace('origin/', '')
+                if branch_name not in ['HEAD', 'main', 'develop']:  # Skip meta branches
+                    remote_branches.append(branch_name)
+        
+        # Include current branch and commonly used benchmark branches
+        benchmark_branches = list(set([current_branch] + remote_branches))
+        print(f"🔍 Found branches for benchmarking: {', '.join(sorted(benchmark_branches))}")
+        
+        # Ensure local branches exist for all benchmark branches
         for branch in benchmark_branches:
             try:
                 # Check if local branch exists
@@ -77,10 +92,6 @@ class IsolatedBenchmarkRunner:
                     print(f"✅ Created local branch '{branch}' from origin/{branch}")
                 except subprocess.CalledProcessError:
                     print(f"⚠️  Could not create local branch '{branch}' - remote may not exist")
-        
-        # Ensure current branch is included in ASV benchmarks
-        if current_branch not in benchmark_branches:
-            benchmark_branches.append(current_branch)
 
         # Switch back to the current branch
         self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
@@ -369,18 +380,23 @@ class IsolatedBenchmarkRunner:
             
         html_dir = self.benchmark_dir / "html"
         
-        # If HTML doesn't exist, generate it
-        if not html_dir.exists() or not (html_dir / "index.html").exists():
-            print("📊 Generating HTML results...")
-            try:
-                # Ensure we include all branches when generating HTML
-                self._ensure_all_branches_in_html_generation()
-                self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
-                print("✅ HTML results generated successfully")
-            except subprocess.CalledProcessError as e:
-                print(f"❌ Failed to generate HTML results: {e}")
-                print("💡 Try running: ./benchmark setup to ensure proper environment")
-                return
+        # Always ensure we include all branches when generating/viewing HTML
+        print("📊 Ensuring HTML includes all available branch results...")
+        try:
+            self._ensure_all_branches_in_html_generation()
+            
+            # Generate or update HTML
+            if not html_dir.exists() or not (html_dir / "index.html").exists():
+                print("📊 Generating HTML results...")
+            else:
+                print("📊 Updating HTML results...")
+                
+            self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
+            print("✅ HTML results generated successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to generate HTML results: {e}")
+            print("💡 Try running: ./benchmark setup to ensure proper environment")
+            return
         
         # Use ASV preview to start local web server and open browser at port 8081
         print("🌐 Starting local web server at port 8081 and opening results in browser...")
@@ -578,12 +594,13 @@ class IsolatedBenchmarkRunner:
                             for branch in branch_lines:
                                 if branch and not branch.startswith('('):  # Skip detached HEAD
                                     branches_with_results.add(branch)
+                                    print(f"🔍 Found branch '{branch}' for commit {commit_hash[:8]}")
                         except subprocess.CalledProcessError:
                             print(f"⚠️  Could not find branch for commit {commit_hash[:8]}")
             except (json.JSONDecodeError, OSError) as e:
                 print(f"⚠️  Could not read {result_file.name}: {e}")
         
-        print(f"📊 Found results for {len(commit_hashes)} commits across {len(branches_with_results)} branches")
+        print(f"📊 Found results for {len(commit_hashes)} commits across {len(branches_with_results)} branches: {', '.join(sorted(branches_with_results))}")
         
         if branches_with_results:
             # Update ASV config to include all branches with results
@@ -592,11 +609,11 @@ class IsolatedBenchmarkRunner:
             # Force ASV to rebuild its internal data structures to include all branches
             print("🔄 Rebuilding ASV data to include all branches...")
             try:
-                # Use 'asv publish --no-build' to regenerate HTML without re-running benchmarks
-                self._run_command(["poetry", "run", "asv", "publish", "--no-build"], cwd=self.repo_dir)
-            except subprocess.CalledProcessError:
-                # If that fails, try a regular publish
-                print("⚠️  Fallback to regular publish...")
+                # Try regular publish since --no-build is not supported in this ASV version
+                self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
+                print("✅ HTML successfully regenerated with all branches")
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️  Failed to publish HTML: {e}")
         else:
             print("⚠️  No branches found with results")
 
