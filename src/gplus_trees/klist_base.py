@@ -337,7 +337,7 @@ class KListBase(AbstractSetDataStructure):
             return self, False
 
         # Handle successful insertion with potential overflow
-        if node is self.tail and overflow is None:
+        if node is tail and overflow is None:
             self._rebuild_index()
             return self, True
 
@@ -347,8 +347,17 @@ class KListBase(AbstractSetDataStructure):
         # Propagate overflow if needed
         while overflow is not None:
             if node.next is None:
+                overflow_key = overflow.item.key
                 node.next = self.KListNodeClass()
                 self.tail = node.next
+                tail = self.tail
+                tail.entries.append(overflow)
+                tail.keys.append(overflow_key)
+                if overflow_key >= 0:  # Only add to real_keys if it's not a dummy key
+                    tail.real_keys.append(overflow_key)
+                self._rebuild_index()
+                return self, True
+
             node = node.next
             overflow, inserted = node.insert_entry(overflow)
             depth += 1
