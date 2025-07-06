@@ -22,7 +22,7 @@ class GKPlusTreeInsertBenchmarks(BaseBenchmark):
     # Test different capacities, data sizes, distributions, and l_factors
     params = [
         [4, 8, 32],  # K values (capacities)
-        [1000, 5000, 10000],  # data sizes
+        [1000, 10000],  # data sizes
         ['uniform', 'sequential', 'clustered'],  # data distributions
         [1.0, 2.0, 4.0]  # l_factor values
     ]
@@ -84,7 +84,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     # Test different capacities, data sizes, hit ratios, distributions, and l_factors
     params = [
         [4, 8, 32],  # K values (capacities)
-        [1000, 5000, 10000],  # data sizes
+        [1000, 10000],  # data sizes
         [0.0, 0.5, 1.0],  # hit ratios
         ['uniform', 'sequential', 'clustered'],  # data distributions
         [1.0, 2.0, 4.0]  # l_factor values
@@ -194,7 +194,7 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
     
     params = [
         [4, 8, 32],  # K values
-        [1000, 5000, 10000],  # sizes
+        [1000, 10000],  # sizes
         [0.1, 0.5, 0.9],  # insert ratios
         [1.0, 2.0, 4.0]  # l_factor values
     ]
@@ -326,7 +326,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     
     params = [
         [4, 8, 32],  # K values
-        [1000, 5000, 10000],  # sizes
+        [1000, 10000],  # sizes
         [1.0, 2.0, 4.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'l_factor']
@@ -359,7 +359,7 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
     """Benchmarks comparing different capacity configurations."""
     
     params = [
-        [1000, 5000, 10000],  # sizes
+        [1000, 10000],  # sizes
         ['insert', 'retrieve'],  # operation types
         [1.0, 2.0, 4.0]  # l_factor values
     ]
