@@ -3,6 +3,7 @@
 from __future__ import annotations
 from typing import Optional, Type, TypeVar, Tuple, List, Union
 from itertools import islice, chain
+from bisect import bisect_left
 
 import copy
 
@@ -1087,11 +1088,77 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
 
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
-    """Create a KList from a list of entries."""
+    """
+    Create a KList from a list of entries with highly optimized bulk construction.
+    
+    This function assumes entries are already sorted in ASCENDING order.
+    For KList (which stores in descending order), we iterate in reverse and append.
+    
+    This function is optimized for hot loops by:
+    1. Assuming pre-sorted ascending input (common case in GKPlusTree construction)
+    2. Single reverse iteration with append-only operations (no insertions)
+    3. Direct node construction with minimal memory allocations
+    4. Single index rebuild at the end
+    
+    Args:
+        entries: List of Entry objects ALREADY SORTED in ASCENDING order by key
+        KListClass: The KList class to instantiate
+        
+    Returns:
+        A new KListBase instance containing all entries
+        
+    Complexity:
+        Time: O(n) - single pass through entries in reverse
+        Space: O(n) - for the created KList
+        
+    Note: This assumes the caller guarantees entries are sorted ascending.
+    If this assumption is violated, the KList will be incorrectly ordered.
+    """
+    if not entries:
+        return KListClass()
+    
+    # Cache frequently accessed values
+    capacity = KListClass.KListNodeClass.CAPACITY
+    NodeClass = KListClass.KListNodeClass
+    
     klist = KListClass()
-    insert_entry_fn = klist.insert_entry  # Cache method reference
-    for entry in entries:
-        klist, _ = insert_entry_fn(entry)
+    current_node = None
+    
+    # Iterate from largest to smallest (reverse of ascending sorted list)
+    # This gives us the descending order that KList requires
+    for entry in reversed(entries):
+        key = entry.item.key
+        
+        # Create new node if needed (either first node or current is full)
+        if current_node is None or len(current_node.entries) >= capacity:
+            new_node = NodeClass()
+            new_node.entries = []
+            new_node.keys = []
+            new_node.real_keys = []
+            
+            # Link the new node properly
+            if klist.head is None:
+                # First node
+                klist.head = new_node
+                klist.tail = new_node
+            else:
+                # Append to end of list
+                klist.tail.next = new_node
+                klist.tail = new_node
+            
+            current_node = new_node
+        
+        # Always append to current node (since we're going largest to smallest)
+        # This maintains descending order within each node
+        current_node.entries.append(entry)
+        current_node.keys.append(key)
+        if key >= 0:  # Only add non-dummy keys to real_keys
+            current_node.real_keys.append(key)
+    
+    # Rebuild index once at the end for optimal performance
+    if klist.head is not None:
+        klist._rebuild_index()
+    
     return klist
 
 
