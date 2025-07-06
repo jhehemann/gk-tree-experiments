@@ -135,7 +135,26 @@ class IsolatedBenchmarkRunner:
             raise
     
     def _resolve_commit_reference(self, commit_ref, branch=None):
-        """Resolve commit references like HEAD^!, branch^! to actual commit hashes."""
+        """Resolve commit references including ranges like HEAD~2..HEAD, commit^!, etc."""
+        
+        # Handle commit ranges (e.g., HEAD~2..HEAD, branch1..branch2)
+        if ".." in commit_ref:
+            print(f"🔍 Detected commit range: {commit_ref}")
+            try:
+                # Use git rev-list to expand the range to individual commits
+                result = self._run_command(["git", "rev-list", "--reverse", commit_ref], cwd=self.working_dir)
+                commits = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+                
+                if commits:
+                    print(f"🔍 Expanded range {commit_ref} to {len(commits)} commits: {[c[:8] for c in commits]}")
+                    return commits, None  # Return list of commits for range
+                else:
+                    print(f"⚠️  No commits found in range {commit_ref}")
+                    return [], None
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️  Could not resolve range {commit_ref}: {e}")
+                return commit_ref, None
+        
         # Handle special syntax like HEAD^!, performance-refactor^!
         if commit_ref.endswith("^!"):
             base_ref = commit_ref[:-2]  # Remove ^!
@@ -147,8 +166,17 @@ class IsolatedBenchmarkRunner:
                 print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (current branch HEAD)")
                 return resolved_commit, None
             
-            # If it's branch^!, resolve from that branch
-            elif branch or base_ref != "HEAD":
+            # Try to resolve the base reference directly first
+            try:
+                result = self._run_command(["git", "rev-parse", base_ref], cwd=self.working_dir)
+                resolved_commit = result.stdout.strip()
+                print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (commit hash)")
+                return resolved_commit, None
+            except subprocess.CalledProcessError:
+                pass
+            
+            # If it's branch^!, try to resolve from that branch
+            if branch or base_ref != "HEAD":
                 target_branch = branch or base_ref
                 try:
                     result = self._run_command(["git", "rev-parse", f"origin/{target_branch}"], cwd=self.working_dir)
@@ -156,11 +184,20 @@ class IsolatedBenchmarkRunner:
                     print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]} (latest on {target_branch})")
                     return resolved_commit, target_branch
                 except subprocess.CalledProcessError:
-                    print(f"⚠️  Could not resolve {commit_ref}, using as-is")
-                    return commit_ref, None
+                    print(f"⚠️  Could not resolve {commit_ref}, using base reference: {base_ref}")
+                    return base_ref, None
         
-        # For regular commit references (hash, HEAD, branch names), return as-is
-        return commit_ref, None
+        # Handle other git references (commit hash, HEAD~2, etc.) by trying to resolve them
+        try:
+            result = self._run_command(["git", "rev-parse", commit_ref], cwd=self.working_dir)
+            resolved_commit = result.stdout.strip()
+            if resolved_commit != commit_ref:
+                print(f"🔍 Resolved {commit_ref} to {resolved_commit[:8]}")
+            return resolved_commit, None
+        except subprocess.CalledProcessError:
+            # If resolution fails, return as-is (might be a branch name or other valid reference)
+            print(f"🔍 Using commit reference as-is: {commit_ref}")
+            return commit_ref, None
     
     def update_status(self, status, message="", commit=None, subprocess_pid=None):
         """Update status file for progress tracking."""
@@ -239,121 +276,156 @@ class IsolatedBenchmarkRunner:
         
         def benchmark_worker():
             try:
-                # Handle special commit syntax
-                resolved_commit, resolved_branch = self._resolve_commit_reference(commit_hash, branch)
+                # Handle special commit syntax (including ranges)
+                resolved_commits, resolved_branch = self._resolve_commit_reference(commit_hash, branch)
                 effective_branch = branch or resolved_branch
                 
-                self.update_status("running", f"Starting benchmarks for {resolved_commit}", resolved_commit)
+                # Handle commit ranges vs single commits
+                if isinstance(resolved_commits, list):
+                    # Multiple commits (range)
+                    commits_to_benchmark = resolved_commits
+                    total_commits = len(commits_to_benchmark)
+                    print(f"📊 Benchmarking {total_commits} commits from range: {commit_hash}")
+                else:
+                    # Single commit
+                    commits_to_benchmark = [resolved_commits]
+                    total_commits = 1
+                
+                self.update_status("running", f"Starting benchmarks for {total_commits} commit(s)", commits_to_benchmark[0] if commits_to_benchmark else "unknown")
                 
                 # Update isolated repo
                 print("📡 Updating isolated repository...")
                 self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
                 
-                # Checkout the specific commit or branch
-                if effective_branch:
-                    print(f"🔄 Switching to branch: {effective_branch}")
-                    self._run_command(["git", "checkout", effective_branch], cwd=self.repo_dir)
-                    self._run_command(["git", "reset", "--hard", f"origin/{effective_branch}"], cwd=self.repo_dir)
-                    # Update ASV config to include this branch
-                    self._update_asv_config_for_branch(effective_branch)
-                else:
-                    # If no branch specified, checkout the commit directly
-                    print(f"🔄 Checking out commit: {resolved_commit}")
-                    self._run_command(["git", "checkout", resolved_commit], cwd=self.repo_dir)
-                    # If we're on a specific branch after checkout, add it to ASV config
+                # Process each commit
+                for i, current_commit in enumerate(commits_to_benchmark, 1):
+                    print(f"\n🔄 Processing commit {i}/{total_commits}: {current_commit[:8]}")
+                    
+                    # Checkout the specific commit or branch
+                    if effective_branch:
+                        print(f"🔄 Switching to branch: {effective_branch}")
+                        self._run_command(["git", "checkout", effective_branch], cwd=self.repo_dir)
+                        self._run_command(["git", "reset", "--hard", f"origin/{effective_branch}"], cwd=self.repo_dir)
+                        # Update ASV config to include this branch
+                        self._update_asv_config_for_branch(effective_branch)
+                    else:
+                        # If no branch specified, checkout the commit directly
+                        print(f"🔄 Checking out commit: {current_commit}")
+                        self._run_command(["git", "checkout", current_commit], cwd=self.repo_dir)
+                        # If we're on a specific branch after checkout, add it to ASV config
+                        try:
+                            current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
+                            current_branch = current_branch_result.stdout.strip()
+                            if current_branch:
+                                self._update_asv_config_for_branch(current_branch)
+                        except:
+                            pass  # Detached HEAD state, no branch to add
+                    
+                    # Setup ASV environment (only once for the first commit)
+                    if i == 1:
+                        self.update_status("running", "Setting up ASV environment...", current_commit)
+                        self._run_command(["poetry", "run", "asv", "machine", "--yes"], cwd=self.repo_dir)
+                    
+                    # Run benchmarks for this commit
+                    # Only use commit^! format if the original commit_hash ended with ^!
+                    if commit_hash.endswith("^!") and total_commits == 1:
+                        commit_spec = f"{current_commit}^!"
+                    else:
+                        commit_spec = current_commit
+                        
+                    bench_cmd = ["poetry", "run", "asv", "run"]
+                    # Include quick mode if requested
+                    if quick:
+                        bench_cmd.append("--quick")
+                    bench_cmd.extend(["--python=3.11", commit_spec])
+                    if benchmark_filter:
+                        bench_cmd.extend(["--bench", benchmark_filter])
+                    
+                    self.update_status("running", f"Running benchmarks for {current_commit[:8]} ({i}/{total_commits})...", current_commit)
+                    
+                    # Create log file for this run
+                    short_commit = current_commit[:8]
+                    
+                    # Get current branch name for log file
                     try:
-                        current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
-                        current_branch = current_branch_result.stdout.strip()
-                        if current_branch:
-                            self._update_asv_config_for_branch(current_branch)
+                        branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
+                        current_branch = branch_result.stdout.strip()
+                        if not current_branch:  # Detached HEAD
+                            current_branch = "detached"
                     except:
-                        pass  # Detached HEAD state, no branch to add
+                        current_branch = "unknown"
+                    
+                    log_file = self.logs_dir / f"benchmark_{current_branch}_{short_commit}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+                    
+                    with open(log_file, "w") as f:
+                        f.write(f"Benchmark run started at {datetime.now()}\n")
+                        f.write(f"Commit: {current_commit}\n")
+                        f.write(f"Commit {i}/{total_commits} in range: {commit_hash}\n")
+                        f.write(f"Filter: {benchmark_filter or 'All benchmarks'}\n")
+                        f.write("="*50 + "\n\n")
+                        f.flush()
+                        
+                        # Start ASV process and track its PID
+                        process = subprocess.Popen(
+                            bench_cmd,
+                            cwd=self.repo_dir,
+                            stdout=f,
+                            stderr=subprocess.STDOUT,
+                            text=True
+                        )
+                        
+                        # Update status with subprocess PID
+                        self.update_status("running", f"Running benchmarks for {current_commit[:8]} ({i}/{total_commits})...", current_commit, process.pid)
+                        
+                        # Wait for completion
+                        result = process.wait()
+                    
+                    if result != 0:
+                        print(f"❌ Benchmarks failed for commit {current_commit[:8]}")
+                        print(f"📋 Check log: {log_file}")
+                        # Continue with next commit instead of failing completely
+                        continue
+                    else:
+                        print(f"✅ Benchmarks completed for commit {current_commit[:8]}")
                 
-                # Setup ASV environment
-                self.update_status("running", "Setting up ASV environment...", resolved_commit)
-                self._run_command(["poetry", "run", "asv", "machine", "--yes"], cwd=self.repo_dir)
+                # Generate HTML report after all commits are done
+                print("📊 Generating HTML report for all commits...")
+                self.update_status("running", "Generating HTML report...", commits_to_benchmark[-1] if commits_to_benchmark else "unknown")
+                self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
                 
-                # Run benchmarks
-                # Only use commit^! format if the original commit_hash ended with ^!
-                if commit_hash.endswith("^!"):
-                    commit_spec = f"{resolved_commit}^!"
+                if total_commits == 1:
+                    final_message = f"Benchmarks completed successfully for {commits_to_benchmark[0][:8]}"
                 else:
-                    commit_spec = resolved_commit
-                bench_cmd = ["poetry", "run", "asv", "run"]
-                # Include quick mode if requested
-                if quick:
-                    bench_cmd.append("--quick")
-                bench_cmd.extend(["--python=3.11", commit_spec])
-                if benchmark_filter:
-                    bench_cmd.extend(["--bench", benchmark_filter])
+                    final_message = f"Benchmarks completed successfully for {total_commits} commits from range {commit_hash}"
                 
-                self.update_status("running", f"Running benchmarks for {resolved_commit}...", resolved_commit)
-                
-                # Create log file for this run
-                short_commit = resolved_commit[:8]
-                
-                # Get current branch name for log file
-                try:
-                    branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.repo_dir)
-                    current_branch = branch_result.stdout.strip()
-                    if not current_branch:  # Detached HEAD
-                        current_branch = "detached"
-                except:
-                    current_branch = "unknown"
-                
-                log_file = self.logs_dir / f"benchmark_{current_branch}_{short_commit}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-                
-                with open(log_file, "w") as f:
-                    f.write(f"Benchmark run started at {datetime.now()}\n")
-                    f.write(f"Commit: {resolved_commit}\n")
-                    f.write(f"Filter: {benchmark_filter or 'All benchmarks'}\n")
-                    f.write("="*50 + "\n\n")
-                    f.flush()
-                    
-                    # Start ASV process and track its PID
-                    process = subprocess.Popen(
-                        bench_cmd,
-                        cwd=self.repo_dir,
-                        stdout=f,
-                        stderr=subprocess.STDOUT,
-                        text=True
-                    )
-                    
-                    # Update status with subprocess PID
-                    self.update_status("running", f"Running benchmarks for {resolved_commit}...", resolved_commit, process.pid)
-                    
-                    # Wait for completion
-                    result = process.wait()
-                
-                if result == 0:
-                    # Generate HTML report
-                    self.update_status("running", "Generating HTML report...", resolved_commit)
-                    self._run_command(["poetry", "run", "asv", "publish"], cwd=self.repo_dir)
-                    
-                    self.update_status("completed", f"Benchmarks completed successfully for {resolved_commit}", resolved_commit)
-                    print(f"✅ Benchmarks completed for {resolved_commit}")
-                    print(f"📊 Results: {self.benchmark_dir / 'html' / 'index.html'}")
-                    print(f"📋 Log: {log_file}")
-                else:
-                    self.update_status("failed", f"Benchmarks failed for {resolved_commit}", resolved_commit)
-                    print(f"❌ Benchmarks failed for {resolved_commit}")
-                    print(f"📋 Check log: {log_file}")
+                self.update_status("completed", final_message, commits_to_benchmark[-1] if commits_to_benchmark else "unknown")
+                print(f"✅ {final_message}")
+                print(f"📊 Results: {self.benchmark_dir / 'html' / 'index.html'}")
                 
             except Exception as e:
                 error_msg = f"Benchmark error: {str(e)}"
-                self.update_status("failed", error_msg, resolved_commit if 'resolved_commit' in locals() else commit_hash)
-                print(f"❌ {error_msg}")
+                commit_for_status = commits_to_benchmark[0] if 'commits_to_benchmark' in locals() and commits_to_benchmark else commit_hash
+                self.update_status("failed", error_msg, commit_for_status)
         
         # Start background thread
         thread = Thread(target=benchmark_worker, daemon=True)
         thread.start()
         
-        # Show resolved commit if it was a special reference
-        if commit_hash.endswith("^!"):
-            resolved, _ = self._resolve_commit_reference(commit_hash, branch)
-            print(f"🚀 Benchmarks started in background for commit {commit_hash} → {resolved[:8]}")
+        # Show resolved commit information
+        if ".." in commit_hash:
+            print(f"🚀 Benchmarks started in background for commit range: {commit_hash}")
+        elif commit_hash.endswith("^!"):
+            try:
+                resolved, _ = self._resolve_commit_reference(commit_hash, branch)
+                if isinstance(resolved, list):
+                    print(f"🚀 Benchmarks started in background for {len(resolved)} commits from range {commit_hash}")
+                else:
+                    print(f"🚀 Benchmarks started in background for commit {commit_hash} → {resolved[:8]}")
+            except:
+                print(f"🚀 Benchmarks started in background for commit {commit_hash}")
         else:
             print(f"🚀 Benchmarks started in background for commit {commit_hash}")
+        
         print(f"📊 Monitor progress: python {__file__} --status")
         print(f"🔍 View results when done: python {__file__} --view")
         
