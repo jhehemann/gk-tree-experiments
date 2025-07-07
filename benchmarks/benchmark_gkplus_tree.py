@@ -22,14 +22,13 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, distributions, and l_factors
     params = [
-        [4, 8, 32],  # K values (capacities)
+        [4, 8, 16, 32],  # K values (capacities)
         [1000, 10000],  # data sizes
         ['uniform', 'sequential', 'clustered'],  # data distributions
-        [1.0, 2.0, 4.0]  # l_factor values
+        [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'distribution', 'l_factor']
     
-    repeat = 5
     min_run_count = 3
     
     def setup(self, capacity, size, distribution, l_factor):
@@ -71,14 +70,13 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, hit ratios, and l_factors (distribution fixed to 'sequential')
     params = [
-        [4, 8, 32],  # K values (capacities)
+        [4, 8, 16, 32],  # K values (capacities)
         [1000, 10000],  # data sizes
         [0.0, 1.0],  # hit ratios
-        [1.0, 2.0, 4.0]  # l_factor values
+        [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'hit_ratio', 'l_factor']
     
-    repeat = 5
     min_run_count = 3
     
     # Class-level cache for trees and data
@@ -149,9 +147,9 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of GKPlusTree operations."""
     
     params = [
-        [4, 8, 32],  # K values
+        [4, 8, 16, 32],  # K values
         [1000, 10000],  # sizes
-        [1.0, 2.0, 4.0]  # l_factor values
+        [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'l_factor']
     
@@ -179,94 +177,3 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         for entry, rank in zip(self.entries, self.ranks):
             tree, _ = tree.insert_entry(entry, rank)
         return tree
-
-
-# Comparison benchmarks between different algorithms
-class CapacityComparisonBenchmarks(BaseBenchmark):
-    """Benchmarks comparing different capacity configurations."""
-    
-    params = [
-        [4, 8, 16, 32],  # capacities
-        [1000, 10000],  # sizes
-        ['insert', 'retrieve'],  # operation types
-        [1.0, 2.0, 4.0]  # l_factor values
-    ]
-    param_names = ['capacity', 'size', 'operation', 'l_factor']
-
-    repeat = 5
-    min_run_count = 3
-    
-    # Cache for trees only (lookup keys are generated fresh each time)
-    _tree_cache = {}
-    
-    def setup(self, capacity, size, operation, l_factor):
-        """Setup for comparison benchmarking."""
-        super().setup(capacity, size, operation, l_factor)
-        
-        # Create cache key that works for both insert and retrieve operations
-        cache_key = (capacity, size, l_factor)
-        
-        # Create tree class and test data
-        self.tree_class, _, klist_class, _ = make_gkplustree_classes(capacity)
-        self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
-        self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
-        # Calculate ranks for insertions
-        self.group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(entry.item.key, self.group_size) for entry in self.entries]
-        
-        if operation == 'retrieve':
-            # For retrieve operations, set up tree and lookup keys
-            if cache_key not in self._tree_cache:
-                # No cached tree from insert operations, build one using efficient bulk creation
-                tree = bulk_create_gkplus_tree(self.entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
-                self._tree_cache[cache_key] = tree
-            
-            # Always generate fresh lookup keys for retrieve operations
-            lookup_keys = BenchmarkUtils.create_lookup_keys(
-                insert_keys=self.keys,
-                hit_ratio=0.8,
-                seed=43
-            )
-            
-            # Use cached tree and fresh lookup keys
-            self.tree = self._tree_cache[cache_key]
-            self.lookup_keys = lookup_keys
-        
-        # For insert operations, no additional setup needed - we build tree during timing
-        
-        # Store l_factor for tree creation
-        self.l_factor = l_factor
-        
-        gc.collect()
-        gc.disable() # Enabled in teardown
-
-    @classmethod
-    def clear_cache(cls):
-        """Clear the tree cache to free memory when needed."""
-        cls._tree_cache.clear()
-        gc.collect()
-    
-    def time_operation(self, capacity, size, operation, l_factor):
-        """Benchmark the specified operation with the given capacity."""
-        if operation == 'insert':
-            # Build tree from scratch for timing, but cache result for retrieve operations
-            tree = self.tree_class(l_factor=l_factor)
-            for entry, rank in zip(self.entries, self.ranks):
-                tree, _ = tree.insert_entry(entry, rank)
-            
-            # Cache the built tree for potential retrieve operations
-            cache_key = (capacity, size, l_factor)
-            self._tree_cache[cache_key] = tree
-            
-        else:  # retrieve
-            for key in self.lookup_keys:
-                self.tree.retrieve(key)
-
-
-def clear_all_caches():
-    """Clear all benchmark caches to free memory."""
-    GKPlusTreeRetrieveBenchmarks.clear_cache()
-    CapacityComparisonBenchmarks.clear_cache()
-    gc.collect()
-    print("🧹 All benchmark caches cleared")
