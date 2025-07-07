@@ -151,7 +151,30 @@ class IsolatedBenchmarkRunner:
             raise
     
     def _resolve_commit_reference(self, commit_ref, branch=None):
-        """Resolve commit references, with special handling for branch^! syntax."""
+        """Resolve commit references, with special handling for branch^! syntax and multiple commits."""
+        
+        # Handle multiple commit references separated by spaces
+        if ' ' in commit_ref.strip():
+            individual_refs = commit_ref.strip().split()
+            resolved_refs = []
+            resolved_branches = []
+            
+            for ref in individual_refs:
+                resolved_ref, resolved_branch = self._resolve_single_commit_reference(ref.strip(), branch)
+                resolved_refs.append(resolved_ref)
+                if resolved_branch:
+                    resolved_branches.append(resolved_branch)
+            
+            # Join resolved references back with spaces for ASV
+            final_ref = ' '.join(resolved_refs)
+            print(f"🔍 Resolved multiple commits: {final_ref}")
+            return final_ref, resolved_branches[0] if resolved_branches else None
+        
+        # Handle single commit reference
+        return self._resolve_single_commit_reference(commit_ref, branch)
+    
+    def _resolve_single_commit_reference(self, commit_ref, branch=None):
+        """Resolve a single commit reference, with special handling for branch^! syntax."""
         
         # Handle special branch^! syntax (ASV doesn't understand origin/branch^!)
         if commit_ref.endswith("^!"):
@@ -317,7 +340,7 @@ class IsolatedBenchmarkRunner:
                 
                 # Create log file for this run  
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                safe_commit = commit_hash.replace('..', '_to_').replace('^!', '_head').replace('/', '_')
+                safe_commit = commit_hash.replace('..', '_to_').replace('^!', '_head').replace('/', '_').replace(' ', '_')
                 log_file = self.logs_dir / f"benchmark_{safe_commit}_{timestamp}.log"
                 
                 with open(log_file, "w") as f:
@@ -369,6 +392,8 @@ class IsolatedBenchmarkRunner:
         # Show appropriate message based on commit reference type
         if ".." in commit_hash:
             print(f"🚀 Benchmarks started in background for commit range: {commit_hash}")
+        elif ' ' in commit_hash.strip():
+            print(f"🚀 Benchmarks started in background for multiple commits: {commit_hash}")
         else:
             print(f"🚀 Benchmarks started in background for commit: {commit_hash}")
         
@@ -720,7 +745,7 @@ class IsolatedBenchmarkRunner:
 def main():
     parser = argparse.ArgumentParser(description="Isolated Background Benchmark Runner")
     parser.add_argument("--setup", action="store_true", help="Setup isolated environment")
-    parser.add_argument("--run", help="Run benchmarks for specific commit")
+    parser.add_argument("--run", help="Run benchmarks for specific commit(s). Can be a single commit, range, or multiple commits separated by spaces (e.g., 'commit1^! commit2^!')")
     parser.add_argument("--bench", help="Filter to specific benchmark")
     parser.add_argument("--branch", help="Specify branch for benchmarking")
     parser.add_argument("--commit", help="Commit hash to benchmark")
@@ -742,7 +767,8 @@ def main():
         runner.remove_git_hooks()
         print("\n🎉 Isolated benchmark environment ready!")
         print("📝 Usage:")
-        print(f"  - Run manually: python {__file__} --run HEAD --bench GKPlusTreeInsert")
+        print(f"  - Run single commit: python {__file__} --run HEAD --bench GKPlusTreeInsert")
+        print(f"  - Run multiple commits: python {__file__} --run 'performance-refactor^! inverse-klist^!'")
         print(f"  - Check status: python {__file__} --status")
         print(f"  - View results: python {__file__} --view")
         print("📡 Note: Repository is automatically updated to latest remote state on every benchmark run")
