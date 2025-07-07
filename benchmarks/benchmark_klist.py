@@ -30,7 +30,7 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
     param_names = ['capacity', 'l_factor', 'distribution']
 
     # Timing configuration for robust measurements
-    min_run_count = 3
+    min_run_count = 5
 
     def setup(self, capacity, l_factor, distribution):
         """Setup KList and test data for batch insert benchmarking."""
@@ -70,7 +70,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'l_factor', 'hit_ratio']
 
-    min_run_count = 3
+    min_run_count = 5
 
     # Class-level cache for initialized KLlists and insert keys
     _klist_cache = {}

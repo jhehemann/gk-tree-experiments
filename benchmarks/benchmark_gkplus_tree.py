@@ -29,7 +29,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'size', 'distribution', 'l_factor']
     
-    min_run_count = 3
+    min_run_count = 5
     
     def setup(self, capacity, size, distribution, l_factor):
         """Setup GKPlusTree and test data for tree construction benchmarking."""
@@ -77,7 +77,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'size', 'hit_ratio', 'l_factor']
     
-    min_run_count = 3
+    min_run_count = 5
     
     # Class-level cache for trees and data
     _tree_cache = {}
