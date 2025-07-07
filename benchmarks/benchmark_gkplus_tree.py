@@ -64,13 +64,6 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         
         for entry, rank in zip(self.entries, self.ranks):
             tree, _ = tree.insert_entry(entry, rank)
-    
-    def peakmem_insert_entry_tree_construction(self, capacity, size, distribution, l_factor):
-        """Measure peak memory usage during full tree construction."""
-        tree = self.tree_class(l_factor=l_factor)
-        
-        for entry, rank in zip(self.entries, self.ranks):
-            tree, _ = tree.insert_entry(entry, rank)
 
 
 class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
@@ -88,6 +81,10 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     repeat = 5
     min_run_count = 3
     
+    # Class-level cache for trees and data
+    _tree_cache = {}
+    _data_cache = {}
+    
     def setup(self, capacity, size, hit_ratio, l_factor):
         """Setup populated GKPlusTree and lookup keys for benchmarking."""
         super().setup(capacity, size, hit_ratio, l_factor)
@@ -95,24 +92,37 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         # Use only 'sequential' distribution
         distribution = 'sequential'
         
-        # Create and populate GKPlusTree
-        self.tree_class, _, self.klist_class, _ = make_gkplustree_classes(capacity)
-        self.tree = self.tree_class(l_factor=l_factor)
+        # Create cache key for tree (hit_ratio doesn't affect tree structure)
+        tree_cache_key = (capacity, size, l_factor, distribution)
         
-        # Generate and insert test data
+        # Check if we have a cached tree for these parameters
+        if tree_cache_key not in self._tree_cache:
+            # Create and populate GKPlusTree (only when not cached)
+            tree_class, _, klist_class, _ = make_gkplustree_classes(capacity)
+            
+            # Generate and insert test data
+            base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
+            insert_keys = BenchmarkUtils.generate_deterministic_keys(
+                size=size,
+                seed=base_seed,
+                distribution=distribution
+            )
+            
+            entries = BenchmarkUtils.create_test_entries(insert_keys)
+            
+            # Use bulk_create_gkplus_tree for efficient initial tree construction
+            tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
+            
+            # Cache the tree and associated data
+            self._tree_cache[tree_cache_key] = tree
+            self._data_cache[tree_cache_key] = insert_keys
+            
+        # Reuse cached tree and data
+        self.tree = self._tree_cache[tree_cache_key]
+        self.insert_keys = self._data_cache[tree_cache_key]
+        
+        # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
         base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
-        self.insert_keys = BenchmarkUtils.generate_deterministic_keys(
-            size=size,
-            seed=base_seed,
-            distribution=distribution
-        )
-        
-        entries = BenchmarkUtils.create_test_entries(self.insert_keys)
-        
-        # Use bulk_create_gkplus_tree for efficient initial tree construction
-        self.tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=self.klist_class)
-
-        # Generate lookup keys with specified hit ratio
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
@@ -121,7 +131,14 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         gc.collect()
         gc.disable() # Enabled in teardown
 
-    def time_retrieve_sequential(self, capacity, size, hit_ratio, distribution, l_factor):
+    @classmethod
+    def clear_cache(cls):
+        """Clear the tree cache to free memory when needed."""
+        cls._tree_cache.clear()
+        cls._data_cache.clear()
+        gc.collect()
+
+    def time_retrieve_sequential(self, capacity, size, hit_ratio, l_factor):
         """Benchmark sequential retrieve operations."""
         for key in self.lookup_keys:
             self.tree.retrieve(key)
