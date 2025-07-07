@@ -2,8 +2,8 @@
 ASV benchmarks for GKPlusTreeBase operations.
 
 This module contains comprehensive benchmarks for the GKPlusTreeBase class,
-focusing on insert_entry() and retrieve() operations with various
-data patterns and sizes.
+focusing on batch construction (full data structure creation) and 
+retrieve() operations with various data patterns and sizes.
 """
 
 import gc
@@ -12,12 +12,14 @@ from typing import List
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes, create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
+from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, RobustTimer
 
 
-class GKPlusTreeInsertBenchmarks(BaseBenchmark):
-    """Benchmarks for GKPlusTreeBase.insert_entry() method."""
+
+class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
+    """Benchmarks for batch GKPlusTreeBase construction via sequential inserts."""
     
     # Test different capacities, data sizes, distributions, and l_factors
     params = [
@@ -33,7 +35,7 @@ class GKPlusTreeInsertBenchmarks(BaseBenchmark):
     min_run_count = 3
     
     def setup(self, capacity, size, distribution, l_factor):
-        """Setup GKPlusTree and test data for benchmarking."""
+        """Setup GKPlusTree and test data for tree construction benchmarking."""
         super().setup(capacity, size, distribution, l_factor)
         
         # Create GKPlusTree with specified capacity and l_factor
@@ -54,28 +56,20 @@ class GKPlusTreeInsertBenchmarks(BaseBenchmark):
         # Store l_factor for tree creation
         self.l_factor = l_factor
     
-    def time_insert_entry_sequential(self, capacity, size, distribution, l_factor):
-        """Benchmark sequential insertions into an empty GKPlusTree."""
+    
+    def time_insert_entry_tree_construction(self, capacity, size, distribution, l_factor):
+        """Benchmark full tree construction by inserting all entries."""
         tree = self.tree_class(l_factor=l_factor)
         
         for entry, rank in zip(self.entries, self.ranks):
             tree, _ = tree.insert_entry(entry, rank)
     
-    def time_insert_entry_batch_construction(self, capacity, size, distribution, l_factor):
-        """Benchmark batch construction by inserting all entries."""
+    def peakmem_insert_entry_tree_construction(self, capacity, size, distribution, l_factor):
+        """Measure peak memory usage during full tree construction."""
         tree = self.tree_class(l_factor=l_factor)
         
         for entry, rank in zip(self.entries, self.ranks):
             tree, _ = tree.insert_entry(entry, rank)
-    
-    def peakmem_insert_entry_sequential(self, capacity, size, distribution, l_factor):
-        """Measure peak memory usage during sequential insertions."""
-        tree = self.tree_class(l_factor=l_factor)
-        
-        for entry, rank in zip(self.entries, self.ranks):
-            tree, _ = tree.insert_entry(entry, rank)
-        
-        return tree
 
 
 class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
@@ -85,7 +79,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     params = [
         [4, 8, 32],  # K values (capacities)
         [1000, 10000],  # data sizes
-        [0.0, 0.5, 1.0],  # hit ratios
+        [0.0, 1.0],  # hit ratios
         ['uniform', 'sequential', 'clustered'],  # data distributions
         [1.0, 2.0, 4.0]  # l_factor values
     ]
@@ -124,14 +118,8 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             hit_ratio=hit_ratio,
             seed=base_seed + 1000
         )
-    
     def time_retrieve_sequential(self, capacity, size, hit_ratio, distribution, l_factor):
         """Benchmark sequential retrieve operations."""
-        for key in self.lookup_keys:
-            self.tree.retrieve(key)
-    
-    def time_retrieve_with_next(self, capacity, size, hit_ratio, distribution, l_factor):
-        """Benchmark retrieve operations (with next entry - default behavior)."""
         for key in self.lookup_keys:
             self.tree.retrieve(key)
 
@@ -359,90 +347,48 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
     """Benchmarks comparing different capacity configurations."""
     
     params = [
+        [4, 8, 16, 32],  # capacities
         [1000, 10000],  # sizes
         ['insert', 'retrieve'],  # operation types
         [1.0, 2.0, 4.0]  # l_factor values
     ]
-    param_names = ['size', 'operation', 'l_factor']
+    param_names = ['capacity', 'size', 'operation', 'l_factor']
     
-    def setup(self, size, operation, l_factor):
+    def setup(self, capacity, size, operation, l_factor):
         """Setup for comparison benchmarking."""
-        super().setup(size, operation, l_factor)
+        super().setup(capacity, size, operation, l_factor)
         
-        # Create trees with different capacities
-        self.trees = {}
-        self.tree_classes = {}
+        # Create tree class and test data
+        self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         
-        for capacity in [4, 8, 16, 32]:
-            tree_class, _, _, _ = make_gkplustree_classes(capacity)
-            self.tree_classes[capacity] = tree_class
-            self.trees[capacity] = tree_class(l_factor=l_factor)
-            
-            if operation == 'retrieve':
-                # Pre-populate for retrieve benchmarks
-                group_size = calculate_group_size(capacity)
-                tree = self.trees[capacity]
-                for entry in self.entries:
-                    rank = calc_rank_from_group_size(entry.item.key, group_size)
-                    tree, _ = tree.insert_entry(entry, rank)
-                self.trees[capacity] = tree
+        # Calculate ranks for insertions
+        self.group_size = calculate_group_size(capacity)
+        self.ranks = [calc_rank_from_group_size(entry.item.key, self.group_size) for entry in self.entries]
         
-        # Lookup keys for retrieve operations
-        self.lookup_keys = BenchmarkUtils.create_lookup_keys(
-            insert_keys=self.keys,
-            hit_ratio=0.8,
-            seed=43
-        )
+        if operation == 'retrieve':
+            # Pre-populate tree for retrieve benchmarks
+            self.tree = self.tree_class(l_factor=l_factor)
+            for entry, rank in zip(self.entries, self.ranks):
+                self.tree, _ = self.tree.insert_entry(entry, rank)
+            
+            # Generate lookup keys for retrieve operations
+            self.lookup_keys = BenchmarkUtils.create_lookup_keys(
+                insert_keys=self.keys,
+                hit_ratio=0.8,
+                seed=43
+            )
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
     
-    def time_capacity_4(self, size, operation, l_factor):
-        """Benchmark with capacity 4."""
+    def time_operation(self, capacity, size, operation, l_factor):
+        """Benchmark the specified operation with the given capacity."""
         if operation == 'insert':
-            tree = self.tree_classes[4](l_factor=l_factor)  # Fresh tree
-            group_size = calculate_group_size(4)
-            for entry in self.entries:
-                rank = calc_rank_from_group_size(entry.item.key, group_size)
+            tree = self.tree_class(l_factor=l_factor)  # Fresh tree
+            for entry, rank in zip(self.entries, self.ranks):
                 tree, _ = tree.insert_entry(entry, rank)
         else:  # retrieve
             for key in self.lookup_keys:
-                self.trees[4].retrieve(key)
-    
-    def time_capacity_8(self, size, operation, l_factor):
-        """Benchmark with capacity 8."""
-        if operation == 'insert':
-            tree = self.tree_classes[8](l_factor=l_factor)
-            group_size = calculate_group_size(8)
-            for entry in self.entries:
-                rank = calc_rank_from_group_size(entry.item.key, group_size)
-                tree, _ = tree.insert_entry(entry, rank)
-        else:
-            for key in self.lookup_keys:
-                self.trees[8].retrieve(key)
-    
-    def time_capacity_16(self, size, operation, l_factor):
-        """Benchmark with capacity 16."""
-        if operation == 'insert':
-            tree = self.tree_classes[16](l_factor=l_factor)
-            group_size = calculate_group_size(16)
-            for entry in self.entries:
-                rank = calc_rank_from_group_size(entry.item.key, group_size)
-                tree, _ = tree.insert_entry(entry, rank)
-        else:
-            for key in self.lookup_keys:
-                self.trees[16].retrieve(key)
-    
-    def time_capacity_32(self, size, operation, l_factor):
-        """Benchmark with capacity 32."""
-        if operation == 'insert':
-            tree = self.tree_classes[32](l_factor=l_factor)
-            group_size = calculate_group_size(32)
-            for entry in self.entries:
-                rank = calc_rank_from_group_size(entry.item.key, group_size)
-                tree, _ = tree.insert_entry(entry, rank)
-        else:
-            for key in self.lookup_keys:
-                self.trees[32].retrieve(key)
+                self.tree.retrieve(key)

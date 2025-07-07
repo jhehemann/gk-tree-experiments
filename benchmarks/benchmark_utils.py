@@ -199,8 +199,8 @@ class BaseBenchmark:
     
     # Number of iterations for timing (can be overridden)
     number = 1
-    repeat = 3
-    min_run_count = 5
+    repeat = 5
+    min_run_count = 3
     
     def setup(self, *params):
         """Setup method called before each benchmark."""
