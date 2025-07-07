@@ -144,117 +144,6 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             self.tree.retrieve(key)
 
 
-class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
-    """Benchmarks for mixed insert/retrieve workloads."""
-    
-    params = [
-        [4, 8, 32],  # K values
-        [1000, 10000],  # sizes
-        [0.1, 0.5, 0.9],  # insert ratios
-        [1.0, 2.0, 4.0]  # l_factor values
-    ]
-    param_names = ['capacity', 'size', 'insert_ratio', 'l_factor']
-    
-    repeat = 5
-    min_run_count = 3
-    
-    # Class-level cache for initial trees and data
-    _initial_tree_cache = {}
-    _initial_data_cache = {}
-    
-    def setup(self, capacity, size, insert_ratio, l_factor):
-        """Setup for mixed workload testing."""
-        super().setup(capacity, size, insert_ratio, l_factor)
-        
-        # Create cache key for initial tree setup (insert_ratio doesn't affect initial tree)
-        initial_cache_key = (capacity, size // 2, l_factor)
-        
-        # Check if we have a cached initial tree for these parameters
-        if initial_cache_key not in self._initial_tree_cache:
-            # Create GKPlusTree and initial data
-            tree_class, _, klist_class, _ = make_gkplustree_classes(capacity)
-            
-            # Generate initial data
-            initial_keys = BenchmarkUtils.generate_deterministic_keys(
-                size=size // 2,
-                seed=42,
-                distribution='uniform'
-            )
-            initial_entries = BenchmarkUtils.create_test_entries(initial_keys)
-            
-            # Create initial tree using bulk_create_gkplus_tree
-            initial_tree = bulk_create_gkplus_tree(initial_entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
-            
-            # Cache the tree and data
-            self._initial_tree_cache[initial_cache_key] = initial_tree
-            self._initial_data_cache[initial_cache_key] = initial_keys
-        
-        # Get cached initial tree and data
-        self.initial_tree = self._initial_tree_cache[initial_cache_key]
-        self.initial_keys = self._initial_data_cache[initial_cache_key]
-        
-        # Get tree class for creating fresh trees during benchmark
-        self.tree_class, _, self.klist_class, _ = make_gkplustree_classes(capacity)
-        
-        # Generate mixed operations
-        random.seed(42 + hash((capacity, size, insert_ratio, l_factor)) % 1000)
-        num_operations = size
-        num_inserts = int(num_operations * insert_ratio)
-        num_retrieves = num_operations - num_inserts
-        
-        # Keys for new insertions
-        self.insert_keys = BenchmarkUtils.generate_deterministic_keys(
-            size=num_inserts,
-            seed=43,
-            key_range=(max(self.initial_keys) + 1, max(self.initial_keys) + num_inserts + 1000)
-        )
-        
-        # Keys for retrievals
-        self.retrieve_keys = BenchmarkUtils.create_lookup_keys(
-            insert_keys=self.initial_keys,
-            hit_ratio=0.7,
-            seed=44
-        )[:num_retrieves]
-        
-        # Create mixed operation sequence
-        operations = (['insert'] * num_inserts) + (['retrieve'] * num_retrieves)
-        random.shuffle(operations)
-        self.operations = operations
-        
-        # Prepare entries and ranks for insertions
-        self.insert_entries = BenchmarkUtils.create_test_entries(self.insert_keys)
-        group_size = calculate_group_size(capacity)
-        self.insert_ranks = [calc_rank_from_group_size(key, group_size) for key in self.insert_keys]
-        
-        # Store l_factor for tree creation
-        self.l_factor = l_factor
-        
-        gc.collect()
-        gc.disable() # Enabled in teardown
-
-    @classmethod
-    def clear_cache(cls):
-        """Clear the tree cache to free memory when needed."""
-        cls._initial_tree_cache.clear()
-        cls._initial_data_cache.clear()
-        gc.collect()
-    
-    def time_mixed_workload(self, capacity, size, insert_ratio, l_factor):
-        """Benchmark mixed insert/retrieve workload."""
-        # Start with a copy of the cached initial tree
-        tree = self.initial_tree
-        insert_idx = 0
-        retrieve_idx = 0
-        
-        for operation in self.operations:
-            if operation == 'insert' and insert_idx < len(self.insert_entries):
-                tree, _ = tree.insert_entry(self.insert_entries[insert_idx], self.insert_ranks[insert_idx])
-                insert_idx += 1
-            elif operation == 'retrieve' and retrieve_idx < len(self.retrieve_keys):
-                tree.retrieve(self.retrieve_keys[retrieve_idx])
-                retrieve_idx += 1
-
-
 # Memory usage benchmarks
 class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of GKPlusTree operations."""
@@ -374,7 +263,6 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
 def clear_all_caches():
     """Clear all benchmark caches to free memory."""
     GKPlusTreeRetrieveBenchmarks.clear_cache()
-    GKPlusTreeMixedWorkloadBenchmarks.clear_cache()
     CapacityComparisonBenchmarks.clear_cache()
     gc.collect()
     print("🧹 All benchmark caches cleared")
