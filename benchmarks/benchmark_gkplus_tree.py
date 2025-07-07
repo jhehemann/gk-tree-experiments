@@ -196,9 +196,8 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
     repeat = 5
     min_run_count = 3
     
-    # Unified cache for all trees (shared between insert and retrieve operations)
+    # Cache for trees only (lookup keys are generated fresh each time)
     _tree_cache = {}
-    _data_cache = {}
     
     def setup(self, capacity, size, operation, l_factor):
         """Setup for comparison benchmarking."""
@@ -217,34 +216,24 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
         self.ranks = [calc_rank_from_group_size(entry.item.key, self.group_size) for entry in self.entries]
         
         if operation == 'retrieve':
-            # For retrieve operations, check if we have a pre-built tree from insert operations
+            # For retrieve operations, set up tree and lookup keys
             if cache_key not in self._tree_cache:
-                # If no cached tree from insert operations, build one using efficient bulk creation
+                # No cached tree from insert operations, build one using efficient bulk creation
                 tree = bulk_create_gkplus_tree(self.entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
-                
-                # Generate lookup keys for retrieve operations
-                lookup_keys = BenchmarkUtils.create_lookup_keys(
-                    insert_keys=self.keys,
-                    hit_ratio=0.8,
-                    seed=43
-                )
-                
-                # Cache the tree and lookup keys for future use
                 self._tree_cache[cache_key] = tree
-                self._data_cache[cache_key] = lookup_keys
             
-            # Use cached tree and lookup keys
+            # Always generate fresh lookup keys for retrieve operations
+            lookup_keys = BenchmarkUtils.create_lookup_keys(
+                insert_keys=self.keys,
+                hit_ratio=0.8,
+                seed=43
+            )
+            
+            # Use cached tree and fresh lookup keys
             self.tree = self._tree_cache[cache_key]
-            self.lookup_keys = self._data_cache[cache_key]
-        else:
-            # For insert operations, prepare lookup keys in case retrieve operations run later
-            if cache_key not in self._data_cache:
-                lookup_keys = BenchmarkUtils.create_lookup_keys(
-                    insert_keys=self.keys,
-                    hit_ratio=0.8,
-                    seed=43
-                )
-                self._data_cache[cache_key] = lookup_keys
+            self.lookup_keys = lookup_keys
+        
+        # For insert operations, no additional setup needed - we build tree during timing
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
@@ -256,7 +245,6 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
     def clear_cache(cls):
         """Clear the tree cache to free memory when needed."""
         cls._tree_cache.clear()
-        cls._data_cache.clear()
         gc.collect()
     
     def time_operation(self, capacity, size, operation, l_factor):
