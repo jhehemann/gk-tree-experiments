@@ -131,7 +131,7 @@ class BaseBenchmark:
         """Setup method called before each benchmark."""
         pass
 
-    def teardown(self):
+    def teardown(self, *params):
         """Teardown method called after each benchmark."""
         if not gc.isenabled():
             gc.enable()
