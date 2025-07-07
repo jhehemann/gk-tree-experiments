@@ -14,8 +14,7 @@ from gplus_trees.g_k_plus.factory import make_gkplustree_classes, create_gkplus_
 from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.base import Item, Entry
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, RobustTimer
-
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
 
 class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
@@ -30,8 +29,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'size', 'distribution', 'l_factor']
     
-    repeat = 5
-    min_run_count = 3
+    min_run_count = 5
     
     def setup(self, capacity, size, distribution, l_factor):
         """Setup GKPlusTree and test data for tree construction benchmarking."""
@@ -54,6 +52,9 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
+
+        gc.collect()
+        gc.disable() # Enabled in teardown
     
     
     def time_insert_entry_tree_construction(self, capacity, size, distribution, l_factor):
@@ -74,26 +75,27 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
 class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for GKPlusTreeBase.retrieve() method."""
     
-    # Test different capacities, data sizes, hit ratios, distributions, and l_factors
+    # Test different capacities, data sizes, hit ratios, and l_factors (distribution fixed to 'sequential')
     params = [
         [4, 8, 32],  # K values (capacities)
         [1000, 10000],  # data sizes
         [0.0, 1.0],  # hit ratios
-        ['uniform', 'sequential', 'clustered'],  # data distributions
         [1.0, 2.0, 4.0]  # l_factor values
     ]
-    param_names = ['capacity', 'size', 'hit_ratio', 'distribution', 'l_factor']
+    param_names = ['capacity', 'size', 'hit_ratio', 'l_factor']
     
-    number = 1
     repeat = 5
     min_run_count = 3
     
-    def setup(self, capacity, size, hit_ratio, distribution, l_factor):
+    def setup(self, capacity, size, hit_ratio, l_factor):
         """Setup populated GKPlusTree and lookup keys for benchmarking."""
-        super().setup(capacity, size, hit_ratio, distribution, l_factor)
+        super().setup(capacity, size, hit_ratio, l_factor)
+        
+        # Use only 'sequential' distribution
+        distribution = 'sequential'
         
         # Create and populate GKPlusTree
-        self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
+        self.tree_class, _, self.klist_class, _ = make_gkplustree_classes(capacity)
         self.tree = self.tree_class(l_factor=l_factor)
         
         # Generate and insert test data
@@ -105,75 +107,23 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         )
         
         entries = BenchmarkUtils.create_test_entries(self.insert_keys)
-        group_size = calculate_group_size(capacity)
         
-        for entry in entries:
-            rank = calc_rank_from_group_size(entry.item.key, group_size)
-            self.tree, _ = self.tree.insert_entry(entry, rank)
-        
+        # Use bulk_create_gkplus_tree for efficient initial tree construction
+        self.tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=self.klist_class)
+
         # Generate lookup keys with specified hit ratio
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
             seed=base_seed + 1000
         )
+        gc.collect()
+        gc.disable() # Enabled in teardown
+
     def time_retrieve_sequential(self, capacity, size, hit_ratio, distribution, l_factor):
         """Benchmark sequential retrieve operations."""
         for key in self.lookup_keys:
             self.tree.retrieve(key)
-
-
-# class GKPlusTreeScalabilityBenchmarks(BaseBenchmark):
-#     """Benchmarks to test scalability of GKPlusTree operations."""
-    
-#     # Focus on larger sizes for scalability testing
-#     params = [
-#         [8, 16, 32],  # K values
-#         [1000, 10000],  # larger sizes
-#     ]
-#     param_names = ['capacity', 'size']
-    
-#     number = 1
-#     repeat = 3  # Fewer repeats for large datasets
-#     min_run_count = 2
-    
-#     def setup(self, capacity, size):
-#         """Setup for scalability testing."""
-#         super().setup(capacity, size)
-        
-#         # Create GKPlusTree and test data
-#         self.GKPlusTreeClass, _, _, _ = make_gkplustree_classes(capacity)
-        
-#         # Use uniform distribution for consistency
-#         self.keys = BenchmarkUtils.generate_deterministic_keys(
-#             size=size,
-#             seed=42,
-#             distribution='uniform'
-#         )
-#         self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
-#         # Calculate ranks for entries
-#         group_size = calculate_group_size(capacity)
-#         self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
-    
-#     def time_insert_scalability(self, capacity, size):
-#         """Test how insert performance scales with data size."""
-#         tree = self.GKPlusTreeClass()
-        
-#         for entry, rank in zip(self.entries, self.ranks):
-#             tree, _ = tree.insert_entry(entry, rank)
-    
-#     def time_retrieve_scalability(self, capacity, size):
-#         """Test how retrieve performance scales with data size."""
-#         # First build the structure
-#         tree = self.GKPlusTreeClass()
-#         for entry, rank in zip(self.entries, self.ranks):
-#             tree, _ = tree.insert_entry(entry, rank)
-        
-#         # Then time retrieval of a subset
-#         lookup_keys = self.keys[::10]  # Every 10th key
-#         for key in lookup_keys:
-#             tree.retrieve(key)
 
 
 class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
@@ -187,8 +137,8 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'size', 'insert_ratio', 'l_factor']
     
-    number = 1
-    repeat = 3
+    repeat = 5
+    min_run_count = 3
     
     def setup(self, capacity, size, insert_ratio, l_factor):
         """Setup for mixed workload testing."""
@@ -231,27 +181,19 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
         
         # Prepare entries and ranks for insertions
         self.insert_entries = BenchmarkUtils.create_test_entries(self.insert_keys)
-        group_size = calculate_group_size(capacity)
-        self.insert_ranks = [calc_rank_from_group_size(key, group_size) for key in self.insert_keys]
-        
         # Store l_factor for tree creation
         self.l_factor = l_factor
+        
+        self.tree = bulk_create_gkplus_tree(self.insert_entries, DIM=1, l_factor=self.l_factor, KListClass=self.klist_class)
+        
+        gc.collect()
+        gc.disable() # Enabled in teardown
     
     def time_mixed_workload(self, capacity, size, insert_ratio, l_factor):
         """Benchmark mixed insert/retrieve workload."""
-        # Start with initial data
-        tree = self.tree_class(l_factor=l_factor)
-        initial_entries = BenchmarkUtils.create_test_entries(self.initial_keys)
-        group_size = calculate_group_size(capacity)
-        
-        for entry in initial_entries:
-            rank = calc_rank_from_group_size(entry.item.key, group_size)
-            tree, _ = tree.insert_entry(entry, rank)
-        
-        # Execute mixed operations
         insert_idx = 0
         retrieve_idx = 0
-        
+        tree = self.tree
         for operation in self.operations:
             if operation == 'insert' and insert_idx < len(self.insert_entries):
                 tree, _ = tree.insert_entry(self.insert_entries[insert_idx], self.insert_ranks[insert_idx])
@@ -259,52 +201,6 @@ class GKPlusTreeMixedWorkloadBenchmarks(BaseBenchmark):
             elif operation == 'retrieve' and retrieve_idx < len(self.retrieve_keys):
                 tree.retrieve(self.retrieve_keys[retrieve_idx])
                 retrieve_idx += 1
-
-
-# class GKPlusTreeStructuralBenchmarks(BaseBenchmark):
-#     """Benchmarks for structural properties and operations of GKPlusTree."""
-    
-#     params = [
-#         [8, 16, 32],  # K values
-#         [1000, 10000],  # sizes
-#     ]
-#     param_names = ['capacity', 'size']
-    
-#     def setup(self, capacity, size):
-#         """Setup for structural benchmarking."""
-#         super().setup(capacity, size)
-        
-#         self.GKPlusTreeClass, _, _, _ = make_gkplustree_classes(capacity)
-#         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
-#         self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
-#         # Calculate ranks for entries
-#         group_size = calculate_group_size(capacity)
-#         self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
-    
-#     def time_tree_construction_and_height(self, capacity, size):
-#         """Benchmark tree construction and measure final height."""
-#         tree = self.GKPlusTreeClass()
-#         for entry, rank in zip(self.entries, self.ranks):
-#             tree, _ = tree.insert_entry(entry, rank)
-        
-#         # Access height to ensure it's computed
-#         height = tree.height()
-#         return height
-    
-#     def track_tree_height(self, capacity, size):
-#         """Track the tree height as a structural indicator."""
-#         tree = self.GKPlusTreeClass()
-#         for entry, rank in zip(self.entries, self.ranks):
-#             tree, _ = tree.insert_entry(entry, rank)
-#         return tree.height()
-    
-#     def track_tree_item_count(self, capacity, size):
-#         """Track the number of items as a performance indicator."""
-#         tree = self.GKPlusTreeClass()
-#         for entry, rank in zip(self.entries, self.ranks):
-#             tree, _ = tree.insert_entry(entry, rank)
-#         return tree.item_count()
 
 
 # Memory usage benchmarks
@@ -332,6 +228,9 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
+
+        gc.collect()
+        gc.disable() # Enabled in teardown
     
     def peakmem_tree_construction(self, capacity, size, l_factor):
         """Measure peak memory during tree construction."""
@@ -352,6 +251,9 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
         [1.0, 2.0, 4.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'operation', 'l_factor']
+
+    repeat = 5
+    min_run_count = 3
     
     def setup(self, capacity, size, operation, l_factor):
         """Setup for comparison benchmarking."""
@@ -381,6 +283,9 @@ class CapacityComparisonBenchmarks(BaseBenchmark):
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
+        
+        gc.collect()
+        gc.disable() # Enabled in teardown
     
     def time_operation(self, capacity, size, operation, l_factor):
         """Benchmark the specified operation with the given capacity."""
