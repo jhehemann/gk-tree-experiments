@@ -125,7 +125,7 @@ class BaseBenchmark:
     
     # Let ASV handle timing optimization automatically
     warmup_time = 0.1
-    sample_time = 0.2
+    sample_time = 0.4
     
     def setup(self, *params):
         """Setup method called before each benchmark."""
