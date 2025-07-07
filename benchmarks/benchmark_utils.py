@@ -196,9 +196,9 @@ class BaseBenchmark:
     # Parameters for benchmarking
     params = []
     param_names = []
+    sample_time = 0.2
     
     # Number of iterations for timing (can be overridden)
-    number = 1
     repeat = 5
     min_run_count = 3
     

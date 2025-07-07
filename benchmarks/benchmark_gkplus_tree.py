@@ -30,7 +30,6 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
     ]
     param_names = ['capacity', 'size', 'distribution', 'l_factor']
     
-    number = 1
     repeat = 5
     min_run_count = 3
     
