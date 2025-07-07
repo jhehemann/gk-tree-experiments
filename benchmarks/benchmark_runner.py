@@ -54,6 +54,14 @@ class IsolatedBenchmarkRunner:
             # Check out the current branch instead of main
             self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
             self._run_command(["git", "reset", "--hard", f"origin/{current_branch}"], cwd=self.repo_dir)
+            
+            # Verify current commit
+            try:
+                commit_result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.repo_dir)
+                current_commit = commit_result.stdout.strip()
+                print(f"📍 Isolated repo updated to commit: {current_commit[:12]}...")
+            except subprocess.CalledProcessError:
+                print("⚠️  Could not verify current commit")
         else:
             print("📥 Cloning repository for isolated benchmarking...")
             # Get remote URL from working directory
@@ -61,6 +69,14 @@ class IsolatedBenchmarkRunner:
             repo_url = result.stdout.strip()
             
             self._run_command(["git", "clone", "-b", current_branch, repo_url, str(self.repo_dir)], cwd=self.benchmark_dir)
+            
+            # Verify cloned commit
+            try:
+                commit_result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.repo_dir)
+                current_commit = commit_result.stdout.strip()
+                print(f"📍 Isolated repo cloned at commit: {current_commit[:12]}...")
+            except subprocess.CalledProcessError:
+                print("⚠️  Could not verify cloned commit")
         
         # Discover and set up all relevant benchmark branches
         print("🔄 Setting up local benchmark branches...")
@@ -135,7 +151,30 @@ class IsolatedBenchmarkRunner:
             raise
     
     def _resolve_commit_reference(self, commit_ref, branch=None):
-        """Resolve commit references, with special handling for branch^! syntax."""
+        """Resolve commit references, with special handling for branch^! syntax and multiple commits."""
+        
+        # Handle multiple commit references separated by spaces
+        if ' ' in commit_ref.strip():
+            individual_refs = commit_ref.strip().split()
+            resolved_refs = []
+            resolved_branches = []
+            
+            for ref in individual_refs:
+                resolved_ref, resolved_branch = self._resolve_single_commit_reference(ref.strip(), branch)
+                resolved_refs.append(resolved_ref)
+                if resolved_branch:
+                    resolved_branches.append(resolved_branch)
+            
+            # Join resolved references back with spaces for ASV
+            final_ref = ' '.join(resolved_refs)
+            print(f"🔍 Resolved multiple commits: {final_ref}")
+            return final_ref, resolved_branches[0] if resolved_branches else None
+        
+        # Handle single commit reference
+        return self._resolve_single_commit_reference(commit_ref, branch)
+    
+    def _resolve_single_commit_reference(self, commit_ref, branch=None):
+        """Resolve a single commit reference, with special handling for branch^! syntax."""
         
         # Handle special branch^! syntax (ASV doesn't understand origin/branch^!)
         if commit_ref.endswith("^!"):
@@ -162,8 +201,8 @@ class IsolatedBenchmarkRunner:
                     print(f"🔍 Resolved {commit_ref} to {resolved_ref[:12]}...")
                     return resolved_ref, base_ref
                 except subprocess.CalledProcessError:
-                    print(f"⚠️  Could not resolve {commit_ref}, using as-is")
-                    return commit_ref, None
+                    print(f"⚠️  Could not resolve {commit_ref}, using base reference: {base_ref}")
+                    return base_ref, None
         
         # For all other cases (ranges, hashes, etc.), let ASV handle it natively
         print(f"🔍 Passing {commit_ref} directly to ASV")
@@ -222,25 +261,23 @@ class IsolatedBenchmarkRunner:
             
             recent_log = log_files[0]
             
-            # Check if log file contains completion indicators
+            # Read all lines and find the last non-empty line
             with open(recent_log, 'r') as f:
-                content = f.read()
-                
-            # Look for ASV completion indicators
-            completion_indicators = [
-                "========== ==========",  # ASV results table end
-                "··· ========== ========= ==========",  # ASV results formatting
-            ]
+                lines = [line.rstrip() for line in f if line.strip()]
             
-            for indicator in completion_indicators:
-                if indicator in content:
-                    return True
+            if not lines:
+                return False
+            
+            last_line = lines[-1]
+            # Check if the last line contains only '=' and whitespace
+            if all(c == '=' or c.isspace() for c in last_line) and any(c == '=' for c in last_line):
+                return True
             
             return False
             
         except Exception:
             return False
-    
+            
     def run_benchmarks_background(self, commit_hash, benchmark_filter=None, branch=None, quick=False):
         """Run benchmarks in background without blocking."""
         
@@ -252,20 +289,40 @@ class IsolatedBenchmarkRunner:
                 
                 self.update_status("running", f"Starting benchmarks for {commit_hash}", commit_hash)
                 
-                # Update isolated repo
-                print("📡 Updating isolated repository...")
+                # Always update isolated repo to latest remote state
+                print("📡 Updating isolated repository to latest remote state...")
                 self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
                 
-                # For branch-specific commits, ensure the branch exists locally
-                if effective_branch:
-                    print(f"🔄 Ensuring branch {effective_branch} exists locally...")
+                # Determine target branch (prefer explicitly specified, fallback to working directory)
+                target_branch = effective_branch
+                if not target_branch:
                     try:
-                        self._run_command(["git", "checkout", effective_branch], cwd=self.repo_dir)
-                        self._run_command(["git", "reset", "--hard", f"origin/{effective_branch}"], cwd=self.repo_dir)
-                        # Update ASV config to include this branch
-                        self._update_asv_config_for_branch(effective_branch)
+                        current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.working_dir)
+                        target_branch = current_branch_result.stdout.strip()
+                        print(f"📍 Using working directory branch: {target_branch}")
                     except subprocess.CalledProcessError:
-                        print(f"⚠️  Could not setup branch {effective_branch}, continuing anyway...")
+                        print("⚠️  Could not determine current branch from working directory")
+                        target_branch = "main"  # Fallback to main
+                        print(f"📍 Falling back to default branch: {target_branch}")
+                
+                # Always update to latest remote state
+                print(f"🔄 Updating to latest {target_branch}...")
+                try:
+                    self._run_command(["git", "checkout", target_branch], cwd=self.repo_dir)
+                    self._run_command(["git", "reset", "--hard", f"origin/{target_branch}"], cwd=self.repo_dir)
+                    
+                    # Update ASV config to include this branch
+                    self._update_asv_config_for_branch(target_branch)
+                    
+                    # Verify and display current commit
+                    commit_result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.repo_dir)
+                    current_commit = commit_result.stdout.strip()
+                    print(f"✅ Isolated repo updated to latest {target_branch}: {current_commit[:12]}...")
+                    
+                except subprocess.CalledProcessError as e:
+                    print(f"❌ Failed to update branch {target_branch}: {e}")
+                    print("💡 Benchmarks may run on stale code")
+                    # Continue anyway - ASV might still be able to handle the commit reference
                 
                 # Setup ASV environment (only once)
                 self.update_status("running", "Setting up ASV environment...", commit_hash)
@@ -283,7 +340,7 @@ class IsolatedBenchmarkRunner:
                 
                 # Create log file for this run  
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                safe_commit = commit_hash.replace('..', '_to_').replace('^!', '_head').replace('/', '_')
+                safe_commit = commit_hash.replace('..', '_to_').replace('^!', '_head').replace('/', '_').replace(' ', '_')
                 log_file = self.logs_dir / f"benchmark_{safe_commit}_{timestamp}.log"
                 
                 with open(log_file, "w") as f:
@@ -335,6 +392,8 @@ class IsolatedBenchmarkRunner:
         # Show appropriate message based on commit reference type
         if ".." in commit_hash:
             print(f"🚀 Benchmarks started in background for commit range: {commit_hash}")
+        elif ' ' in commit_hash.strip():
+            print(f"🚀 Benchmarks started in background for multiple commits: {commit_hash}")
         else:
             print(f"🚀 Benchmarks started in background for commit: {commit_hash}")
         
@@ -483,6 +542,59 @@ class IsolatedBenchmarkRunner:
             print("ℹ️  No git hooks to remove")
         
         return True
+
+    def force_update_repo(self):
+        """Force update the isolated repository to match the latest remote state."""
+        if not self.repo_dir.exists():
+            print("❌ Isolated repository not found. Run --setup first.")
+            return False
+        
+        print("🔄 Force updating isolated repository to latest remote state...")
+        
+        # Get current branch from working directory
+        try:
+            current_branch_result = self._run_command(["git", "branch", "--show-current"], cwd=self.working_dir)
+            current_branch = current_branch_result.stdout.strip()
+            print(f"📍 Working directory branch: {current_branch}")
+        except subprocess.CalledProcessError:
+            print("❌ Could not determine current branch from working directory")
+            current_branch = "main"  # Fallback
+            print(f"📍 Falling back to default branch: {current_branch}")
+        
+        try:
+            # Fetch all latest changes
+            print("📡 Fetching all remote changes...")
+            self._run_command(["git", "fetch", "--all"], cwd=self.repo_dir)
+            
+            # Always update to latest remote state
+            print(f"🔄 Updating to latest {current_branch}...")
+            self._run_command(["git", "checkout", current_branch], cwd=self.repo_dir)
+            self._run_command(["git", "reset", "--hard", f"origin/{current_branch}"], cwd=self.repo_dir)
+            
+            # Verify current commit
+            commit_result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.repo_dir)
+            current_commit = commit_result.stdout.strip()
+            
+            print(f"✅ Isolated repo updated to latest {current_branch}: {current_commit[:12]}...")
+            
+            # Optional: compare with working directory commit
+            try:
+                work_commit_result = self._run_command(["git", "rev-parse", "HEAD"], cwd=self.working_dir)
+                work_commit = work_commit_result.stdout.strip()
+                print(f"📍 Working directory at: {work_commit[:12]}...")
+                
+                if current_commit == work_commit:
+                    print("✅ Isolated repo and working directory are in sync")
+                else:
+                    print("💡 Different commits - this is normal if you have uncommitted changes")
+            except subprocess.CalledProcessError:
+                print("⚠️  Could not check working directory commit")
+            
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to update repository: {e}")
+            return False
 
     def show_status(self):
         """Show current benchmark status."""
@@ -633,7 +745,7 @@ class IsolatedBenchmarkRunner:
 def main():
     parser = argparse.ArgumentParser(description="Isolated Background Benchmark Runner")
     parser.add_argument("--setup", action="store_true", help="Setup isolated environment")
-    parser.add_argument("--run", help="Run benchmarks for specific commit")
+    parser.add_argument("--run", help="Run benchmarks for specific commit(s). Can be a single commit, range, or multiple commits separated by spaces (e.g., 'commit1^! commit2^!')")
     parser.add_argument("--bench", help="Filter to specific benchmark")
     parser.add_argument("--branch", help="Specify branch for benchmarking")
     parser.add_argument("--commit", help="Commit hash to benchmark")
@@ -641,6 +753,7 @@ def main():
     parser.add_argument("--stop", action="store_true", help="Stop running benchmarks")
     parser.add_argument("--clean", action="store_true", help="Clean up benchmark environment")
     parser.add_argument("--force", action="store_true", help="Force clean without confirmation")
+    parser.add_argument("--update", action="store_true", help="Manually force update isolated repository (automatically done on every benchmark run)")
     parser.add_argument("--view", action="store_true", help="View benchmark results")
     parser.add_argument("--quick", action="store_true", help="Run benchmarks in quick mode")
     parser.add_argument("--working-dir", help="Working directory path")
@@ -654,9 +767,11 @@ def main():
         runner.remove_git_hooks()
         print("\n🎉 Isolated benchmark environment ready!")
         print("📝 Usage:")
-        print(f"  - Run manually: python {__file__} --run HEAD --bench GKPlusTreeInsert")
+        print(f"  - Run single commit: python {__file__} --run HEAD --bench GKPlusTreeInsert")
+        print(f"  - Run multiple commits: python {__file__} --run 'performance-refactor^! inverse-klist^!'")
         print(f"  - Check status: python {__file__} --status")
         print(f"  - View results: python {__file__} --view")
+        print("📡 Note: Repository is automatically updated to latest remote state on every benchmark run")
         
     elif args.status:
         runner.show_status()
@@ -666,6 +781,15 @@ def main():
         
     elif args.clean:
         runner.clean_benchmarks(force=args.force)
+        
+    elif args.update:
+        success = runner.force_update_repo()
+        if success:
+            print("\n✅ Repository update completed successfully!")
+            print("💡 Note: The repository is automatically updated to latest remote state on every benchmark run")
+        else:
+            print("\n❌ Repository update failed!")
+            sys.exit(1)
         
     elif args.view:
         runner.view_results()

@@ -1,44 +1,20 @@
 """
 Benchmarking utilities for G+ trees and K-lists.
 
-This module provides common utilities and base classes for robust benchmarking
-that minimizes the impact of CPU and memory load variations.
+This module provides common utilities and base classes for ASV benchmarking
+that work optimally with ASV's built-in timing and stabilization mechanisms.
 """
 
-import gc
 import random
-import time
-import statistics
-from typing import List, Tuple, Optional, Iterator
+import gc
+from typing import List, Tuple
 import numpy as np
 
 from gplus_trees.base import Item, Entry
-from gplus_trees.factory import make_gplustree_classes, create_gplustree
 
 
 class BenchmarkUtils:
-    """Utility class for robust benchmarking operations."""
-    
-    @staticmethod
-    def ensure_stable_system(warmup_iterations: int = 5, 
-                           stabilization_time: float = 0.1) -> None:
-        """
-        Perform operations to stabilize the system before benchmarking.
-        
-        Args:
-            warmup_iterations: Number of warmup iterations to perform
-            stabilization_time: Time to wait for system stabilization
-        """
-        # Force garbage collection
-        for _ in range(3):
-            gc.collect()
-        
-        # Warm up the CPU with some computation
-        for _ in range(warmup_iterations):
-            _ = sum(i * i for i in range(1000))
-        
-        # Wait for system stabilization
-        time.sleep(stabilization_time)
+    """Utility class for ASV benchmarking operations."""
     
     @staticmethod
     def generate_deterministic_keys(size: int, 
@@ -115,7 +91,7 @@ class BenchmarkUtils:
         """
         random.seed(seed)
         
-        num_lookups = len(insert_keys)
+        num_lookups = 1000
         num_hits = int(num_lookups * hit_ratio)
         num_misses = num_lookups - num_hits
         
@@ -140,73 +116,22 @@ class BenchmarkUtils:
         return lookup_keys
 
 
-class RobustTimer:
-    """Timer class for robust timing measurements."""
-    
-    def __init__(self, num_iterations: int = 1):
-        self.num_iterations = num_iterations
-        self.times = []
-    
-    def time_operation(self, operation_func, *args, **kwargs) -> float:
-        """
-        Time an operation multiple times and return the median time.
-        
-        Args:
-            operation_func: Function to time
-            *args, **kwargs: Arguments for the function
-            
-        Returns:
-            Median execution time in seconds
-        """
-        BenchmarkUtils.ensure_stable_system()
-        
-        times = []
-        for _ in range(self.num_iterations):
-            # Force garbage collection before each iteration
-            gc.collect()
-            
-            start_time = time.perf_counter()
-            result = operation_func(*args, **kwargs)
-            end_time = time.perf_counter()
-            
-            times.append(end_time - start_time)
-        
-        self.times = times
-        return statistics.median(times)
-    
-    def get_statistics(self) -> dict:
-        """Get timing statistics."""
-        if not self.times:
-            return {}
-        
-        return {
-            'median': statistics.median(self.times),
-            'mean': statistics.mean(self.times),
-            'min': min(self.times),
-            'max': max(self.times),
-            'std': statistics.stdev(self.times) if len(self.times) > 1 else 0,
-            'q25': np.percentile(self.times, 25),
-            'q75': np.percentile(self.times, 75)
-        }
-
-
 class BaseBenchmark:
-    """Base class for ASV benchmarks with robust timing."""
+    """Base class for ASV benchmarks optimized for ASV's built-in timing."""
     
     # Parameters for benchmarking
     params = []
     param_names = []
     
-    # Number of iterations for timing (can be overridden)
-    number = 1
-    repeat = 3
-    min_run_count = 5
+    # Let ASV handle timing optimization automatically
+    warmup_time = 0.1
+    sample_time = 0.4
     
     def setup(self, *params):
         """Setup method called before each benchmark."""
-        BenchmarkUtils.ensure_stable_system()
-    
+        pass
+
     def teardown(self, *params):
         """Teardown method called after each benchmark."""
-        # Force garbage collection
-        gc.collect()
+        if not gc.isenabled():
+            gc.enable()
