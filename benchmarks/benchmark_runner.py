@@ -222,25 +222,23 @@ class IsolatedBenchmarkRunner:
             
             recent_log = log_files[0]
             
-            # Check if log file contains completion indicators
+            # Read all lines and find the last non-empty line
             with open(recent_log, 'r') as f:
-                content = f.read()
-                
-            # Look for ASV completion indicators
-            completion_indicators = [
-                "========== ==========",  # ASV results table end
-                "··· ========== ========= ==========",  # ASV results formatting
-            ]
+                lines = [line.rstrip() for line in f if line.strip()]
             
-            for indicator in completion_indicators:
-                if indicator in content:
-                    return True
+            if not lines:
+                return False
+            
+            last_line = lines[-1]
+            # Check if the last line contains only '=' and whitespace
+            if all(c == '=' or c.isspace() for c in last_line) and any(c == '=' for c in last_line):
+                return True
             
             return False
             
         except Exception:
             return False
-    
+            
     def run_benchmarks_background(self, commit_hash, benchmark_filter=None, branch=None, quick=False):
         """Run benchmarks in background without blocking."""
         
