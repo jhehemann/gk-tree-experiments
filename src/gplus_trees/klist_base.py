@@ -2,6 +2,7 @@
 from typing import TYPE_CHECKING, Optional, Tuple, Type
 from bisect import bisect_left, insort_left
 from itertools import chain
+import copy
 
 from gplus_trees.base import (
     Item,
@@ -27,13 +28,25 @@ class KListNodeBase:
     
     # Default capacity that will be overridden by factory-created subclasses
     CAPACITY: int  # Default value, will usually be overridden by factory
-    
-    def __init__(self):
-        self.entries: list[Entry] = []
-        self.keys: list[int] = []       # Sorted list of keys for fast binary search
-        self.real_keys: list[int] = []  # Sorted list of real keys (excluding dummy keys)
-        self.next: Optional['KListNodeBase'] = None
-        
+
+    def __init__(
+            self, entries: Optional[list[Entry]] = None,
+            keys: Optional[list[int]] = None,
+            real_keys: Optional[list[int]] = None,
+            next_node: Optional['KListNodeBase'] = None
+        ):
+        self.entries: list[Entry] = entries if entries is not None else []
+        self.keys: list[int] = keys if keys is not None else []  # Sorted keys for binary search
+        self.real_keys: list[int] = real_keys if real_keys is not None else []  # without dummy keys
+        self.next: Optional['KListNodeBase'] = next_node
+
+    def _set_attributes(self, entries: list[Entry], keys: list[int], real_keys: list[int], next_node: Optional['KListNodeBase']):
+        self.entries = entries
+        self.keys = keys
+        self.real_keys = real_keys
+        self.next = next_node
+        return self
+
     def insert_entry(
             self, 
             entry: Entry,
@@ -184,17 +197,39 @@ class KListBase(AbstractSetDataStructure):
     # Will be assigned by factory
     KListNodeClass: Type[KListNodeBase]
     
-    def __init__(self):
-        self.head = self.tail = None
+    def __init__(
+            self,
+            head: Optional[KListNodeBase] = None,
+            tail: Optional[KListNodeBase] = None,
+            nodes: Optional[list[KListNodeBase]] = None,
+            prefix_counts_tot: Optional[list[int]] = None,
+            prefix_counts_real: Optional[list[int]] = None,
+            bounds: Optional[list[int]] = None
+        ):
+        self.head = head
+        self.tail = tail
         # auxiliary index
-        self._nodes = []               # List[KListNodeBase]
-        self._prefix_counts_tot = []   # List[int]
-        self._prefix_counts_real = []  # List[int], real items count (excluding dummy items)
-        self._bounds = []              # List[int], max key per node (optional)
+        self._nodes = nodes if nodes is not None else []
+        self._prefix_counts_tot = prefix_counts_tot if prefix_counts_tot is not None else []
+        self._prefix_counts_real = prefix_counts_real if prefix_counts_real is not None else []
+        self._bounds = bounds if bounds is not None else []
     
     def __bool__(self) -> bool:
         # return False when empty, True when non-empty
         return not self.is_empty()
+
+    def reset(self):
+        self.head = None
+        self.tail = None
+        self._nodes = []
+        self._prefix_counts_tot = []
+        self._prefix_counts_real = []
+        self._bounds = []
+        return self
+
+    def clone(self):
+        return self.__class__(self.head, self.tail, self._nodes, self._prefix_counts_tot,
+                              self._prefix_counts_real, self._bounds)
 
     def _rebuild_index(self):
         """Rebuild the node list and prefix-sum of entry counts."""
@@ -293,21 +328,25 @@ class KListBase(AbstractSetDataStructure):
 
         # If the k-list is empty, create a new node.
         if self.head is None:
-            node = self.KListNodeClass()
-            node.entries.append(entry)
-            node.keys.append(key)
-            if key >= 0: # Only add to real_keys if it's not a dummy key
-                node.real_keys.append(key)
+            node = self.KListNodeClass(
+                entries=[entry],
+                keys=[key],
+                real_keys=[key] if key >= 0 else []
+            )
             self.head = self.tail = node
             self._rebuild_index()
             return self, True
         elif key < bounds[-1]:
             tail_entries = tail.entries
             if len(tail_entries) >= self.KListNodeClass.CAPACITY:
-                tail.next = self.KListNodeClass()
+                tail.next = self.KListNodeClass(
+                    entries=[entry],
+                    keys=[key],
+                    real_keys=[key] if key >= 0 else []
+                )
                 self.tail = tail.next
-                tail = self.tail
-                tail_entries = tail.entries
+                self._rebuild_index()
+                return self, True
 
             tail_entries.append(entry)
             tail.keys.append(key)
@@ -315,6 +354,7 @@ class KListBase(AbstractSetDataStructure):
                 tail.real_keys.append(key)
             self._rebuild_index()
             return self, True
+        
         elif key > self._nodes[0].entries[0].item.key:
             node = self.head
         else:
@@ -351,13 +391,12 @@ class KListBase(AbstractSetDataStructure):
         while overflow is not None:
             if node.next is None:
                 overflow_key = overflow.item.key
-                node.next = self.KListNodeClass()
+                node.next = self.KListNodeClass(
+                    entries=[overflow],
+                    keys=[overflow_key],
+                    real_keys=[overflow_key] if overflow_key >= 0 else []
+                )
                 self.tail = node.next
-                tail = self.tail
-                tail.entries.append(overflow)
-                tail.keys.append(overflow_key)
-                if overflow_key >= 0:  # Only add to real_keys if it's not a dummy key
-                    tail.real_keys.append(overflow_key)
                 self._rebuild_index()
                 return self, True
 
@@ -643,31 +682,27 @@ class KListBase(AbstractSetDataStructure):
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
 
-        if self.head is None:                        # ··· (1) empty
-            self = type(self)()  # Create new instances of the same class
+        # Fast path: Empty K-List
+        if self.head is None:
             right = type(self)()
             return self, None, right
 
-        # --- locate split node ------------------------------------------------
-        # Find the first node where key >= min_key (using reverse order bounds)
-        i = bisect_left(self._bounds, -key, key=lambda v: -v)
         nodes = self._nodes
 
         # If key is smaller than any key in the list, all entries have keys > key
         # Interface expects: left (keys < key), right (keys > key)
-        if i >= len(nodes):         # ··· (2) key < min
-            new_klist = type(self)()  # Empty klist for keys < key
-            new_klist.head = self.head  # All entries go to right
-            new_klist.tail = self.tail
-            self.head = self.tail = None  # Clear the original klist
-            self._rebuild_index()
-            new_klist._rebuild_index()
-            return self, None, new_klist  # Empty left, all entries go to right
+        if key < nodes[-1].entries[-1].item.key:
+            right_return = copy.copy(self)
+            return self.reset(), None, right_return  # Empty left, all entries go to right
 
         # If key is larger than the maximum key, all entries have keys < key
-        if key > nodes[0].entries[0].item.key:  # key > max
-            empty_klist = type(self)()  # Empty klist for keys > key
-            return self, None, empty_klist  # All entries go to left, empty right
+        if key > nodes[0].entries[0].item.key:
+            right_return = type(self)()
+            return self, None, right_return  # All entries go to left, empty right
+
+        # --- locate split node ------------------------------------------------
+        # Find the first node where key >= min_key (using reverse order bounds)
+        i = bisect_left(self._bounds, -key, key=lambda v: -v)
 
         node_idx = i
         split_node = nodes[node_idx]
@@ -684,9 +719,9 @@ class KListBase(AbstractSetDataStructure):
         lo_idx = i + 1 if exact else i
 
         # In reverse order: entries with keys > split_key go to greater_part, <= split_key go to lesser_part
-        greater_entries = node_entries[:i]  # Keys > split_key -> will become interface RIGHT
-        lesser_entries = node_entries[lo_idx:]  # Keys < split_key -> will become interface LEFT
-        left_subtree = node_entries[i].left_subtree if exact else None
+        greater_entries = node_entries[:i]  # Keys > split_key -> will become RIGHT return
+        lesser_entries = node_entries[lo_idx:]  # Keys < split_key -> will become LEFT return
+        key_subtree = node_entries[i].left_subtree if exact else None
 
         greater_keys = node_keys[:i]
         lesser_keys = node_keys[lo_idx:]
@@ -697,32 +732,32 @@ class KListBase(AbstractSetDataStructure):
         greater_real_keys = real_keys[:j]
         lesser_real_keys = real_keys[j + 1 if exact else j :]
 
-        # ------------- build GREATER PART (keys > split_key) -> INTERFACE RIGHT ------------
-        interface_right = type(self)()
-        interface_right.head = self.head
-        if greater_entries:                          # reuse split_node
+        # ------------- build RIGHT RETURN (keys > split_key) ------------
+        if greater_entries:                          
             # Right: previous nodes + split_node
-            split_node.entries = greater_entries
-            split_node.keys = greater_keys
-            split_node.next    = None
-            split_node.real_keys = greater_real_keys
-            interface_right.tail = split_node
+            split_node = split_node._set_attributes(    # reuse split_node
+                entries=greater_entries,
+                keys=greater_keys,
+                real_keys=greater_real_keys,
+                next_node=None
+            )
+            right_return = type(self)(head=self.head, tail=split_node)
         else:
             # Right: previous nodes
             if prev_node:
                 prev_node.next = None
-                interface_right.tail = prev_node
+                right_return = type(self)(head=self.head, tail=prev_node)
             else:                                    # empty greater part
-                interface_right.head = interface_right.tail = None
+                right_return = type(self)()
 
-        # ------------- build LESSER PART (keys < split_key) -> INTERFACE LEFT ------------
-        # interface_left = type(self)()
+        # ------------- build LEFT RETURN (keys < split_key) ------------
         if lesser_entries:
-            new_node = self.KListNodeClass()
-            new_node.entries   = lesser_entries
-            new_node.keys      = lesser_keys
-            new_node.real_keys = lesser_real_keys
-            new_node.next      = original_next
+            new_node = self.KListNodeClass(
+                entries=lesser_entries,
+                keys=lesser_keys,
+                real_keys=lesser_real_keys,
+                next_node=original_next
+            )
             self.head = new_node
         else:
             self.head = original_next
@@ -731,16 +766,16 @@ class KListBase(AbstractSetDataStructure):
         if self.tail is split_node:
             self.tail = self.head
 
-        # Ensure non-tail nodes in left return are at full capacity
-        if self.head:
+        # Ensure all non-tail nodes in left return are at full capacity
+        if self.head and lesser_entries:
             self._rebalance_for_compaction(self)
         
         # ------------- rebuild indexes ---------------------------------------
         self._rebuild_index()
-        interface_right._rebuild_index()
+        right_return._rebuild_index()
 
-        # Return in interface order: left (keys < split_key), subtree, right (keys > split_key)
-        return self, left_subtree, interface_right
+        # Return in interface order: left (keys < split_key), key_subtree, right (keys > split_key)
+        return self, key_subtree, right_return
 
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
         """
