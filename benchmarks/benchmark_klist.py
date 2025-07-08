@@ -76,10 +76,10 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     _klist_cache = {}
     _data_cache = {}
 
-    def setup(self, capacity, l_factor, hit_ratio, distribution):
+    def setup(self, capacity, l_factor, hit_ratio):
         """Setup populated KList and lookup keys for benchmarking."""
         size = capacity * l_factor
-        super().setup(capacity, size, hit_ratio, distribution)
+        super().setup(capacity, size, hit_ratio)
 
         # Use deterministic key generation parameters
         cache_key = (capacity, size)
