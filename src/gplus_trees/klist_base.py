@@ -818,8 +818,6 @@ class KListBase(AbstractSetDataStructure):
         for node in self._nodes:
             yield from node.entries
 
-        
-
     def __str__(self):
         """
         Returns a string representation of the k-list for debugging.
@@ -891,72 +889,6 @@ class KListBase(AbstractSetDataStructure):
                 previous_last_key = node.entries[-1].item.key
 
             node = node.next
-
-    def count_ge(self, key: int) -> int:
-        """
-        Return the count of items with keys greater than or equal to the input key.
-        
-        This method leverages the existing index system for O(log l + log k) performance,
-        where l is the number of nodes and k is the capacity per node.
-        
-        Since entries are stored in descending order, we count from the beginning.
-        
-        Args:
-            key (int): The key threshold
-            
-        Returns:
-            int: Number of items with keys >= key
-            
-        Raises:
-            TypeError: If key is not an integer
-        """
-        if not isinstance(key, int):
-            raise TypeError(f"key must be int, got {type(key).__name__!r}")
-        
-        # Empty list case
-        if not self._prefix_counts_tot:
-            return 0
-        
-        # If key is greater than the maximum key (first entry), return 0
-        if self.head and key > self.head.entries[0].item.key:
-            return 0
-            
-        # If key is less than or equal to the minimum key (last entry), return total count
-        if key <= self._bounds[-1]:  # _bounds contains minimum keys
-            return self._prefix_counts_tot[-1]
-        
-        # Find the first node that might contain keys >= key
-        # We need to find the first node where key >= min_key
-        # Since _bounds contains minimum keys in descending order, search for -key
-        left = search_idx(key, self._bounds)
-
-        # If key is smaller than all minimum keys, count all items
-        if left >= len(self._nodes):
-            return self._prefix_counts_tot[-1]
-            
-        count = 0
-        
-        # Count items from the beginning up to but not including the target node
-        if left > 0:
-            count = self._prefix_counts_tot[left - 1]
-        
-        # Count items in the target node that are >= key
-        node = self._nodes[left]
-        node_keys = node.keys
-        if node_keys:
-            # Binary search within the node to find first position >= key (in descending order)
-            left_bs, right_bs = 0, len(node_keys)
-            while left_bs < right_bs:
-                mid = (left_bs + right_bs) // 2
-                if node_keys[mid] >= key:
-                    left_bs = mid + 1
-                else:
-                    right_bs = mid
-            
-            # In descending order, all items from 0 to left_bs-1 are >= key
-            count += left_bs
-        
-        return count
 
 
 def search_idx(comp_elem: Any, list: list[Any]) -> int:
