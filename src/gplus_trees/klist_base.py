@@ -1,6 +1,6 @@
 """K-list implementation"""
 from typing import TYPE_CHECKING, Optional, Tuple, Type, Any
-from bisect import bisect_left, insort_left
+from bisect import bisect_left
 from itertools import chain
 import copy
 
@@ -89,25 +89,11 @@ class KListNodeBase:
                 real_keys.insert(0, x_key)
         else:
             # Choose algorithm based on list length
-            entries_len = len(entries)
-            if entries_len < 8:
-                # Linear search for very small lists (descending order)
-                for i in range(entries_len):
-                    if x_key > entries[i].item.key:
-                        entries.insert(i, entry)
-                        keys.insert(i, x_key)
-                        break
-                    elif x_key == entries[i].item.key:
-                        # If we find an exact match, we can choose to replace or ignore
-                        # Here we choose to ignore the insertion if the key already exists
-                        return None, False
-            else:
-                # Binary search for larger lists using reverse bisect
-                i = bisect_left(keys, -x_key, key=lambda v: -v)
-                if i < len(entries) and keys[i] == x_key:
-                    return None, False
-                entries.insert(i, entry)
-                keys.insert(i, x_key)
+            i = search_idx(x_key, keys)
+            if i < len(entries) and keys[i] == x_key:
+                return None, False
+            entries.insert(i, entry)
+            keys.insert(i, x_key)
 
             if not is_dummy:
                 # Insert into real_keys in descending order
@@ -116,20 +102,12 @@ class KListNodeBase:
                 if real_keys_len == 0 or x_key < real_keys[-1]:
                     real_keys.append(x_key)
                 else:
-                    if real_keys_len < 8:
-                        # Linear search for very small lists (descending order)
-                        for i in range(real_keys_len):
-                            if x_key > real_keys[i]:
-                                real_keys.insert(i, x_key)
-                                break
-                    else:
-                        # Binary search for larger lists (descending order)
-                        insort_left(real_keys, x_key, key=lambda v: -v)
+                    i = search_idx(x_key, real_keys)
+                    real_keys.insert(i, x_key)
 
         # Handle overflow - pop the smallest (last) entry
         if len(entries) > self.__class__.CAPACITY:
             pop_entry = entries.pop()
-            # logger.debug(f"POP ENTRY {pop_entry.item.key}")
             keys.pop()
             if pop_entry.item.key >= 0:
                 real_keys.pop()
@@ -155,8 +133,8 @@ class KListNodeBase:
 
         keys = self.keys
         
-        # Binary search in descending order
-        i = bisect_left(keys, -x_key, key=lambda v: -v)
+        # Find the index of the key in the sorted (descending) keys list
+        i = search_idx(x_key, keys)
 
         # Case A: found exact
         if i < len(entries) and keys[i] == x_key:
@@ -350,18 +328,6 @@ class KListBase(AbstractSetDataStructure):
 
         return self, True
 
-    def search_idx(self, comp_elem: Any, list: list[Any]) -> int:
-        list_len = len(list)
-        if list_len < 8:
-            # Linear search for small number of nodes
-            for i, bound in enumerate(list):
-                if comp_elem >= bound:
-                    return i
-            return list_len
-        else:
-            # Binary search for larger node count
-            i = bisect_left(list, -comp_elem, key=lambda v: -v)
-            return i
 
     def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
         """
@@ -396,7 +362,7 @@ class KListBase(AbstractSetDataStructure):
         else:
             nodes = self._nodes
             node = tail  # Default fallback
-            i = self.search_idx(key, bounds)
+            i = search_idx(key, bounds)
             if i < len(nodes):
                 node = nodes[i]
         
@@ -443,11 +409,10 @@ class KListBase(AbstractSetDataStructure):
 
         # 1) Find and remove the entry.
         while node:
-            # Search within the node using bisect (descending order)
+            # Search within the node (descending order)
             keys = node.keys
             if keys:
-                # Use bisect to find the key position
-                left = bisect_left(keys, -key, key=lambda v: -v)
+                left = search_idx(key, keys)
                 
                 if left < len(keys) and keys[left] == key:
                     # Found the key
@@ -456,7 +421,7 @@ class KListBase(AbstractSetDataStructure):
                     if key >= 0:  # Only remove from real_keys if it's not a dummy key
                         # Find the key in real_keys and remove it (also in descending order)
                         real_keys = node.real_keys
-                        left_rk = bisect_left(real_keys, -key, key=lambda v: -v)
+                        left_rk = search_idx(key, real_keys)
                         if left_rk < len(real_keys) and real_keys[left_rk] == key:
                             del node.real_keys[left_rk]
                     found = True
@@ -534,8 +499,8 @@ class KListBase(AbstractSetDataStructure):
                         current.entries.append(shifted)
                         current.keys.append(shifted_key)
                     else:
-                        # Use bisect to find correct position in descending order
-                        pos = bisect_left(current.keys, -shifted_key, key=lambda v: -v)
+                        # Find correct position in descending order
+                        pos = search_idx(shifted_key, current.keys)
                         current.entries.insert(pos, shifted)
                         current.keys.insert(pos, shifted_key)
                     
@@ -553,8 +518,7 @@ class KListBase(AbstractSetDataStructure):
                         elif shifted_key <= current.real_keys[-1]:
                             current.real_keys.append(shifted_key)
                         else:
-                            # Use bisect for real_keys insertion
-                            pos = bisect_left(current.real_keys, -shifted_key, key=lambda v: -v)
+                            pos = search_idx(shifted_key, current.real_keys)
                             current.real_keys.insert(pos, shifted_key)
                     
                     # If next_node became empty, splice it out and restart rebalancing
@@ -617,62 +581,36 @@ class KListBase(AbstractSetDataStructure):
         if self.is_empty():
             return None, None
             
+        nodes = self._nodes
+        
         # Fast path: Key is larger than the largest key
-        if key > self._nodes[0].entries[0].item.key:
+        if key > nodes[0].entries[0].item.key:
             return None, None
         
         # Fast path: Key is smaller than the smallest key
         if key < self._bounds[-1]:
-            return None, self._nodes[-1].entries[-1]
+            return None, nodes[-1].entries[-1]
 
-        # Find target node using binary search on bounds
-        node_idx = bisect_left(self._bounds, -key, key=lambda v: -v)
+        # Find target node using bounds
+        node_idx = search_idx(key, self._bounds)
         node = self._nodes[node_idx]
         entries = node.entries
-        keys = node.keys
         
-        # Fast path: Key is larger than max key in this node
-        if key > entries[0].item.key:
-            return None, self._find_next_larger_entry(node_idx, -1)
-        
-        # Choose search strategy based on node size (threshold = 8)
         found_entry = None
-        found_idx = -1
         next_entry = None
-        
-        if len(entries) < 8:
-            # Linear search for small nodes
-            for i, entry in enumerate(entries):
-                entry_key = entry.item.key
-                if entry_key == key:
-                    found_entry = entry
-                    found_idx = i
-                    break
-                elif entry_key < key:
-                    # Found insertion point, next larger entry is previous in list
-                    next_entry = entries[i-1] if i > 0 else self._find_next_larger_entry(node_idx, -1)
-                    break
-            else:
-                # All entries are larger than key, next larger is in previous node
-                next_entry = self._find_next_larger_entry(node_idx, -1)
+
+        i = search_idx(key, node.keys)
+        # i must be smaller than len(entries) since we checked bounds above
+        if entries[i].item.key == key:
+            found_entry = entries[i]
+            next_entry = self._find_next_larger_entry(node_idx, i)
+        elif i > 0:
+            # Key would be inserted at position i, so next larger is at i-1
+            next_entry = entries[i-1]
         else:
-            # Binary search for larger nodes
-            i = bisect_left(keys, -key, key=lambda v: -v)
-            if i < len(entries) and entries[i].item.key == key:
-                found_entry = entries[i]
-                found_idx = i
-            elif i > 0:
-                # Key would be inserted at position i, so next larger is at i-1
-                next_entry = entries[i-1]
-            else:
-                # Key is larger than all entries in this node
-                next_entry = self._find_next_larger_entry(node_idx, -1)
-        
-        # Handle successor finding for exact matches
-        if found_entry is not None and with_next:
-            next_entry = self._find_next_larger_entry(node_idx, found_idx)
-        elif found_entry is not None:
-            next_entry = None
+            # Key is larger than all entries in this node
+            next_entry = self._find_next_larger_entry(node_idx, -1)
+
         
         return found_entry, next_entry
 
@@ -730,21 +668,18 @@ class KListBase(AbstractSetDataStructure):
             return self, None, right_return  # All entries go to left, empty right
 
         # --- locate split node ------------------------------------------------
-        # Find the first node where key >= min_key (using reverse order bounds)
-        i = bisect_left(self._bounds, -key, key=lambda v: -v)
-
-        node_idx = i
+        # Find the first node where key >= min_key
+        node_idx = search_idx(key, self._bounds)
         split_node = nodes[node_idx]
         prev_node = nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
 
-        # --- bisect inside that node (reverse order) -------------------------
+        # --- locate target inside that node (reverse order) -------------------------
         node_entries = split_node.entries
         node_keys = split_node.keys
 
-        # Binary search in descending order
-        i = bisect_left(node_keys, -key, key=lambda v: -v)
-        exact = i < len(node_keys) and node_keys[i] == key
+        i = search_idx(key, node_keys)
+        exact = node_keys[i] == key
         lo_idx = i + 1 if exact else i
 
         # In reverse order: entries with keys > split_key go to greater_part, <= split_key go to lesser_part
@@ -756,8 +691,7 @@ class KListBase(AbstractSetDataStructure):
         lesser_keys = node_keys[lo_idx:]
 
         real_keys = split_node.real_keys
-        # Find position in real_keys using bisect (also in descending order)
-        j = bisect_left(real_keys, -key, key=lambda v: -v)
+        j = search_idx(key, real_keys)
         greater_real_keys = real_keys[:j]
         lesser_real_keys = real_keys[j + 1 if exact else j :]
 
@@ -994,8 +928,8 @@ class KListBase(AbstractSetDataStructure):
         # Find the first node that might contain keys >= key
         # We need to find the first node where key >= min_key
         # Since _bounds contains minimum keys in descending order, search for -key
-        left = bisect_left(self._bounds, -key, key=lambda v: -v)
-        
+        left = search_idx(key, self._bounds)
+
         # If key is smaller than all minimum keys, count all items
         if left >= len(self._nodes):
             return self._prefix_counts_tot[-1]
@@ -1024,47 +958,27 @@ class KListBase(AbstractSetDataStructure):
         
         return count
 
-    # def get_entry(self, index: int) -> RetrievalResult:
-    #         """
-    #         Returns the entry at the given overall index in the sorted KList along with the next entry. O(log l) node-lookup plus O(1) in-node offset.
 
-    #         Parameters:
-    #             index (int): Zero-based index to retrieve.
-
-    #         Returns:
-    #             RetrievalResult: A structured result containing:
-    #                 - found_entry: The requested Entry if present, otherwise None.
-    #                 - next_entry: The subsequent Entry, or None if no next entry exists.
-    #         """
-    #         # 0) validate
-    #         if not isinstance(index, int):
-    #             raise TypeError(f"index must be int, got {type(index).__name__!r}")
-
-    #         # 1) empty list?
-    #         if not self._prefix_counts_tot:
-    #             return RetrievalResult(found_entry=None, next_entry=None)
-
-    #         total_items = self._prefix_counts_tot[-1]
-    #         # 2) out‐of‐bounds?
-    #         if index < 0 or index >= total_items:
-    #             return RetrievalResult(found_entry=None, next_entry=None)
-
-    #         # 3) find the node in O(log l)
-    #         node_idx = bisect_right(self._prefix_counts_tot, index)
-    #         node = self._nodes[node_idx]
-
-    #         # 4) compute offset within that node
-    #         prev_count = self._prefix_counts_tot[node_idx - 1] if node_idx else 0
-    #         offset = index - prev_count
-
-    #         # 5) delegate to node
-    #         entry, in_node_succ, needs_next = node.get_by_offset(offset)
-
-    #         # 6) if we hit the end of this node, pull the true successor
-    #         if needs_next:
-    #             if node.next and node.next.entries:
-    #                 next_entry = node.next.entries[0]
-    #             else:
-    #                 next_entry = None
-    #         else:
-    #             next_entry = in_node_succ
+def search_idx(comp_elem: Any, list: list[Any]) -> int:
+    """
+    Searches for the index in the given list (sorted in descending order) where the comparison element `comp_elem` fits according to a custom comparison.
+    For lists with fewer than 8 elements, performs a linear search, returning the index of the first element where `comp_elem >= bound`.
+    For longer lists, performs a binary search using `bisect_left` with a custom key to efficiently find the insertion point.
+    Args:
+        comp_elem (Any): The element to compare against the list elements.
+        list (list[Any]): The list of elements to search sorted in descending order.
+    Returns:
+        int: The index where `comp_elem` fits in the list according to the comparison logic.
+    """
+    
+    list_len = len(list)
+    if list_len < 8:
+        # Linear search for small number of nodes
+        for i, bound in enumerate(list):
+            if comp_elem >= bound:
+                return i
+        return list_len
+    else:
+        # Binary search for larger node count
+        i = bisect_left(list, -comp_elem, key=lambda v: -v)
+        return i
