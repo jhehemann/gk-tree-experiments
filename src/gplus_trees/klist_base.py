@@ -650,28 +650,28 @@ class KListBase(AbstractSetDataStructure):
 
         # --- locate split node ------------------------------------------------
         # Find the first node where key >= min_key (using reverse order bounds)
-        left_search, right_search = 0, len(self._bounds)
-        while left_search < right_search:
-            mid = (left_search + right_search) // 2
-            if key >= self._bounds[mid]:  # key >= min_key of node
-                right_search = mid
-            else:
-                left_search = mid + 1
-        
+        i = bisect_left(self._bounds, -key, key=lambda v: -v)
+        nodes = self._nodes
+
         # If key is smaller than any key in the list, all entries have keys > key
         # Interface expects: left (keys < key), right (keys > key)
-        if left_search >= len(self._nodes):         # ··· (2) key < min
-            empty_klist = type(self)()  # Empty klist for keys < key
-            return empty_klist, None, self  # Empty left, all entries go to right
+        if i >= len(nodes):         # ··· (2) key < min
+            new_klist = type(self)()  # Empty klist for keys < key
+            new_klist.head = self.head  # All entries go to right
+            new_klist.tail = self.tail
+            self.head = self.tail = None  # Clear the original klist
+            self._rebuild_index()
+            new_klist._rebuild_index()
+            return self, None, new_klist  # Empty left, all entries go to right
 
-        # If key is larger than the maximum key, all entries have keys < key  
-        if self._nodes and key > self._nodes[0].entries[0].item.key:  # key > max
+        # If key is larger than the maximum key, all entries have keys < key
+        if key > nodes[0].entries[0].item.key:  # key > max
             empty_klist = type(self)()  # Empty klist for keys > key
             return self, None, empty_klist  # All entries go to left, empty right
 
-        node_idx = left_search
-        split_node = self._nodes[node_idx]
-        prev_node = self._nodes[node_idx - 1] if node_idx else None
+        node_idx = i
+        split_node = nodes[node_idx]
+        prev_node = nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
 
         # --- bisect inside that node (reverse order) -------------------------
@@ -681,76 +681,67 @@ class KListBase(AbstractSetDataStructure):
         # Binary search in descending order
         i = bisect_left(node_keys, -key, key=lambda v: -v)
         exact = i < len(node_keys) and node_keys[i] == key
+        lo_idx = i + 1 if exact else i
 
         # In reverse order: entries with keys > split_key go to greater_part, <= split_key go to lesser_part
         greater_entries = node_entries[:i]  # Keys > split_key -> will become interface RIGHT
-        lesser_entries = node_entries[i + 1 if exact else i :]  # Keys < split_key -> will become interface LEFT
+        lesser_entries = node_entries[lo_idx:]  # Keys < split_key -> will become interface LEFT
         left_subtree = node_entries[i].left_subtree if exact else None
 
         greater_keys = node_keys[:i]
-        lesser_keys = node_keys[i + 1 if exact else i :]
+        lesser_keys = node_keys[lo_idx:]
 
         real_keys = split_node.real_keys
         # Find position in real_keys using bisect (also in descending order)
         j = bisect_left(real_keys, -key, key=lambda v: -v)
-        
         greater_real_keys = real_keys[:j]
         lesser_real_keys = real_keys[j + 1 if exact else j :]
 
         # ------------- build GREATER PART (keys > split_key) -> INTERFACE RIGHT ------------
         interface_right = type(self)()
+        interface_right.head = self.head
         if greater_entries:                          # reuse split_node
+            # Right: previous nodes + split_node
             split_node.entries = greater_entries
             split_node.keys = greater_keys
             split_node.next    = None
             split_node.real_keys = greater_real_keys
-            
-            # Build the right part: previous nodes + split_node
-            interface_right.head = self.head
             interface_right.tail = split_node
+        else:
+            # Right: previous nodes
             if prev_node:
-                prev_node.next = split_node
-            else:
-                interface_right.head = split_node
-        else:                                        # nothing in greater part
-            if prev_node:                            # just the previous nodes
                 prev_node.next = None
-                interface_right.head = self.head
                 interface_right.tail = prev_node
             else:                                    # empty greater part
                 interface_right.head = interface_right.tail = None
 
         # ------------- build LESSER PART (keys < split_key) -> INTERFACE LEFT ------------
-        interface_left = type(self)()
+        # interface_left = type(self)()
         if lesser_entries:
             new_node = self.KListNodeClass()
             new_node.entries   = lesser_entries
             new_node.keys      = lesser_keys
             new_node.real_keys = lesser_real_keys
             new_node.next      = original_next
-            interface_left.head = new_node
-        else:                                        # no lesser_entries
-            interface_left.head = original_next
+            self.head = new_node
+        else:
+            self.head = original_next
 
-        # find interface_left.tail
-        tail = interface_left.head
-        while tail and tail.next:
-            tail = tail.next
-        interface_left.tail = tail
+        # Check if we need to update tail for left return
+        if self.tail is split_node:
+            self.tail = self.head
 
-        # Rebalance both lists for compaction
-        if interface_left.head:
-            self._rebalance_for_compaction(interface_left)
-        if interface_right.head:
-            self._rebalance_for_compaction(interface_right)
+        # Ensure non-tail nodes in left return are at full capacity
+        if self.head:
+            self._rebalance_for_compaction(self)
         
         # ------------- rebuild indexes ---------------------------------------
-        interface_left._rebuild_index()
+        self._rebuild_index()
         interface_right._rebuild_index()
 
         # Return in interface order: left (keys < split_key), subtree, right (keys > split_key)
-        return interface_left, left_subtree, interface_right
-        
+        return self, left_subtree, interface_right
+
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
         """
         Helper method to ensure the compaction invariant is maintained in a klist.
