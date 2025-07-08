@@ -757,23 +757,34 @@ class KListBase(AbstractSetDataStructure):
             
             # Continue moving items from next_node to current until current is at capacity
             # or next_node is empty
-            while len(current.entries) < capacity and next_node.entries:
-                # Move an item from next_node to current
-                shifted = next_node.entries.pop(0)
-                shifted_key = next_node.keys.pop(0)
-                current.entries.append(shifted)
-                current.keys.append(shifted_key)
-                if shifted_key >= 0:  # Only update real_keys if it's not a dummy key
-                    shifted_real_key = next_node.real_keys.pop(0)
-                    current.real_keys.append(shifted_real_key)
-                
-                # If next_node became empty, splice it out and update tail
-                if not next_node.entries:
-                    current.next = next_node.next
-                    if next_node is klist.tail:
-                        klist.tail = current
-                    # Exit inner loop as we've emptied next_node
-                    break
+            needed = capacity - len(current.entries)
+            available = len(next_node.entries)
+            move_count = min(needed, available)
+            if move_count > 0:
+                # Move a slice of entries and keys
+                current.entries.extend(next_node.entries[:move_count])
+                current.keys.extend(next_node.keys[:move_count])
+                del next_node.entries[:move_count]
+                del next_node.keys[:move_count]
+                # Move real_keys if needed (only for non-dummy keys)
+                if next_node.real_keys:
+                    # Find how many of the moved keys are real (>= 0)
+                    moved_real_keys = []
+                    for k in current.keys[-move_count:]:
+                        if k >= 0:
+                            moved_real_keys.append(k)
+                        else:
+                            break
+                    if moved_real_keys:
+                        current.real_keys.extend(next_node.real_keys[:len(moved_real_keys)])
+                        del next_node.real_keys[:len(moved_real_keys)]
+            # If next_node became empty, splice it out and update tail
+            if not next_node.entries:
+                current.next = next_node.next
+                if next_node is klist.tail:
+                    klist.tail = current
+                # Exit inner loop as we've emptied next_node
+                break
             
             # Move to next node for the next iteration
             current = current.next
