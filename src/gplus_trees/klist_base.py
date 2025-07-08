@@ -1,5 +1,5 @@
 """K-list implementation"""
-from typing import TYPE_CHECKING, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Optional, Tuple, Type, Any
 from bisect import bisect_left, insort_left
 from itertools import chain
 import copy
@@ -303,6 +303,66 @@ class KListBase(AbstractSetDataStructure):
         # print(f"Klist Height: {height}")
         return height
 
+    def _handle_empty_insert(self, entry: Entry) -> 'KListBase':
+        key = entry.item.key
+        node = self.KListNodeClass(
+            entries=[entry],
+            keys=[key],
+            real_keys=[key] if key >= 0 else []
+        )
+        self.head = self.tail = node
+        self._nodes.append(node)
+        self._prefix_counts_tot.append(1)
+        self._prefix_counts_real.append(1 if key >= 0 else 0)
+        self._bounds.append(key)
+        return self, True
+
+    def _handle_min_insert(self, entry: Entry) -> 'KListBase':
+        key = entry.item.key
+        tail = self.tail
+        tail_entries = tail.entries
+        is_real = key >= 0
+        if len(tail_entries) >= self.KListNodeClass.CAPACITY:
+            tail.next = self.KListNodeClass(
+                entries=[entry],
+                keys=[key],
+                real_keys=[key] if is_real else []
+            )
+            self.tail = tail.next
+            
+            # Manually update index and return
+            self._nodes.append(self.tail)
+            self._prefix_counts_tot.append(self._prefix_counts_tot[-1] + 1)
+            if is_real:
+                self._prefix_counts_real.append(self._prefix_counts_real[-1] + 1)
+            self._bounds.append(key)
+            return self, True
+
+        tail_entries.append(entry)
+        tail.keys.append(key)
+        if is_real:  # Only add to real_keys if it's not a dummy key
+            tail.real_keys.append(key)
+            self._prefix_counts_real[-1] += 1 # partial index update
+
+        # Complete the index update
+        self._prefix_counts_tot[-1] += 1
+        self._bounds[-1] = key
+
+        return self, True
+
+    def search_idx(self, comp_elem: Any, list: list[Any]) -> int:
+        list_len = len(list)
+        if list_len < 8:
+            # Linear search for small number of nodes
+            for i, bound in enumerate(list):
+                if comp_elem >= bound:
+                    return i
+            return list_len
+        else:
+            # Binary search for larger node count
+            i = bisect_left(list, -comp_elem, key=lambda v: -v)
+            return i
+
     def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
         """
         Inserts an existing Entry object into the k-list, preserving the Entry object's identity.
@@ -328,51 +388,17 @@ class KListBase(AbstractSetDataStructure):
 
         # If the k-list is empty, create a new node.
         if self.head is None:
-            node = self.KListNodeClass(
-                entries=[entry],
-                keys=[key],
-                real_keys=[key] if key >= 0 else []
-            )
-            self.head = self.tail = node
-            self._rebuild_index()
-            return self, True
+            return self._handle_empty_insert(entry)
         elif key < bounds[-1]:
-            tail_entries = tail.entries
-            if len(tail_entries) >= self.KListNodeClass.CAPACITY:
-                tail.next = self.KListNodeClass(
-                    entries=[entry],
-                    keys=[key],
-                    real_keys=[key] if key >= 0 else []
-                )
-                self.tail = tail.next
-                self._rebuild_index()
-                return self, True
-
-            tail_entries.append(entry)
-            tail.keys.append(key)
-            if key >= 0:  # Only add to real_keys if it's not a dummy key
-                tail.real_keys.append(key)
-            self._rebuild_index()
-            return self, True
-        
+            return self._handle_min_insert(entry)
         elif key > self._nodes[0].entries[0].item.key:
             node = self.head
         else:
-            # Find appropriate node with threshold-based search
             nodes = self._nodes
             node = tail  # Default fallback
-            
-            if len(nodes) < 8:
-                # Linear search for small number of nodes
-                for idx, bound in enumerate(bounds):
-                    if key >= bound:
-                        node = nodes[idx]
-                        break
-            else:
-                # Binary search for larger node count
-                i = bisect_left(bounds, -key, key=lambda v: -v)
-                if i < len(nodes):
-                    node = nodes[i]
+            i = self.search_idx(key, bounds)
+            if i < len(nodes):
+                node = nodes[i]
         
         overflow, inserted = node.insert_entry(entry)
 
@@ -381,7 +407,10 @@ class KListBase(AbstractSetDataStructure):
 
         # Handle successful insertion with potential overflow
         if node is tail and overflow is None:
-            self._rebuild_index()
+            # manually update index
+            self._prefix_counts_tot[-1] += 1
+            if key >= 0:
+                self._prefix_counts_real[-1] += 1
             return self, True
 
         MAX_OVERFLOW_DEPTH = 10000

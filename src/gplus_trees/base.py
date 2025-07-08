@@ -121,6 +121,9 @@ class Entry:
     item: Item
     left_subtree: T
 
+    def __lt__(self, other: 'Entry') -> bool:
+        return self.item.key < other.item.key
+
 
 class RetrievalResult(NamedTuple):
     """
