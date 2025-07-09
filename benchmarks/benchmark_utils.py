@@ -39,23 +39,34 @@ class BenchmarkUtils:
         min_key, max_key = key_range
         
         if distribution == 'uniform':
-            return random.sample(range(min_key, max_key + 1), size)
+            # Use numpy for efficient random integer generation
+            return np.random.randint(min_key, max_key + 1, size=size).tolist()
         elif distribution == 'clustered':
-            # Create clustered data with some hot spots
-            cluster_centers = [min_key + i * (max_key - min_key) // 5 for i in range(5)]
-            keys = []
+            # Create clustered data with some hot spots - more efficient numpy operations
+            cluster_centers = np.linspace(min_key, max_key, 5, dtype=int)
             cluster_size = size // 5
+            keys = np.empty(0, dtype=int)
+            
             for center in cluster_centers:
                 cluster_keys = np.random.normal(center, (max_key - min_key) // 20, cluster_size)
                 cluster_keys = np.clip(cluster_keys, min_key, max_key).astype(int)
-                keys.extend(cluster_keys.tolist())
+                keys = np.concatenate([keys, cluster_keys])
             
             # Fill remaining with uniform distribution
             remaining = size - len(keys)
             if remaining > 0:
-                keys.extend(random.sample(range(min_key, max_key + 1), remaining))
+                uniform_keys = np.random.randint(min_key, max_key + 1, size=remaining)
+                keys = np.concatenate([keys, uniform_keys])
             
-            return list(set(keys))[:size]  # Remove duplicates and trim to size
+            # Remove duplicates efficiently and trim to size
+            unique_keys = np.unique(keys)
+            if len(unique_keys) >= size:
+                return unique_keys[:size].tolist()
+            else:
+                # If not enough unique keys, pad with more random keys
+                additional_needed = size - len(unique_keys)
+                additional_keys = np.random.randint(min_key, max_key + 1, size=additional_needed)
+                return np.concatenate([unique_keys, additional_keys]).tolist()
         elif distribution == 'sequential':
             return list(range(min_key, min_key + size))
         else:
@@ -72,6 +83,7 @@ class BenchmarkUtils:
         Returns:
             List of Entry objects
         """
+        # Use list comprehension for efficiency - already optimal
         return [Entry(Item(key, f"value_{key}"), None) for key in keys]
     
     @staticmethod
@@ -91,24 +103,45 @@ class BenchmarkUtils:
         """
         random.seed(seed)
         
+        # Handle edge case of empty insert_keys
+        if not insert_keys:
+            return np.random.randint(1, 1000001, size=1000).tolist()
+        
         num_lookups = 1000
         num_hits = int(num_lookups * hit_ratio)
         num_misses = num_lookups - num_hits
         
-        # Select hits from inserted keys
-        hit_keys = random.sample(insert_keys, num_hits)
+        # Select hits from inserted keys (allowing duplicates to maintain hit ratio)
+        if num_hits > 0:
+            hit_keys = random.choices(insert_keys, k=num_hits)
+        else:
+            hit_keys = []
         
-        # Generate miss keys (keys not in insert_keys)
-        max_key = max(insert_keys) if insert_keys else 1000000
-        min_key = min(insert_keys) if insert_keys else 1
+        # Generate miss keys more efficiently using set for O(1) lookups
+        insert_keys_set = set(insert_keys)
+        max_key = max(insert_keys)
+        min_key = min(insert_keys)
         
-        miss_keys = []
-        attempts = 0
-        while len(miss_keys) < num_misses and attempts < num_misses * 10:
-            key = random.randint(min_key, max_key * 2)
-            if key not in insert_keys and key not in miss_keys:
-                miss_keys.append(key)
-            attempts += 1
+        # Pre-generate more miss candidates to reduce iterations
+        candidate_range_size = (max_key * 2 - min_key + 1)
+        if candidate_range_size > 0 and num_misses > 0:
+            # Generate more candidates than needed to account for collisions
+            candidates_needed = min(num_misses * 3, candidate_range_size)
+            miss_candidates = np.random.randint(min_key, max_key * 2 + 1, size=candidates_needed)
+            
+            # Filter out keys that are in insert_keys
+            miss_keys = []
+            for key in miss_candidates:
+                if key not in insert_keys_set and len(miss_keys) < num_misses:
+                    miss_keys.append(int(key))
+            
+            # If we still need more miss keys, generate them one by one (fallback)
+            while len(miss_keys) < num_misses:
+                key = random.randint(min_key, max_key * 2)
+                if key not in insert_keys_set:
+                    miss_keys.append(key)
+        else:
+            miss_keys = []
         
         # Combine and shuffle
         lookup_keys = hit_keys + miss_keys
