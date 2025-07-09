@@ -113,7 +113,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
         gc.collect()
         gc.disable() # Enabled in teardown
 
-    def time_retrieve_sequential(self, capacity, l_factor, hit_ratio, distribution):
+    def time_retrieve_sequential(self, capacity, l_factor, hit_ratio):
         """Benchmark sequential retrieve operations."""
         for key in self.lookup_keys:
             self.klist.retrieve(key)
