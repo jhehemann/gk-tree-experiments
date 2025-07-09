@@ -118,3 +118,4 @@ def assert_tree_invariants_raise(t: GPlusTreeBase, stats: Stats) -> None:
                     raise InvariantError(
                         f"Invariant failed: t.real_item_count()={size} ≠ stats.real_item_count={stats.real_item_count}"
                     )
+                

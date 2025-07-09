@@ -177,3 +177,62 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         for entry, rank in zip(self.entries, self.ranks):
             tree, _ = tree.insert_entry(entry, rank)
         return tree
+
+
+class GKPlusTreeSuccessiveRank1Benchmarks(BaseBenchmark):
+    """Benchmarks for GKPlusTreeBase with keys having successive rank=1 across dimensions."""
+    params = [
+        [4, 8, 16, 32],       # K values (capacities)
+        [10, 20, 40, 80],     # successive dimensions to enforce rank=1
+        [1.0, 2.0, 4.0, 8.0]   # l_factor values
+    ]
+    param_names = ['capacity', 'dim_limit', 'l_factor']
+    min_run_count = 5
+
+    _tree_cache = {}
+    _keys_cache = {}
+
+    def setup(self, capacity, dim_limit, l_factor):
+        """Setup tree and lookup keys for successive rank1 benchmarks."""
+        super().setup(capacity, dim_limit, l_factor)
+        from gplus_trees.utils import find_keys_for_successive_rank1
+        # Use count equal to 1000 lookups
+        key_count = 1000
+        cache_key = (capacity, dim_limit, l_factor)
+        if cache_key not in self._tree_cache:
+            # Generate keys where first dim_limit ranks are 1
+            succ_keys = find_keys_for_successive_rank1(
+                k=capacity,
+                dim_limit=dim_limit,
+                count=key_count,
+                spacing=False
+            )
+            # Create Entry objects
+            entries = BenchmarkUtils.create_test_entries(succ_keys)
+            # Bulk create tree
+            _, _, klist_class, _ = make_gkplustree_classes(capacity)
+            tree = bulk_create_gkplus_tree(entries, DIM=dim_limit, l_factor=l_factor, KListClass=klist_class)
+            self._tree_cache[cache_key] = tree
+            self._keys_cache[cache_key] = succ_keys
+        self.tree = self._tree_cache[cache_key]
+        self.lookup_keys = self._keys_cache[cache_key]
+        import gc; gc.collect(); gc.disable()
+
+    def time_bulk_create_successive(self, capacity, dim_limit, l_factor):  # noqa: N802
+        """Benchmark bulk tree creation for successive rank1 keys."""
+        from gplus_trees.utils import find_keys_for_successive_rank1
+        # Regenerate keys to include creation overhead
+        succ_keys = find_keys_for_successive_rank1(
+            k=capacity,
+            dim_limit=dim_limit,
+            count=1000,
+            spacing=False
+        )
+        entries = BenchmarkUtils.create_test_entries(succ_keys)
+        _, _, klist_class, _ = make_gkplustree_classes(capacity)
+        bulk_create_gkplus_tree(entries, DIM=dim_limit, l_factor=l_factor, KListClass=klist_class)
+
+    def time_retrieve_successive(self, capacity, dim_limit, l_factor):  # noqa: N802
+        """Benchmark sequential retrieve operations for successive rank1 keys."""
+        for key in self.lookup_keys:
+            self.tree.retrieve(key)
