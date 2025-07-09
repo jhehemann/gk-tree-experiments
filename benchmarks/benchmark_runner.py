@@ -463,16 +463,20 @@ class IsolatedBenchmarkRunner:
             print("\n🛑 Web server stopped")
     
     def stop_benchmarks(self):
-        """Gracefully stop running benchmarks."""
+        """Gracefully stop running benchmarks and all related processes."""
         status = self.get_status()
         
         if status["status"] != "running":
             print(f"ℹ️  No benchmarks currently running (status: {status['status']})")
+            # Still check for and kill any stray asv processes
+            self._kill_all_asv_processes()
             return
         
         pid = status.get("pid")
         if not pid:
             print("❌ No process ID found in status")
+            # Still check for and kill any stray asv processes
+            self._kill_all_asv_processes()
             return
         
         try:
@@ -497,13 +501,60 @@ class IsolatedBenchmarkRunner:
                 print("⚡ Process did not terminate gracefully, forcing termination...")
                 os.kill(pid, signal.SIGKILL)
             
+            # Also kill any remaining asv processes
+            self._kill_all_asv_processes()
+            
             # Update status
             self.update_status("stopped", "Benchmark stopped by user", status.get("commit"))
             print("✅ Benchmark process stopped successfully")
             
         except OSError:
             print("ℹ️  Process was already terminated")
+            # Still check for and kill any stray asv processes
+            self._kill_all_asv_processes()
             self.update_status("stopped", "Process was already terminated", status.get("commit"))
+
+    def _kill_all_asv_processes(self):
+        """Kill all asv-related processes."""
+        try:
+            # Find all asv processes
+            result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+            asv_pids = []
+            
+            for line in result.stdout.split('\n'):
+                if 'asv' in line and 'grep' not in line:
+                    parts = line.split()
+                    if len(parts) > 1:
+                        try:
+                            pid = int(parts[1])
+                            asv_pids.append(pid)
+                        except ValueError:
+                            continue
+            
+            if asv_pids:
+                print(f"🧹 Cleaning up {len(asv_pids)} stray asv process(es): {asv_pids}")
+                for pid in asv_pids:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                        print(f"   ✅ Terminated PID {pid}")
+                    except OSError:
+                        print(f"   ℹ️  PID {pid} was already terminated")
+                
+                # Wait a moment and force kill any remaining
+                import time
+                time.sleep(1)
+                for pid in asv_pids:
+                    try:
+                        os.kill(pid, 0)  # Check if still running
+                        os.kill(pid, signal.SIGKILL)
+                        print(f"   ⚡ Force killed PID {pid}")
+                    except OSError:
+                        pass  # Already terminated
+            else:
+                print("✅ No stray asv processes found")
+                
+        except Exception as e:
+            print(f"⚠️  Error while cleaning up asv processes: {e}")
 
     def clean_benchmarks(self, force=False):
         """Clean up benchmark environment with confirmation."""
