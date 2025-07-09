@@ -1151,7 +1151,7 @@ def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KLi
         # Always append to current node (since we're going largest to smallest)
         # This maintains descending order within each node
         current_node.entries.append(entry)
-        current_node.keys.append(key)
+        current_node.keys.append(-key)
         if key >= 0:  # Only add non-dummy keys to real_keys
             current_node.real_keys.append(key)
     
