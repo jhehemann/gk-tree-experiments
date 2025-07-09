@@ -13,6 +13,9 @@ from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 from gplus_trees.utils import find_keys_for_successive_rank1
 
 
+# Module-level cache for adversarial keys
+_adversarial_keys_cache = {}
+
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
     params = [
@@ -25,11 +28,18 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
 
     def setup(self, capacity, dim_limit, l_factor):
         super().setup(capacity, dim_limit, l_factor)
-        # Generate adversarial keys
+        # Generate adversarial keys with module-level caching
         key_count = 1000
-        self.succ_keys = find_keys_for_successive_rank1(
-            k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
-        )
+        cache_key = (key_count, capacity, dim_limit)
+        if cache_key not in _adversarial_keys_cache:
+            succ_keys = find_keys_for_successive_rank1(
+                k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
+            )
+            _adversarial_keys_cache[cache_key] = succ_keys
+        else:
+            print(f"Using cached adversarial keys for {cache_key}")
+            succ_keys = _adversarial_keys_cache[cache_key]
+        self.succ_keys = succ_keys
         # Prepare entries and ranks
         self.entries = BenchmarkUtils.create_test_entries(self.succ_keys)
         group_size = calculate_group_size(capacity)
@@ -59,15 +69,18 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
 
     def setup(self, capacity, dim_limit, l_factor):
         super().setup(capacity, dim_limit, l_factor)
-        # Generate adversarial keys
+        # Use module-level adversarial key cache
         key_count = 1000
         cache_key = (key_count, capacity, dim_limit)
-        if cache_key not in self._tree_cache:
+        if cache_key not in _adversarial_keys_cache:
             succ_keys = find_keys_for_successive_rank1(
                 k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
             )
+            _adversarial_keys_cache[cache_key] = succ_keys
+        else:
+            succ_keys = _adversarial_keys_cache[cache_key]
+        if cache_key not in self._tree_cache:
             entries = BenchmarkUtils.create_test_entries(succ_keys)
-            # Bulk create tree
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
             tree = bulk_create_gkplus_tree(entries, DIM=dim_limit, l_factor=l_factor, KListClass=klist_class)
             self._tree_cache[cache_key] = (tree, succ_keys)
