@@ -39,8 +39,9 @@ class BenchmarkUtils:
         min_key, max_key = key_range
         
         if distribution == 'uniform':
-            # Use numpy for efficient random integer generation
-            return np.random.randint(min_key, max_key + 1, size=size).tolist()
+            # Sample without replacement for uniform distribution (no duplicates)
+            population = np.arange(min_key, max_key + 1)
+            return np.random.choice(population, size=size, replace=False).tolist()
         elif distribution == 'clustered':
             # Create clustered data with some hot spots - more efficient numpy operations
             cluster_centers = np.linspace(min_key, max_key, 5, dtype=int)
@@ -63,10 +64,15 @@ class BenchmarkUtils:
             if len(unique_keys) >= size:
                 return unique_keys[:size].tolist()
             else:
-                # If not enough unique keys, pad with more random keys
+                # If not enough unique keys, pad with more random unique keys
                 additional_needed = size - len(unique_keys)
-                additional_keys = np.random.randint(min_key, max_key + 1, size=additional_needed)
-                return np.concatenate([unique_keys, additional_keys]).tolist()
+                # Build population of keys not already used
+                full_population = np.arange(min_key, max_key + 1)
+                remaining = np.setdiff1d(full_population, unique_keys)
+                if len(remaining) < additional_needed:
+                    raise ValueError("Not enough unique keys available to generate desired size")
+                pad = np.random.choice(remaining, size=additional_needed, replace=False)
+                return np.concatenate([unique_keys, pad]).tolist()
         elif distribution == 'sequential':
             return list(range(min_key, min_key + size))
         else:
