@@ -11,6 +11,8 @@ from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 from gplus_trees.utils import find_keys_for_successive_rank1
+import os
+import pickle
 
 
 # Module-level cache for adversarial keys
@@ -20,7 +22,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
     params = [
         [8, 16, 32],    # K values (capacities)
-        [10, 20, 40,],  # successive dimensions to enforce rank=1
+        [10, 20, 30, 40, 50, 60],  # successive dimensions to enforce rank=1
         [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'dim_limit', 'l_factor']
@@ -28,19 +30,29 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
 
     def setup(self, capacity, dim_limit, l_factor):
         super().setup(capacity, dim_limit, l_factor)
-        # Generate adversarial keys with module-level caching
         key_count = 1000
         cache_key = (key_count, capacity, dim_limit)
-        if cache_key not in _adversarial_keys_cache:
+        keys_dir = './adversarial_keys'
+        os.makedirs(keys_dir, exist_ok=True)
+        file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
+        file_path = os.path.join(keys_dir, file_name)
+
+        if cache_key in _adversarial_keys_cache:
+            succ_keys = _adversarial_keys_cache[cache_key]
+        elif os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                succ_keys = pickle.load(f)
+            _adversarial_keys_cache[cache_key] = succ_keys
+        else:
             succ_keys = find_keys_for_successive_rank1(
                 k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
             )
             _adversarial_keys_cache[cache_key] = succ_keys
-        else:
-            print(f"Using cached adversarial keys for {cache_key}")
-            succ_keys = _adversarial_keys_cache[cache_key]
+            print(f"Generated {len(succ_keys)} keys for k={capacity}, dim_limit={dim_limit} and saved to {file_path}. Keys: {succ_keys[:10]}...{succ_keys[-10:] if len(succ_keys) > 20 else succ_keys}")
+            with open(file_path, 'wb') as f:
+                pickle.dump(succ_keys, f)
+
         self.succ_keys = succ_keys
-        # Prepare entries and ranks
         self.entries = BenchmarkUtils.create_test_entries(self.succ_keys)
         group_size = calculate_group_size(capacity)
         self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.succ_keys]
