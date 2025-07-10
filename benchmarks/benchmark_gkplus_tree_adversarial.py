@@ -4,6 +4,7 @@ Adversarial benchmarks for GKPlusTree using keys with successive rank=1 across d
 import gc
 import hashlib
 from typing import List
+import pathlib
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
@@ -32,7 +33,8 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         super().setup(capacity, dim_limit, l_factor)
         key_count = 1000
         cache_key = (key_count, capacity, dim_limit)
-        keys_dir = './adversarial_keys'
+        # Use absolute path for keys_dir
+        keys_dir = str(pathlib.Path(__file__).parent / 'adversarial_keys')
         os.makedirs(keys_dir, exist_ok=True)
         file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
         file_path = os.path.join(keys_dir, file_name)
@@ -71,7 +73,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
     """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys."""
     params = [
         [8, 16, 32],    # K values (capacities)
-        [10, 20, 40],  # successive dimensions to enforce rank=1
+        [10, 20, 40, 50, 60],  # successive dimensions to enforce rank=1
         [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'dim_limit', 'l_factor']
