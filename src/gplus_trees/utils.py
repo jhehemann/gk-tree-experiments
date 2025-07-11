@@ -43,23 +43,3 @@ def find_keys_for_rank_lists(rank_lists: List[List[int]], k: int, spacing: bool 
             raise ValueError(f"No matching key found for rank_lists[{key_idx}]")
 
     return result_keys
-
-
-def find_keys_for_successive_rank1(k: int, dim_limit: int, count: int = 1, spacing: bool = False) -> List[int]:
-    """
-    Generate keys whose first `dim_limit` hash ranks are all 1. 
-
-    Args:
-        k: Group size parameter for hash ranks.
-        dim_limit: Number of successive dimensions to enforce rank=1 (must be >=1).
-        count: Number of keys to find.
-        spacing: If True, enforce at least one non-matching key between results.
-
-    Returns:
-        List of keys satisfying the condition.
-    """
-    if dim_limit < 1:
-        raise ValueError("dim_limit must be at least 1")
-    # Build rank lists for each dimension: each list is [1, 1, ..., 1] of length count
-    rank_lists = [[1] * count for _ in range(dim_limit)]
-    return find_keys_for_rank_lists(rank_lists, k, spacing)
