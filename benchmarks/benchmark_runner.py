@@ -560,7 +560,7 @@ class IsolatedBenchmarkRunner:
         """Clean up benchmark environment with confirmation."""
         if not force:
             print("⚠️  This will permanently delete:")
-            print("   • All benchmark results and data")
+            print("   • All benchmark results and data, including all potentially generated adversarial keys.")
             print("   • Generated HTML reports")
             print("   • Benchmark execution logs")
             print("   • Isolated repository clone")

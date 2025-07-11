@@ -23,7 +23,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
     params = [
         [8, 16, 32],    # K values (capacities)
-        [10, 20, 30, 40, 50, 60],  # successive dimensions to enforce rank=1
+        [10, 20, 30, 40, 50, 60, 70, 80],  # successive dimensions to enforce rank=1
         [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'dim_limit', 'l_factor']
@@ -50,7 +50,6 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
                 k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
             )
             _adversarial_keys_cache[cache_key] = succ_keys
-            print(f"Generated {len(succ_keys)} keys for k={capacity}, dim_limit={dim_limit} and saved to {file_path}. Keys: {succ_keys[:10]}...{succ_keys[-10:] if len(succ_keys) > 20 else succ_keys}")
             with open(file_path, 'wb') as f:
                 pickle.dump(succ_keys, f)
 
@@ -73,7 +72,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
     """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys."""
     params = [
         [8, 16, 32],    # K values (capacities)
-        [10, 20, 40, 50, 60],  # successive dimensions to enforce rank=1
+        [10, 20, 40, 50, 60, 70, 80],  # successive dimensions to enforce rank=1
         [1.0, 2.0, 4.0, 8.0]  # l_factor values
     ]
     param_names = ['capacity', 'dim_limit', 'l_factor']
@@ -83,16 +82,28 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
 
     def setup(self, capacity, dim_limit, l_factor):
         super().setup(capacity, dim_limit, l_factor)
-        # Use module-level adversarial key cache
         key_count = 1000
         cache_key = (key_count, capacity, dim_limit)
-        if cache_key not in _adversarial_keys_cache:
+        # Use absolute path for keys_dir, matching Insert benchmarks
+        keys_dir = str(pathlib.Path(__file__).parent / 'adversarial_keys')
+        os.makedirs(keys_dir, exist_ok=True)
+        file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
+        file_path = os.path.join(keys_dir, file_name)
+
+        if cache_key in _adversarial_keys_cache:
+            succ_keys = _adversarial_keys_cache[cache_key]
+        elif os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                succ_keys = pickle.load(f)
+            _adversarial_keys_cache[cache_key] = succ_keys
+        else:
             succ_keys = find_keys_for_successive_rank1(
                 k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
             )
             _adversarial_keys_cache[cache_key] = succ_keys
-        else:
-            succ_keys = _adversarial_keys_cache[cache_key]
+            with open(file_path, 'wb') as f:
+                pickle.dump(succ_keys, f)
+
         if cache_key not in self._tree_cache:
             entries = BenchmarkUtils.create_test_entries(succ_keys)
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
