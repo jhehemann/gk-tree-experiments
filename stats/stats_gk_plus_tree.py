@@ -13,6 +13,8 @@ import numpy as np
 import sys
 import argparse
 
+
+
 # Add the project root to the Python path so we can import from tests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -30,6 +32,8 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from tests.utils import (
     assert_tree_invariants_raise,
 )
+from benchmarks.benchmark_gkplus_tree_adversarial import load_adversarial_keys_from_file
+
 from gplus_trees.g_k_plus.base import logger
 IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
 
@@ -42,12 +46,7 @@ def create_gtree(items, K=16, l_factor=1.0) -> GKPlusTreeBase:
     tree = create_gkplus_tree(K, l_factor=l_factor)
     tree_insert = tree.insert
     for (item, rank) in items:
-        last = (item, rank)
         tree_insert(item, rank)
-
-    # print(f"\n\nSubtree sizes after {len(items)} insertions:")
-    # tree.print_subtree_sizes()
-
     return tree
 
 # Create a random GPlusTree with n items and target node size (K) determining the rank distribution.
@@ -151,7 +150,8 @@ def repeated_experiment(
         size: int,
         repetitions: int,
         K: int,
-        l_factor: float
+        l_factor: float,
+        adversarial_dim: int
     ) -> None:
     """
     Repeatedly builds random GPlusTrees (with size items) using ranks drawn from a geometric distribution.
@@ -166,12 +166,29 @@ def repeated_experiment(
     times_phy = []
     times_size = []
 
+    if adversarial_dim:
+        # Generate keys for adversarial dimension
+        keys = load_adversarial_keys_from_file(
+            key_count=size,
+            capacity=K,
+            dim_limit=adversarial_dim
+        )
+        items = [Item(key, "val") for key in keys]
+        ranks = [1] * len(keys)
+
     # Generate results from repeated experiments.
     for _ in range(repetitions):
         # Time tree construction
-        t0 = time.perf_counter()
-        tree = random_klist_tree(size, K, l_factor=l_factor)
-        times_build.append(time.perf_counter() - t0)
+        if adversarial_dim:
+            t0 = time.perf_counter()
+            tree = create_gkplus_tree(K=K, l_factor=l_factor)
+            for item, rank in zip(items, ranks):
+                tree.insert(item, rank)
+            times_build.append(time.perf_counter() - t0)
+        else:    
+            t0 = time.perf_counter()
+            tree = random_klist_tree(size, K, l_factor=l_factor)
+            times_build.append(time.perf_counter() - t0)
 
         # Time stats computation
         t0 = time.perf_counter()
@@ -322,6 +339,13 @@ if __name__ == "__main__":
                         help='l_factor for the tree.')
     parser.add_argument('--seed', type=int, default=None,
                         help='Random seed for reproducibility.')
+    parser.add_argument('--adversarial_dim', nargs='?', const=1, type=int, default=0,
+                        help=(
+                            "Only use keys with rank 1 in all dimensions up to dim. "
+                            "Omitting the flag gives 0, "
+                            "using --adversarial_dim       gives 1, "
+                            "using --adversarial_dim N gives N."
+                        ))
     
     args = parser.parse_args()
 
@@ -352,13 +376,15 @@ if __name__ == "__main__":
     Ks = args.ks
     l_factor = args.l_factor
     repetitions = args.repetitions
+    adversarial_dim = args.adversarial_dim
 
     for n in sizes:
         for K in Ks:
             logger.info("")
             logger.info("")
-            logger.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor} repetitions = {repetitions} ----------------")
+            logger.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor}, repetitions = {repetitions}, adversarial_dim = {adversarial_dim} ----------------")
             t0 = time.perf_counter()
-            repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor)
+            # If you want to use adversarial or dim, you need to modify repeated_experiment and tree creation accordingly.
+            repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor, adversarial_dim=adversarial_dim)
             elapsed = time.perf_counter() - t0
             logger.info(f"Total experiment time: {elapsed:.3f} seconds")
