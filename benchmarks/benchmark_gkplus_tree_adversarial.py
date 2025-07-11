@@ -16,8 +16,18 @@ import os
 import pickle
 
 
-# Module-level cache for adversarial keys
-_adversarial_keys_cache = {}
+def load_adversarial_keys_from_file(key_count, capacity, dim_limit):
+    """Load adversarial keys from file for given parameters."""
+    keys_dir = str(pathlib.Path(__file__).parent.parent / 'benchmarks' / 'adversarial_keys')
+    file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
+    file_path = os.path.join(keys_dir, file_name)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(
+            f"Adversarial keys not found for {(key_count, capacity, dim_limit)}: {file_path}")
+    with open(file_path, 'rb') as f:
+        keys = pickle.load(f)
+    return keys
+
 
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
@@ -32,87 +42,65 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     def setup(self, capacity, dim_limit, l_factor):
         super().setup(capacity, dim_limit, l_factor)
         key_count = 1000
-        cache_key = (key_count, capacity, dim_limit)
-        # Use absolute path for keys_dir
-        keys_dir = str(pathlib.Path(__file__).parent / 'adversarial_keys')
-        os.makedirs(keys_dir, exist_ok=True)
-        file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
-        file_path = os.path.join(keys_dir, file_name)
-
-        if cache_key in _adversarial_keys_cache:
-            succ_keys = _adversarial_keys_cache[cache_key]
-        elif os.path.exists(file_path):
-            with open(file_path, 'rb') as f:
-                succ_keys = pickle.load(f)
-            _adversarial_keys_cache[cache_key] = succ_keys
-        else:
-            succ_keys = find_keys_for_successive_rank1(
-                k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
-            )
-            _adversarial_keys_cache[cache_key] = succ_keys
-            with open(file_path, 'wb') as f:
-                pickle.dump(succ_keys, f)
-
-        self.succ_keys = succ_keys
-        self.entries = BenchmarkUtils.create_test_entries(self.succ_keys)
-        group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.succ_keys]
+        
+        self.keys = load_adversarial_keys_from_file(
+                key_count, capacity, dim_limit)
+        self.items = BenchmarkUtils.create_test_items(self.keys)
+        self.ranks = [1] * len(self.keys)
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.l_factor = l_factor
-        gc.collect(); gc.disable()
 
-    def time_adversarial_insert(self, capacity, dim_limit, l_factor):  # noqa: N802
+        gc.collect()
+        gc.disable()
+
+    def time_adversarial_insert(self, capacity, dim_limit, l_factor):
         """Benchmark sequential insertion of adversarial keys."""
         tree = self.tree_class(l_factor=l_factor)
-        for entry, rank in zip(self.entries, self.ranks):
-            tree, _ = tree.insert_entry(entry, rank)
+        for item, rank in zip(self.items, self.ranks):
+            tree, _ = tree.insert(item, rank)
 
 
 class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
     """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys."""
     params = [
         [8, 16, 32],    # K values (capacities)
-        [10, 20, 40, 50, 60, 70, 80],  # successive dimensions to enforce rank=1
-        [1.0, 2.0, 4.0, 8.0]  # l_factor values
+        [10, 20, 40, 80],  # successive dimensions to enforce rank=1
+        [1.0, 2.0, 4.0, 8.0],  # l_factor values
+        [1.0] # hit ratio
     ]
-    param_names = ['capacity', 'dim_limit', 'l_factor']
+    param_names = ['capacity', 'dim_limit', 'hit_ratio', 'l_factor']
     min_run_count = 5
 
     _tree_cache = {}
 
-    def setup(self, capacity, dim_limit, l_factor):
-        super().setup(capacity, dim_limit, l_factor)
-        key_count = 1000
-        cache_key = (key_count, capacity, dim_limit)
-        # Use absolute path for keys_dir, matching Insert benchmarks
-        keys_dir = str(pathlib.Path(__file__).parent / 'adversarial_keys')
-        os.makedirs(keys_dir, exist_ok=True)
-        file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
-        file_path = os.path.join(keys_dir, file_name)
+    def setup(self, capacity, dim_limit, hit_ratio, l_factor):
+        super().setup(capacity, dim_limit, hit_ratio, l_factor)
+        size = 1000
 
-        if cache_key in _adversarial_keys_cache:
-            succ_keys = _adversarial_keys_cache[cache_key]
-        elif os.path.exists(file_path):
-            with open(file_path, 'rb') as f:
-                succ_keys = pickle.load(f)
-            _adversarial_keys_cache[cache_key] = succ_keys
-        else:
-            succ_keys = find_keys_for_successive_rank1(
-                k=capacity, dim_limit=dim_limit, count=key_count, spacing=False
+        tree_cache_key = (capacity, size, dim_limit, l_factor)
+
+        if tree_cache_key not in self._tree_cache:
+            insert_keys = load_adversarial_keys_from_file(
+                key_count=size,
+                capacity=capacity,
+                dim_limit=dim_limit
             )
-            _adversarial_keys_cache[cache_key] = succ_keys
-            with open(file_path, 'wb') as f:
-                pickle.dump(succ_keys, f)
-
-        if cache_key not in self._tree_cache:
-            entries = BenchmarkUtils.create_test_entries(succ_keys)
+            entries = BenchmarkUtils.create_test_entries(insert_keys)
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
-            tree = bulk_create_gkplus_tree(entries, DIM=dim_limit, l_factor=l_factor, KListClass=klist_class)
-            self._tree_cache[cache_key] = (tree, succ_keys)
-        self.tree, self.lookup_keys = self._tree_cache[cache_key]
+            tree = bulk_create_gkplus_tree(entries, dim_limit, l_factor, klist_class)
+            self._tree_cache[tree_cache_key] = (tree, insert_keys)
+        self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
+
+        # Generate lookup keys with specified hit ratio, using class-level cache
+        base_seed = 42 + hash((size, capacity, dim_limit, hit_ratio)) % 1000
+        self.lookup_keys = BenchmarkUtils.create_lookup_keys(
+            insert_keys=self.insert_keys,
+            hit_ratio=hit_ratio,
+            seed=base_seed + 1000
+        )
         gc.collect(); gc.disable()
 
-    def time_adversarial_retrieve(self, capacity, dim_limit, l_factor):  # noqa: N802
+    def time_adversarial_retrieve(self, capacity, dim_limit, hit_ratio, l_factor):
         """Benchmark sequential retrieval of adversarial keys."""
         for key in self.lookup_keys:
             self.tree.retrieve(key)

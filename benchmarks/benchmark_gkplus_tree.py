@@ -79,9 +79,8 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     min_run_count = 5
     
-    # Class-level cache for trees and data
+    # Class-level cache for trees and associated data
     _tree_cache = {}
-    _data_cache = {}
     
     def setup(self, capacity, size, hit_ratio, l_factor):
         """Setup populated GKPlusTree and lookup keys for benchmarking."""
@@ -91,12 +90,12 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         distribution = 'sequential'
         
         # Create cache key for tree (hit_ratio doesn't affect tree structure)
-        tree_cache_key = (capacity, size, l_factor, distribution)
+        tree_cache_key = (capacity, size, l_factor)
         
-        # Check if we have a cached tree for these parameters
+        # Check if we have a cached tree and its data for these parameters
         if tree_cache_key not in self._tree_cache:
             # Create and populate GKPlusTree (only when not cached)
-            tree_class, _, klist_class, _ = make_gkplustree_classes(capacity)
+            _, _, klist_class, _ = make_gkplustree_classes(capacity)
             
             # Generate and insert test data
             base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
@@ -111,13 +110,11 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             # Use bulk_create_gkplus_tree for efficient initial tree construction
             tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
             
-            # Cache the tree and associated data
-            self._tree_cache[tree_cache_key] = tree
-            self._data_cache[tree_cache_key] = insert_keys
-            
+            # Cache the tree and associated data together
+            self._tree_cache[tree_cache_key] = (tree, insert_keys)
+        
         # Reuse cached tree and data
-        self.tree = self._tree_cache[tree_cache_key]
-        self.insert_keys = self._data_cache[tree_cache_key]
+        self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
         
         # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
         base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000

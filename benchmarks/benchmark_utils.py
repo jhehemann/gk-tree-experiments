@@ -5,12 +5,15 @@ This module provides common utilities and base classes for ASV benchmarking
 that work optimally with ASV's built-in timing and stabilization mechanisms.
 """
 
+import hashlib
 import random
 import gc
 from typing import List, Tuple
+from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calculate_group_size
 import numpy as np
 
 from gplus_trees.base import Item, Entry
+from tqdm import trange
 
 
 class BenchmarkUtils:
@@ -80,22 +83,19 @@ class BenchmarkUtils:
     
     @staticmethod
     def create_test_entries(keys: List[int]) -> List[Entry]:
-        """
-        Create Entry objects from a list of keys.
-        
-        Args:
-            keys: List of keys to create entries for
-            
-        Returns:
-            List of Entry objects
-        """
-        # Use list comprehension for efficiency - already optimal
+        """Create Entry objects from a list of keys."""
         return [Entry(Item(key, f"value_{key}"), None) for key in keys]
+    
+    @staticmethod
+    def create_test_items(keys: List[int]) -> List[Item]:
+        """Create Item objects from a list of keys."""
+        return [Item(key, f"value_{key}") for key in keys]
     
     @staticmethod
     def create_lookup_keys(insert_keys: List[int], 
                           hit_ratio: float = 0.8,
-                          seed: int = 42) -> List[int]:
+                          seed: int = 42,
+                          num_lookups = 1000) -> List[int]:
         """
         Create keys for lookup operations with specified hit ratio.
         
@@ -113,7 +113,6 @@ class BenchmarkUtils:
         if not insert_keys:
             return np.random.randint(1, 1000001, size=1000).tolist()
         
-        num_lookups = 1000
         num_hits = int(num_lookups * hit_ratio)
         num_misses = num_lookups - num_hits
         
