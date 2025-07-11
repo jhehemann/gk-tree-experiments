@@ -7,26 +7,24 @@ from typing import List
 import pathlib
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
-from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
-from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
-from gplus_trees.utils import find_keys_for_successive_rank1
 import os
 import pickle
 
 
-def load_adversarial_keys_from_file(key_count, capacity, dim_limit):
-    """Load adversarial keys from file for given parameters."""
-    keys_dir = str(pathlib.Path(__file__).parent.parent / 'benchmarks' / 'adversarial_keys')
+# Utility to load previously generated adversarial keys
+def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: int) -> list:
+    """
+    Load adversarial keys from a pickle file corresponding to the given parameters.
+    """
+    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys')
     file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
     file_path = os.path.join(keys_dir, file_name)
     if not os.path.exists(file_path):
-        raise FileNotFoundError(
-            f"Adversarial keys not found for {(key_count, capacity, dim_limit)}: {file_path}")
+        raise FileNotFoundError(f"Adversarial key file not found: {file_path}")
     with open(file_path, 'rb') as f:
-        keys = pickle.load(f)
-    return keys
+        return pickle.load(f)
 
 
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
