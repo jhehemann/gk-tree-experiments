@@ -1,82 +1,8 @@
 """Pure utility functions for rank calculation without circular dependencies."""
 
 import hashlib
-import numpy as np
 from typing import List
-
-
-def get_rand_rank(K: int) -> int:
-    """
-    Generate a random rank for an item in a GKPlus tree.
-    
-    Args:
-        K: The capacity of the KList, used to determine the probability distribution.
-        
-    Returns:
-        A random rank as an integer.
-    """
-    p = 1.0 - (1.0 / K)
-    return np.random.geometric(p)
-
-
-def count_trailing_zero_bits(digest: bytes) -> int:
-    tz = 0
-    # look at each byte, starting from least-significant (rightmost)
-    for byte in reversed(digest):
-        if byte == 0:
-            tz += 8
-        else:
-            # (byte & -byte) isolates the lowest set bit, 
-            # bit_length()-1 gives its zero-based position within the byte
-            tz += (byte & -byte).bit_length() - 1
-            break
-    return tz
-
-
-def calculate_group_size(k: int) -> int:
-    """
-    Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).
-    
-    Parameters:
-        k (int): The expected gplus node size, must be a positive power of 2.
-    
-    Returns:
-        int: The group size, which is log2(k).
-    
-    Raises:
-        ValueError: If k is not a positive power of 2.
-    """
-    if k <= 0 or (k & (k - 1)) != 0:
-        raise ValueError("k must be a positive power of 2")
-    
-    return k.bit_length() - 1
-
-
-def calculate_rank(key, group_size: int) -> int:
-    """
-    Calculate the rank for an item by counting the number of complete groups of trailing zero-bits in the SHA-256 hash of its key.
-    
-    Parameters:
-        k (int): The desired g-node size, must be a positive power of 2.
-        group_size (int): The size of the groups to count (log2(k)).
-    
-    Returns:
-        int: The rank calculated for this item.
-    """
-
-    key_bytes = key.to_bytes(32, 'big')
-
-    digest = hashlib.sha256(key_bytes).digest()
-    
-    tz = count_trailing_zero_bits(digest)
-    
-    return (tz // group_size) + 1
-
-
-def calc_rank_from_digest(digest: bytes, group_size: int) -> int:
-    """Calculate rank from a hash digest."""
-    tz = count_trailing_zero_bits(digest)
-    return (tz // group_size) + 1
+from gplus_trees.utils import calculate_group_size, calc_rank_from_digest
 
 
 def calc_rank_for_dim(key: int, k: int, dim: int) -> int:

@@ -6,19 +6,15 @@ import hashlib
 from dataclasses import asdict
 from pprint import pformat
 
-
+from gplus_trees.utils import count_trailing_zero_bits, calc_rank_from_digest
 from gplus_trees.base import Item, Entry
 from gplus_trees.factory import make_gplustree_classes
-from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-from gplus_trees.g_k_plus.utils import (
-    calc_rank_from_digest,
-    calc_ranks_multi_dims,
-    calculate_group_size,
-    count_trailing_zero_bits,
-)
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.klist_base import KListBase
+from gplus_trees.g_k_plus.utils import calculate_group_size
+from gplus_trees.g_k_plus.factory import create_gkplus_tree
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
+
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
 # from gplus_trees.base import logger
