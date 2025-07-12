@@ -6,7 +6,7 @@ from itertools import islice, chain
 
 import copy
 
-
+from gplus_trees.utils import calculate_group_size
 from gplus_trees.base import (
     AbstractSetDataStructure,
     Item,
