@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import NamedTuple, Optional, TypeVar, Generic, List, Tuple
+from typing import NamedTuple, Optional, TypeVar, Generic, Tuple
 import hashlib
 import logging
+
 from gplus_trees.logging_config import get_logger
-import numpy as np
+from gplus_trees.utils import calc_rank_from_digest
+
 
 # Get logger for this module
 logger = get_logger("GPlusTree")
@@ -15,12 +17,13 @@ class Item:
     """
     Represents an item (a key-value pair) for insertion in G-trees and k-lists.
     """
-    __slots__ = ("key", "value")  # Define slots for memory efficiency
+    __slots__ = ("key", "value", "rank_hash")  # Define slots for memory efficiency
 
     def __init__(
             self,
             key: int,
-            value: str = None
+            value: str = None,
+            rank_hash: Optional[bytes] = None
     ):
         """
         Initialize an Item.
@@ -28,9 +31,12 @@ class Item:
         Parameters:
             key (int): The item's key.
             value (str): The item's value.
+            rank_hash (bytes): The hash digest for rank calculation. Uses a provided rank hash or the absolute value of the key (to ensure negative keys (dummy keys) are hashable).
         """
         self.key = key
         self.value = value
+        self.rank_hash = rank_hash or hashlib.sha256(abs(self.key).to_bytes(32, 'big')).digest()
+    
     
     def short_key(self) -> str:
         """Create a short representation of the key for display purposes."""
@@ -44,7 +50,6 @@ class Item:
         return s if len(s) <= 10 else f"{s[:3]}...{s[-3:]}"
     
     
-
     def __repr__(self) -> str:
         cls = self.__class__.__name__
         return f"{cls}(key={self.key!r}, value={self.value!r})"
