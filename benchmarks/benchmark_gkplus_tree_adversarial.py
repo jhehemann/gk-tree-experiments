@@ -22,9 +22,24 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
     file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
     file_path = os.path.join(keys_dir, file_name)
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Adversarial key file not found: {file_path}")
+        # Find the next higher key_count file with same k and d
+        available_files = [f for f in os.listdir(keys_dir) if f.startswith(f"keys_sz") and f.endswith(f"_k{capacity}_d{dim_limit}.pkl")]
+        sizes = []
+        for fname in available_files:
+            try:
+                sz = int(fname.split("_")[1][2:])
+                sizes.append(sz)
+            except Exception:
+                continue
+        sizes = sorted([s for s in sizes if s > key_count])
+        if sizes:
+            next_file = f"keys_sz{sizes[0]}_k{capacity}_d{dim_limit}.pkl"
+            file_path = os.path.join(keys_dir, next_file)
+        else:
+            raise FileNotFoundError(f"No adversarial key file found for k={capacity}, d={dim_limit} with size >= {key_count}")
     with open(file_path, 'rb') as f:
-        return pickle.load(f)
+        keys = pickle.load(f)
+        return keys[:key_count]
 
 
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
