@@ -10,6 +10,7 @@ from gplus_trees.base import (
     AbstractSetDataStructure,
     Item,
     Entry,
+    InsertResult,
     _create_replica,
 )
 from gplus_trees.klist_base import KListBase
@@ -104,7 +105,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
     __repr__ = __str__
     
     # Public API
-    def insert(self, x: Item, rank: int, x_left: Optional[GPlusTreeBase] = None) -> GPlusTreeBase:
+    def insert(self, x: Item, rank: int, x_left: Optional[GPlusTreeBase] = None) -> InsertResult:
         """
         Public method (average-case O(log n)): Insert an item into the G+-tree. 
         If the item already exists, updates its value at the leaf node.
@@ -113,7 +114,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
             x_item (Item): The item (key, value) to be inserted.
             rank (int): The rank of the item. Must be a natural number > 0.
         Returns:
-            GPlusTreeBase: The updated G+-tree.
+            InsertResult: The result containing the updated G+-tree, insertion status, and next entry.
 
         Raises:
             TypeError: If x_item is not an Item or rank is not a positive int.
@@ -232,14 +233,14 @@ class GPlusTreeBase(AbstractSetDataStructure):
         if rank == 1:
             leaf_set = self._make_leaf_klist(insert_entry)
             self.node = self.NodeClass(rank, leaf_set, None)
-            return self, inserted
+            return InsertResult(self, inserted, None)
 
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(insert_entry)
         root_set, _ = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
         root_set, _ = root_set.insert_entry(Entry(_create_replica(insert_entry.item.key), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
-        return self, inserted
+        return InsertResult(self, inserted, None)
 
     def _insert_non_empty(self, x_entry: Entry, rank: int) -> GPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
@@ -269,8 +270,8 @@ class GPlusTreeBase(AbstractSetDataStructure):
                     # Direct update for leaf nodes (common case)
                     if rank == 1:
                         existing_x_entry.item.value = x_item.value
-                        return self, inserted
-                    return self._update_existing_item(cur, x_item)
+                        return InsertResult(self, inserted, next_entry)
+                    return self._update_existing_item(cur, x_item, next_entry)
                 
                 # Insert new item
                 return self._insert_new_item(cur, x_entry, next_entry)
@@ -337,7 +338,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         return new_tree
 
     def _update_existing_item(
-        self, cur: GPlusTreeBase, new_item: Item
+        self, cur: GPlusTreeBase, new_item: Item, next_entry: Entry
     ) -> GPlusTreeBase:
         """Traverse to leaf (rank==1) and update the entry in-place."""
         inserted = False
@@ -348,7 +349,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 entry = node.set.retrieve(key)[0]
                 if entry:
                     entry.item.value = new_item.value
-                return self, inserted
+                return InsertResult(self, inserted, next_entry)
             next = node.set.retrieve(key)[1]
             cur = next.left_subtree if next else node.right_subtree
 
@@ -399,7 +400,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 # Insert the item and return early if we're already at a leaf node
                 if is_leaf:
                     node.set, _ = node.set.insert_entry(x_entry)
-                    return self, inserted
+                    return InsertResult(self, inserted, next_entry)
                 
                 # Insert a replica and assign parent tracking for next iteration
                 insert_entry = Entry(replica, subtree)
@@ -489,8 +490,8 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 if is_leaf:
                     new_tree.node.next = cur.node.next
                     cur.node.next = new_tree
-                    return self, inserted  # Early return when leaf is processed
-                    
+                    return InsertResult(self, inserted, next_entry)
+
                 # Continue to next iteration with updated current node
                 cur = next_cur
 

@@ -11,6 +11,7 @@ from gplus_trees.base import (
     AbstractSetDataStructure,
     Item,
     Entry,
+    InsertResult,
     _create_replica,
 )
 import logging
@@ -422,22 +423,24 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def _insert_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Build the initial tree structure depending on rank."""
+        logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
         # Single-level leaf
         inserted = True
         if rank == 1:
             leaf_set = self._make_leaf_klist(x_entry)
             self.node = self.NodeClass(rank, leaf_set, None)
-            return self, inserted
+            return InsertResult(self, inserted, None)
 
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(x_entry)
         root_set, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
         root_set, _ = root_set.insert_entry(Entry(_create_replica(x_entry.item.key), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
-        return self, inserted
+        return InsertResult(self, inserted, None)
 
     def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
+        logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
         x_item = x_entry.item
         x_key = x_item.key
         
@@ -561,27 +564,33 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Fast path: First iteration without splitting
             if right_parent is None:
-                res = node.set.retrieve(x_key)
-                next_entry = res[1]
-                subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 is_gkplus_type = isinstance(node.set, GKPlusTreeBase)
-                insert_entry = x_entry if is_leaf else Entry(replica, subtree)
-
+                insert_entry = x_entry if is_leaf else Entry(replica, None)
                 if not is_gkplus_type:
-                    node.set, inserted = node.set.insert_entry(insert_entry)
+                    res = node.set.insert_entry(insert_entry)
+                    node.set, inserted, next_entry = res[0], res[1], res[2]
                     if not inserted:
                         return self.update(cur, x_entry)
                     node.set = check_and_convert_set(node.set) # only KLists can be extended
                 else:
                     new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
-                    node.set, inserted = node.set.insert_entry(insert_entry, rank=new_rank)
+                    res = node.set.insert_entry(insert_entry, rank=new_rank)
+                    node.set, inserted, next_entry = res[0], res[1], res[2]
                     if not inserted:
                         return self.update(cur, x_entry)
+
+                subtree = next_entry.left_subtree if next_entry else node.right_subtree
+                insert_entry.left_subtree = subtree if not is_leaf else insert_entry.left_subtree
+
 
                 # Fastest path for leaf nodes - direct return
                 if is_leaf:                    
                     self._invalidate_tree_size()
-                    return self, True
+                    # Check for next entry in the next leaf if it exists and no next entry was found
+                    if next_entry is None and node.next is not None:
+                        next_entry = node.next.find_pivot()[0]
+                    return InsertResult(self, True, next_entry)
+                
 
                 # Setup for next iteration with optimized assignments
                 right_parent = left_parent = cur
@@ -673,6 +682,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Handle leaf level with early return optimization
             if is_leaf:
+                # Check for next entry in the next leaf if it exists and no next entry was found
+                if next_entry is None and node.next is not None:
+                        next_entry = node.next.find_pivot()[0]
                 if new_tree and cur:
                     new_tree.node.next = cur.node.next
                     cur.node.next = new_tree
@@ -681,7 +693,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Do it here to maintain search tree structure across dimensions.
                     cur.node.right_subtree = None  # No right subtree at leaf level
                 self._invalidate_tree_size()
-                return self, True  # Early return when leaf is processed
+                return InsertResult(self, True, next_entry)  # Early return when leaf is processed
 
             # Continue to next iteration with updated current node
             cur = next_cur
@@ -1417,5 +1429,6 @@ def bulk_create_gkplus_tree(
         l_factor,
         max_rank
     )
+    # logger.debug(f"Bulk created GKPlusTree: {print_pretty(root_tree)}")
 
     return root_tree

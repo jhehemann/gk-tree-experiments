@@ -137,6 +137,19 @@ class RetrievalResult(NamedTuple):
     found_entry: Optional[Entry]
     next_entry: Optional[Entry]
 
+class InsertResult:
+    __slots__ = ('tree','inserted','next_entry')
+    def __init__(self, tree, inserted, next_entry):
+        self.tree = tree
+        self.inserted = inserted
+        self.next_entry = next_entry
+    def __iter__(self):
+        # Only yield the original two, so `a, b = func()` still works
+        yield self.tree
+        yield self.inserted
+    def __getitem__(self, idx):
+        return (self.tree, self.inserted, self.next_entry)[idx]
+
 
 def _create_replica(key):
     """Create a replica item with given key and no value."""

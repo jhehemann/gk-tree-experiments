@@ -332,6 +332,35 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                     gnode_capacity=k, l_factor=l_factor
                 )
 
+    def test_insert_a(self):
+        k = 2
+        l_factor = 1.0
+        tree = create_gkplus_tree(K=k)
+        rank_lists = [
+            [1, 2, 2],  # Dimension 1
+            [1, 2, 1],  # Dimension 2
+            [3, 1, 1],  # Dimension 3
+        ]
+        insert_rank = 2
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+
+        item_map = { k: self.create_item(k) for k in keys}
+        for idx, item in enumerate(item_map.values()):
+            rank = rank_lists[0][idx]
+            tree, _ = tree.insert(item, rank=rank)
+
+        insert_cases = [("before smallest", 66)]
+        for case_name, insert_key in insert_cases:
+            insert_entry = Entry(Item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+            exp_keys = sorted(keys + [insert_key])
+            with self.subTest(case=case_name, insert_key=insert_key):
+                self._run_insert_case(
+                    keys, rank_lists,
+                    insert_entry, insert_rank,
+                    exp_keys, case_name,
+                    gnode_capacity=k, l_factor=l_factor
+                )
+
 
     def test_failing_insert(self):
         """
