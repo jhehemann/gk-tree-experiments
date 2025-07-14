@@ -10,7 +10,7 @@ from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Entry, Item
+from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 # from gplus_trees.g_k_plus.utils import _tree_to_klist, _klist_to_tree
 from gplus_trees.klist_base import KListBase
@@ -30,13 +30,13 @@ class TestSetConversion(GKPlusTreeTestCase):
         """
         if not with_subtrees:
             # Create entries without subtrees
-            return [Entry(Item(key, f"val_{key}"), None) for key in keys]
+            return [Entry(self.make_item(key, f"val_{key}"), None) for key in keys]
         
-        items = [Item(key, f"val_{key}") for key in keys]
+        items = [self.make_item(key, f"val_{key}") for key in keys]
         subtrees = [create_gkplus_tree(K=self.k, dimension=1) for _ in items]
         # for i, subtree in enumerate(subtrees):
         #     # Set the dummy item for the subtree
-        #     subtrees[i] = subtree.insert(Item(1000 + i, "subtree_val"), 1)[0]
+        #     subtrees[i] = subtree.insert(self.make_item(1000 + i, "subtree_val"), 1)[0]
         return [Entry(item, subtree) for item, subtree in zip(items, subtrees)]
     
     def assert_entries_present_same_instance(
@@ -83,7 +83,7 @@ class TestKListToTree(TestSetConversion):
             [1, 1], # Dimension 3 (Test 2: conversion and stopping)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
-        items = [Item(key, f"val_{i}") for i, key in enumerate(keys)]
+        items = [self.make_item(key, f"val_{i}") for i, key in enumerate(keys)]
         entries = [Entry(item, None) for item in items]
         for entry in entries:
             self.klist, _, _ = self.klist.insert_entry(entry)
@@ -782,7 +782,7 @@ class TestTreeToKList(TestSetConversion):
     #     random.seed(44)  # For reproducibility
     #     for i in range(num_items):
     #         keys.append(random.randint(1, 1000))
-    #         items.append(Item(keys[-1], f"val_{i}"))
+    #         items.append(self.make_item(keys[-1], f"val_{i}"))
     #     ranks = [calc_rank_for_dim(key=key, k=2, dim=1) for key in keys]
     #     logger.debug(f"Keys: {[item.key for item in items]}")
     #     logger.debug(f"Ranks: {ranks}")

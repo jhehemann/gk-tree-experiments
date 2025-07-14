@@ -1,13 +1,105 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import Optional, TypeVar, Generic, Tuple
+import hashlib
+from typing import Optional, TypeVar, Generic, Tuple, Union
 import logging
 
+# from gplus_trees.klist_base import KListBase
 from gplus_trees.logging_config import get_logger
 
 # Get logger for this module
 logger = get_logger("GPlusTree")
+
+class ItemData:
+    __slots__ = ("key", "value", "dim_rank_hashes")
+    def __init__(self, key, value=None):
+        self.key   = key
+        self.value = value
+        self.dim_rank_hashes  = {}         # ← per-entry storage
+
+class LeafItem:
+    __slots__ = ("_item",)
+    def __init__(self, item_data: ItemData):
+        self._item = item_data
+
+    @property
+    def key(self):
+        return self._item.key
+
+    @property
+    def value(self):
+        return self._item.value
+
+    @value.setter
+    def value(self, v):
+        self._item.value = v
+
+    @property
+    def dim_hashes(self):
+        return self._item.dim_hashes
+    
+    def short_key(self) -> str:
+        """Create a short representation of the key for display purposes."""
+        if isinstance(self.key, (bytes, bytearray)):
+            s = self.key.hex()
+        else:
+            # treat everything else—including int—as decimal-string
+            s = str(self.key)
+
+        # 2) If it’s already short, just return it; otherwise elide the middle
+        return s if len(s) <= 10 else f"{s[:3]}...{s[-3:]}"
+    
+    
+    def __repr__(self) -> str:
+        cls = self.__class__.__name__
+        return f"{cls}(key={self.key!r}, value={self.value!r})"
+
+    def __str__(self):
+        cls = self.__class__.__name__
+        return f"{cls}(key={self.short_key()}, value={self.value})"
+
+class InternalItem:
+    __slots__ = ("_item",)
+    def __init__(self, item_data: ItemData):
+        self._item = item_data
+
+    @property
+    def key(self):
+        return self._item.key
+
+    @property
+    def dim_hashes(self):
+        return self._item.dim_hashes
+
+    @property
+    def value(self):
+        return None
+    
+    def short_key(self) -> str:
+        """Create a short representation of the key for display purposes."""
+        if isinstance(self.key, (bytes, bytearray)):
+            s = self.key.hex()
+        else:
+            # treat everything else—including int—as decimal-string
+            s = str(self.key)
+
+        # 2) If it’s already short, just return it; otherwise elide the middle
+        return s if len(s) <= 10 else f"{s[:3]}...{s[-3:]}"
+    
+    
+    def __repr__(self) -> str:
+        cls = self.__class__.__name__
+        return f"{cls}(key={self.key!r}, value={self.value!r})"
+
+    def __str__(self):
+        cls = self.__class__.__name__
+        return f"{cls}(key={self.short_key()}, value={self.value})"
+    
+
+class DummyItem(InternalItem):
+    """Represents a dummy item with no value and negative key, used for internal operations."""
+    __slots__ = () 
 
 
 class Item:
@@ -125,8 +217,12 @@ class Entry:
 
 def _create_replica(key):
     """Create a replica item with given key and no value."""
-    return Item(key, None)
+    return InternalItem(ItemData(key=key))
 
+def _get_replica(item: Union[LeafItem, InternalItem, DummyItem]) -> InternalItem:
+    """Get a replica item with given key and no value."""
+    data = item._item
+    return InternalItem(data)
 
 def debug_log(message, *args, **kwargs):
     """Log a debug message only if debug logging is enabled"""

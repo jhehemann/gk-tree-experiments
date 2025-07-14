@@ -1,7 +1,7 @@
 """G+-tree base implementation"""
 
 from __future__ import annotations
-from typing import Dict, Optional, Tuple, Any, Type
+from typing import Dict, Optional, Tuple, Any, Type, Union
 from dataclasses import dataclass
 import collections
 import math
@@ -9,8 +9,11 @@ import math
 from gplus_trees.base import (
     AbstractSetDataStructure,
     Item,
+    ItemData,
+    LeafItem,
+    DummyItem,
     Entry,
-    _create_replica,
+    _get_replica,
 )
 from gplus_trees.klist_base import KListBase
 import logging
@@ -20,8 +23,8 @@ t = Type["GPlusTreeBase"]
 
 # Constants
 DUMMY_KEY = int("-1", 16)
-DUMMY_VALUE = None
-DUMMY_ITEM = Item(DUMMY_KEY, DUMMY_VALUE)
+DUMMY_ITEM = DummyItem(ItemData(key=DUMMY_KEY))
+
 
 # Cache for dimension-specific dummy items
 _DUMMY_ITEM_CACHE: Dict[int, Item] = {}
@@ -46,7 +49,7 @@ def get_dummy(dim: int) -> Item:
     
     # Create a new dummy item for this dimension
     dummy_key = -(dim)  # Negative dimension as key 
-    dummy_item = Item(dummy_key, None)
+    dummy_item = DummyItem(ItemData(key=dummy_key))
     
     # Cache it for future use
     _DUMMY_ITEM_CACHE[dim] = dummy_item
@@ -118,7 +121,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         Raises:
             TypeError: If x_item is not an Item or rank is not a positive int.
         """
-        if not isinstance(x, Item):
+        if not isinstance(x, Union[Item, LeafItem]):
             raise TypeError(f"insert(): expected Item, got {type(x).__name__}")
         if not isinstance(rank, int) or rank <= 0:
             raise TypeError(f"insert(): rank must be a positive int, got {rank!r}")
@@ -237,7 +240,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(insert_entry)
         root_set, _, _ = self.SetClass().insert_entry(Entry(DUMMY_ITEM, None))
-        root_set, _, _ = root_set.insert_entry(Entry(_create_replica(insert_entry.item.key), l_leaf_t))
+        root_set, _, _ = root_set.insert_entry(Entry(_get_replica(insert_entry.item), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted, None
 
@@ -324,7 +327,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         # Unfold intermediate node between parent and current
         # Set replica of the current node's min as first entry.
         min_entry = cur.node.set.get_min()[0]
-        min_replica = _create_replica(min_entry.item.key)
+        min_replica = _get_replica(min_entry.item)
         new_set, _, _ = self.SetClass().insert_entry(Entry(min_replica, None))
         new_tree = TreeClass()
         new_tree.node = self.NodeClass(rank, new_set, cur)
@@ -371,8 +374,9 @@ class GPlusTreeBase(AbstractSetDataStructure):
             The updated G+-tree
         """
         inserted = True
-        x_key = x_entry.item.key
-        replica = _create_replica(x_key)
+        x_item = x_entry.item
+        x_key = x_item.key
+        replica = _get_replica(x_item)
         TreeClass = type(self)
 
         # Parent tracking variables

@@ -21,7 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # random.seed(42)  # For reproducibility
 # np.random.seed(42)  # For reproducibility
 
-from gplus_trees.base import Item
+from gplus_trees.base import Item, ItemData, LeafItem
 from gplus_trees.gplus_tree_base import (
     gtree_stats_,
 )
@@ -54,7 +54,8 @@ def random_gkplus_tree_of_size(n: int, target_node_size: int, l_factor: float) -
     # cache globals
     # calc_rank = calculate_item_rank
     # group_size = calculate_group_size(target_node_size)
-    make_item = Item
+    make_item_data = ItemData
+    make_item = LeafItem
     p = 1.0 - (1.0 / (target_node_size))    # probability for geometric dist
     # logging.info(f"p = {p:.4f} for K = {target_node_size}")
 
@@ -80,7 +81,7 @@ def random_gkplus_tree_of_size(n: int, target_node_size: int, l_factor: float) -
         # Use the index directly as the key
         key = idx
         val = "val"
-        items[i] = (make_item(key, val), int(ranks[i]))
+        items[i] = (make_item(make_item_data(key, val)), int(ranks[i]))
 
     return create_gtree(items, K=target_node_size, l_factor=l_factor)
 
@@ -173,7 +174,7 @@ def repeated_experiment(
             capacity=K,
             dim_limit=adversarial_dim
         )
-        items = [Item(key, "val") for key in keys]
+        items = [LeafItem(ItemData(key, "val")) for key in keys]
         random.shuffle(items)
         ranks = [1] * len(keys)
 

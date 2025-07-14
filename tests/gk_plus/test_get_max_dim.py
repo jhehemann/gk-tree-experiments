@@ -29,7 +29,7 @@ class TestGKPlusDimensionTracking(GKPlusTreeTestCase):
             for i in range(3):
                 key = keys[i]
                 rank = rank_lists[0][i]
-                item = self.create_item(key)
+                item = self.make_item(key)
                 tree, inserted, _ = tree.insert(item, rank=rank)
                 self.assertTrue(inserted, 
                                 f"Item with key {key} should be inserted successfully")
@@ -51,7 +51,7 @@ class TestGKPlusDimensionTracking(GKPlusTreeTestCase):
 
         with self.subTest(f"Insert item to trigger expansion"):
             # Insert one more item to trigger expansion
-            tree, inserted, _ = tree.insert(self.create_item(keys[3]), rank=rank_lists[0][3])
+            tree, inserted, _ = tree.insert(self.make_item(keys[3]), rank=rank_lists[0][3])
             self.assertTrue(inserted,
                             f"Item with key {keys[3]} should be inserted successfully")
             max_dim = tree.get_max_dim()

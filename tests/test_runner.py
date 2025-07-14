@@ -25,6 +25,7 @@ TEST_FILES = [
     'gk_plus/test_item_count.py',
     
     'gk_plus/test_split_inplace.py',
+    'gk_plus.test_split_inplace.TestGKPlusSplitInplace.test_split_root_highest_and_two_consecutive_internal_after_first',
     'gk_plus.test_item_count.TestGKPlusTreeItemCountTracking.test_large_tree_size',
 
     'test_gp_mkl_tree.py',

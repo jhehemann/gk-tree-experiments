@@ -6,9 +6,6 @@ import logging
 
 # Import factory function instead of concrete classes
 from gplus_trees.gplus_tree_base import collect_leaf_keys
-from gplus_trees.base import Item
-
-
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
 
 # Configure logging for test
@@ -22,16 +19,16 @@ class TestRetrieveBase(TreeTestCase):
         super().setUp()
         # Create some default test items
         self.items = {
-            1: Item(1, "value_1"),
-            2: Item(2, "value_2"),
-            3: Item(3, "value_3"),
-            4: Item(4, "value_4"),
-            5: Item(5, "value_5"),
-            6: Item(6, "value_6"),
-            7: Item(7, "value_7"),
-            8: Item(8, "value_8"),
-            9: Item(9, "value_9"),
-            10: Item(10, "value_10"),
+            1: self.make_item(1, "value_1"),
+            2: self.make_item(2, "value_2"),
+            3: self.make_item(3, "value_3"),
+            4: self.make_item(4, "value_4"),
+            5: self.make_item(5, "value_5"),
+            6: self.make_item(6, "value_6"),
+            7: self.make_item(7, "value_7"),
+            8: self.make_item(8, "value_8"),
+            9: self.make_item(9, "value_9"),
+            10: self.make_item(10, "value_10"),
         }
     
     def _assert_retrieval_result(self, result, expected_key=None, expected_next_key=None):
@@ -223,7 +220,7 @@ class TestRetrieveEdgeCases(TestRetrieveBase):
         self.tree.insert(self.items[1], 1)
         
         # Update the value
-        updated_item = Item(1, "updated_value")
+        updated_item = self.make_item(1, "updated_value")
         self.tree.insert(updated_item, 1)
         
         # Retrieve and verify the updated value
@@ -239,7 +236,7 @@ class TestRetrieveEdgeCases(TestRetrieveBase):
             self.tree.insert(self.items[key], 1)
         
         # Insert a duplicate key
-        duplicate_item = Item(2, "duplicate_value")
+        duplicate_item = self.make_item(2, "duplicate_value")
         self.tree.insert(duplicate_item, 1)
         
         # Verify the item was updated, not duplicated

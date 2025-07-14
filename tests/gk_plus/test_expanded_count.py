@@ -1,6 +1,5 @@
 import sys
 import os
-import random
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -26,7 +25,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
 
     def test_expansion_empty_tree_insertion(self):
         """Test that the count of expanded nodes is 0 after inserting a single item"""
-        item = self.create_item(1)
+        item = self.make_item(1)
         tree, _, _ = self.tree_k2.insert(item, rank=1)
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
@@ -44,7 +43,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1], # Dimension 2 (expanded)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
@@ -64,7 +63,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1], # Dimension 2 (expanded)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
@@ -84,7 +83,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1, 2, 1, 2, 1, 2, 1], # Dimension 2 (expanded)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         if logger.isEnabledFor(logging.DEBUG):
@@ -107,7 +106,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1], # Dimension 3 (expanded)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
@@ -130,7 +129,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1], # Dimension 3 (expanded)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
@@ -153,7 +152,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
             [2, 1, 3, 1, 2],
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        items = [self.create_item(key) for key in keys]
+        items = [self.make_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
             tree, _, _ = tree.insert(item, rank=rank_lists[0][i])

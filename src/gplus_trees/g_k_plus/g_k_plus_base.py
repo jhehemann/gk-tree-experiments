@@ -7,8 +7,11 @@ from itertools import islice
 from gplus_trees.utils import calculate_group_size
 from gplus_trees.base import (
     AbstractSetDataStructure,
+    LeafItem,
+    InternalItem,
+    DummyItem,
     Entry,
-    _create_replica,
+    _get_replica,
 )
 import logging
 
@@ -26,19 +29,19 @@ from gplus_trees.g_k_plus.utils import (
 
 class RankData:
     """Consolidated data structure for each rank level in bulk tree creation."""
-    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'pivot_key')
+    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'pivot_item')
     
     def __init__(self, 
                  entries: Optional[list[Entry]] = None,
                  child_indices: Optional[list[int]] = None,
                  next_child_idx: int = 0,
                  boundaries: Optional[list[int]] = None,
-                 pivot_key: Optional[int] = None):
+                 pivot_item: Optional[Union[LeafItem, InternalItem, DummyItem]] = None):
         self.entries = entries
         self.child_indices = child_indices
         self.next_child_idx = next_child_idx
         self.boundaries = boundaries
-        self.pivot_key = pivot_key
+        self.pivot_item = pivot_item
 
 t = TypeVar('t', bound='GKPlusTreeBase')
 
@@ -428,7 +431,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         # Higher-level root with two linked leaf children
         l_leaf_t, r_leaf_t = self._make_leaf_trees(x_entry)
         root_set, _, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
-        root_set, _, _ = root_set.insert_entry(Entry(_create_replica(x_entry.item.key), l_leaf_t))
+        root_set, _, _ = root_set.insert_entry(Entry(_get_replica(x_entry.item), l_leaf_t))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted, None
 
@@ -503,7 +506,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         # Unfold intermediate node between parent and current
         # Locate the current node’s pivot and place its replica first in the intermediate node.
         pivot = cur.node.set.find_pivot()[0]
-        pivot_replica = _create_replica(pivot.item.key)
+        pivot_replica = _get_replica(pivot.item)
         new_set, _, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
         new_tree = TreeClass(l_factor=self.l_factor)
         new_tree.node = self.NodeClass(rank, new_set, cur)
@@ -534,8 +537,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """
         # Pre-cache all frequently used values to minimize overhead
         # Cache frequently accessed attributes and methods to reduce lookups
-        x_key = x_entry.item.key
-        replica = _create_replica(x_key)
+        x_item = x_entry.item
+        x_key = x_item.key
+        replica = _get_replica(x_item)
         TreeClass = type(self)
         NodeClass = self.NodeClass
         check_and_convert_set = self.check_and_convert_set
@@ -1303,7 +1307,7 @@ def bulk_create_gkplus_tree(
     # Pre-cache all constants and frequently used objects
     NodeClass = sample_tree.NodeClass
     TreeClass = type(sample_tree)
-    create_replica_fn = _create_replica
+    get_replica_fn = _get_replica
     threshold = int(k * l_factor)
     dummy = Entry(get_dummy(DIM), None)
     dummy_key = dummy.item.key
@@ -1313,9 +1317,11 @@ def bulk_create_gkplus_tree(
     max_rank = 1
     
     for entry in entries:
-        insert_rank = calc_rank_from_group_size(entry.item.key, calculate_group_size(k), DIM)
-        entry_key = entry.item.key
-        
+        entry_item = entry.item
+        entry_key = entry_item.key
+        insert_rank = calc_rank_from_group_size(entry_key, calculate_group_size(k), DIM)
+
+
         # Update max_rank early to avoid repeated comparisons
         if insert_rank > max_rank:
             max_rank = insert_rank
@@ -1332,17 +1338,17 @@ def bulk_create_gkplus_tree(
             rank_entries = rank_data.entries
             boundaries = rank_data.boundaries
             child_indices = rank_data.child_indices
-            pivot_key = rank_data.pivot_key
+            pivot_item = rank_data.pivot_item
             next_child_idx = rank_data.next_child_idx
             
             if rank == insert_rank or rank == 1:
                 # Handle insert rank and leaf rank
-                insert_entry = entry if rank == 1 else Entry(create_replica_fn(entry_key), None)
+                insert_entry = entry if rank == 1 else Entry(get_replica_fn(entry_item), None)
 
                 # Entry insertion
                 if rank_entries is not None:
-                    if pivot_key is not None:
-                        rank_entries.append(Entry(create_replica_fn(pivot_key), None))
+                    if pivot_item is not None:
+                        rank_entries.append(Entry(get_replica_fn(pivot_item), None))
                         if child_indices is not None:
                             child_indices.append(None)
                     
@@ -1356,13 +1362,13 @@ def bulk_create_gkplus_tree(
                         rank_data.next_child_idx = next_child_idx
                 else:
                     # Initialize new entries list for this rank
-                    if rank == 1 or rank == max_rank or pivot_key is None:
+                    if rank == 1 or rank == max_rank or pivot_item is None:
                         # For leaf and root level or when there is no pivot flag, start with dummy
                         new_entries = [dummy, insert_entry]
-                        pivot_key = dummy_key
+                        pivot_item = dummy
                     else:
                         # For internal nodes with pivot, start with pivot entry
-                        pivot_entry = Entry(create_replica_fn(pivot_key), None)
+                        pivot_entry = Entry(get_replica_fn(pivot_item), None)
                         new_entries = [pivot_entry, insert_entry]
                     
                     rank_data.entries = new_entries
@@ -1378,9 +1384,9 @@ def bulk_create_gkplus_tree(
 
                 # Boundary management
                 if rank == insert_rank:
-                    if pivot_key is not None:
-                        # A non-None pivot key indicates a node boundary
-                        boundary_pos = rank_entries_len - (2 if pivot_key is not None else 1)
+                    if pivot_item is not None:
+                        # A non-None pivot item indicates a node boundary
+                        boundary_pos = rank_entries_len - (2 if pivot_item is not None else 1)
                         if boundaries is not None:
                             boundaries.append(boundary_pos)
                         else:
@@ -1392,13 +1398,13 @@ def bulk_create_gkplus_tree(
                         boundaries.append(boundary_pos)
                     else:
                         rank_data.boundaries = [0, boundary_pos]
-                
-                # Always reset pivot key after insertion
-                rank_data.pivot_key = None
+
+                # Always reset pivot item after insertion
+                rank_data.pivot_item = None
             else:
                 # Handle non-insert/non-leaf ranks
                 # Set the variables indicating a node boundary for lower ranks
-                rank_data.pivot_key = entry_key
+                rank_data.pivot_item = entry_item
                 rank_data.next_child_idx = next_child_idx + 1
 
             rank -= 1

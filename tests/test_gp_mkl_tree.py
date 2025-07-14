@@ -6,12 +6,12 @@ import numpy as np
 import random
 from binascii import hexlify
 
-from gplus_trees.base import Item
 from gplus_trees.gplus_tree_base import gtree_stats_
 from gplus_trees.merkle import create_merkle_gplustree
+from tests.test_base import GPlusTreeTestCase
 from tests.utils import assert_tree_invariants_tc
 
-class TestMerkleGPlusTree(unittest.TestCase):
+class TestMerkleGPlusTree(GPlusTreeTestCase):
     """Base class for Merkle GPlus-tree tests"""
 
     def setUp(self):
@@ -43,7 +43,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
         if ranks is None:
             ranks = [1] * len(keys)
             
-        items = [Item(k, v) for k, v in zip(keys, values)]
+        items = [self.make_item(k, v) for k, v in zip(keys, values)]
         
         for item, rank in zip(items, ranks):
             self.tree.insert(item, rank)
@@ -61,7 +61,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
         
 #     def test_insert_single_item(self):
 #         """Test inserting a single item and verifying the hash"""
-#         item = Item(1, "value_1")
+#         item = self.make_item(1, "value_1")
 #         self.tree.insert(item, 1)
         
 #         # Tree should not be empty and should have a hash
@@ -81,13 +81,13 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #     def test_hash_depends_on_values(self):
 #         """Test that the hash changes when values change"""
 #         # Insert an item
-#         item1 = Item(1, "value_1")
+#         item1 = self.make_item(1, "value_1")
 #         self.tree.insert(item1, 1)
 #         hash1 = self.tree.get_root_hash()
         
 #         # Create a new tree with a different value for the same key
 #         tree2 = create_merkle_gplustree(self.K)
-#         item2 = Item(1, "value_2")
+#         item2 = self.make_item(1, "value_2")
 #         tree2.insert(item2, 1)
 #         hash2 = tree2.get_root_hash()
         
@@ -98,13 +98,13 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #         """Test that the hash depends on the tree structure"""
 #         # Create two trees with same items but different rank assignments
 #         tree1 = create_merkle_gplustree(self.K)
-#         tree1.insert(Item(1, "val"), 1)
-#         tree1.insert(Item(2, "val"), 1)
+#         tree1.insert(self.make_item(1, "val"), 1)
+#         tree1.insert(self.make_item(2, "val"), 1)
 #         hash1 = tree1.get_root_hash()
         
 #         tree2 = create_merkle_gplustree(self.K)
-#         tree2.insert(Item(1, "val"), 1)
-#         tree2.insert(Item(2, "val"), 2)  # Different rank
+#         tree2.insert(self.make_item(1, "val"), 1)
+#         tree2.insert(self.make_item(2, "val"), 2)  # Different rank
 #         hash2 = tree2.get_root_hash()
         
 #         # Hashes should be different
@@ -124,7 +124,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #         self.assertIsNotNone(self.tree.get_root_hash())
         
 #         # Adding another item should still work
-#         self.tree.insert(Item(7, "val_7"), 1)
+#         self.tree.insert(self.make_item(7, "val_7"), 1)
         
 #         # Hash should change
 #         new_hash = self.tree.get_root_hash()
@@ -133,9 +133,9 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #     def test_insert_creates_internal_nodes(self):
 #         """Test that inserting with higher ranks creates internal nodes with valid hashes"""
 #         # Insert with different ranks to create internal structure
-#         self.tree.insert(Item(1, "val_1"), 1)
-#         self.tree.insert(Item(3, "val_3"), 2)
-#         self.tree.insert(Item(5, "val_5"), 3)
+#         self.tree.insert(self.make_item(1, "val_1"), 1)
+#         self.tree.insert(self.make_item(3, "val_3"), 2)
+#         self.tree.insert(self.make_item(5, "val_5"), 3)
         
 #         # Root should be at rank 3
 #         self.assertEqual(self.tree.node.rank, 3)
@@ -147,18 +147,18 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #     def test_multi_level_hashing(self):
 #         """Test that hashes are properly computed in a multi-level tree"""
 #         # Create a complex tree
-#         self.tree.insert(Item(1, "val_1"), 3)
-#         self.tree.insert(Item(3, "val_3"), 2)
-#         self.tree.insert(Item(5, "val_5"), 1)
-#         self.tree.insert(Item(7, "val_7"), 2)
-#         self.tree.insert(Item(9, "val_9"), 1)
+#         self.tree.insert(self.make_item(1, "val_1"), 3)
+#         self.tree.insert(self.make_item(3, "val_3"), 2)
+#         self.tree.insert(self.make_item(5, "val_5"), 1)
+#         self.tree.insert(self.make_item(7, "val_7"), 2)
+#         self.tree.insert(self.make_item(9, "val_9"), 1)
         
 #         # Get the root hash
 #         root_hash = self.tree.get_root_hash()
 #         self.assertIsNotNone(root_hash)
         
 #         # Now modify a leaf and check hash change
-#         leaf_item = Item(9, "modified")
+#         leaf_item = self.make_item(9, "modified")
 #         self.tree.insert(leaf_item, 1)  # Update leaf
         
 #         # Root hash should change
@@ -184,7 +184,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #             MerkleGPlusNodeBase.compute_hash = mock_compute_hash
             
 #             # Insert should only invalidate, not recompute
-#             self.tree.insert(Item(11, "val_11"), 1)
+#             self.tree.insert(self.make_item(11, "val_11"), 1)
 #             self.assertFalse(compute_called[0], 
 #                             "Hash should not be recomputed during insert")
                             
@@ -217,10 +217,10 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #     def test_inclusion_proof_complex(self):
 #         """Test inclusion proof in a more complex tree"""
 #         # Create a tree with internal nodes
-#         self.tree.insert(Item(1, "val_1"), 3)
-#         self.tree.insert(Item(3, "val_3"), 2)
-#         self.tree.insert(Item(5, "val_5"), 1)
-#         self.tree.insert(Item(7, "val_7"), 2)
+#         self.tree.insert(self.make_item(1, "val_1"), 3)
+#         self.tree.insert(self.make_item(3, "val_3"), 2)
+#         self.tree.insert(self.make_item(5, "val_5"), 1)
+#         self.tree.insert(self.make_item(7, "val_7"), 2)
         
 #         # Get proof for key 5
 #         proof = self.tree.get_inclusion_proof(5)
@@ -248,7 +248,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
         
 #     def test_verify_integrity_single(self):
 #         """Test integrity verification on tree with one item"""
-#         self.tree.insert(Item(1, "val_1"), 1)
+#         self.tree.insert(self.make_item(1, "val_1"), 1)
 #         self.assertTrue(self.tree.verify_integrity())
         
 #     def test_verify_integrity_complex(self):
@@ -291,7 +291,7 @@ class TestMerkleGPlusTree(unittest.TestCase):
 #             key = random.randint(1, 10000)
 #             value = f"val_{key}"
 #             rank = random.randint(1, 3)
-#             items.append((Item(key, value), rank))
+#             items.append((self.make_item(key, value), rank))
         
 #         # Insert into tree
 #         for item, rank in items:
@@ -318,11 +318,11 @@ class TestMerkleGPlusTreeSpecialCases(TestMerkleGPlusTree):
         """Test updating an existing value changes the hash"""
         # Insert initial item
         key = 5
-        self.tree.insert(Item(key, "original"), 1)
+        self.tree.insert(self.make_item(key, "original"), 1)
         original_hash = self.tree.get_root_hash()
         
         # Update the same key with new value
-        self.tree.insert(Item(key, "updated"), 1)
+        self.tree.insert(self.make_item(key, "updated"), 1)
         updated_hash = self.tree.get_root_hash()
         
         # Hash should change
@@ -349,8 +349,8 @@ class TestMerkleGPlusTreeSpecialCases(TestMerkleGPlusTree):
         
         # Insert the same items
         for key in [1, 3, 5, 9, 11]:
-            tree1.insert(Item(key, f"val_{key}"), 1)
-            tree2.insert(Item(key, f"val_{key}"), 1)
+            tree1.insert(self.make_item(key, f"val_{key}"), 1)
+            tree2.insert(self.make_item(key, f"val_{key}"), 1)
             
         # Get hashes
         hash1 = tree1.get_root_hash()
@@ -383,7 +383,7 @@ class TestMerkleGPlusTreeSpecialCases(TestMerkleGPlusTree):
             # Use the index directly as the key
             key = idx
             val = "val"
-            items[i] = (Item(key, val), int(ranks[i]))
+            items[i] = (self.make_item(key, val), int(ranks[i]))
 
         hashes = []
         for i in range(100):

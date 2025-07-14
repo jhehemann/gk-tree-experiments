@@ -5,7 +5,6 @@ import random
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
@@ -27,7 +26,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         
     def test_empty_tree_insertion_rank_1(self):
         """Test count is 1 after inserting a single item"""
-        item = self.create_item(1)
+        item = self.make_item(1)
         tree, _, _ = self.tree_k2.insert(item, rank=1)
         self.assertIsNone(tree.item_cnt, 
                           "item_cnt should be None before triggering item_count()")
@@ -38,7 +37,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         
     def test_empty_tree_insertion_rank_gt_1(self):
         """Test count is 1 after inserting a single item"""
-        item = self.create_item(1)
+        item = self.make_item(1)
         tree, _, _ = self.tree_k2.insert(item, rank=3)
         self.assertIsNone(tree.item_cnt, 
                           "item_cnt should be None before triggering item_count()")
@@ -51,11 +50,11 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         """Test count is 3 after inserting an item between two existing items"""
         # Insert two items first
         tree = self.tree_k4
-        item1 = self.create_item(1)
-        item2 = self.create_item(3)
+        item1 = self.make_item(1)
+        item2 = self.make_item(3)
         tree, _, _ = tree.insert(item1, rank=1)
         tree, _, _ = tree.insert(item2, rank=1)
-        item_between = self.create_item(2)
+        item_between = self.make_item(2)
         logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(item_between, rank=1)
         logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
@@ -70,11 +69,11 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
     def test_root_insertion(self):
         """Test count is 3 after inserting an item in the root"""
         tree = self.tree_k4
-        item1 = self.create_item(1)
-        item2 = self.create_item(3)
+        item1 = self.make_item(1)
+        item2 = self.make_item(3)
         tree, _, _ = tree.insert(item1, rank=2)
         tree, _, _ = tree.insert(item2, rank=2)
-        item_root = self.create_item(2)
+        item_root = self.make_item(2)
         logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(item_root, rank=1)
         logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
@@ -95,7 +94,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k=4)
         logger.debug(f"Keys: {keys}")
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
 
         for i in range(len(keys)):
             key = keys[i]
@@ -103,7 +102,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             item = item_map[key]
             tree, _, _ = tree.insert(item, rank=rank)
 
-        insert_item = self.create_item(30)
+        insert_item = self.make_item(30)
         logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(insert_item, rank=3)
         logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
@@ -153,7 +152,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         
         keys = self.find_keys_for_rank_lists(rank_lists, k=4)
         logger.debug(f"Keys: {keys}")
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
 
         for i in range(len(keys)):
             key = keys[i]
@@ -183,13 +182,13 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
     #     tree = self.tree_k2
         
     #     # First insertion
-    #     item = Item(1, "val")
+    #     item = self.make_item(1, "val")
     #     tree, inserted, _ = tree.insert(item, rank=1)
     #     self.assertTrue(inserted)
     #     self.assertEqual(2, tree.node.set.item_count())
         
     #     # Duplicate insertion
-    #     item_duplicate = Item(1, "new_val")
+    #     item_duplicate = self.make_item(1, "new_val")
     #     tree, inserted, _ = tree.insert(item_duplicate, rank=1)
     #     self.assertIsNone(tree.item_cnt,
     #                       "item_cnt should be None before triggering item_count()")
@@ -211,7 +210,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         inserted_count = 0
         for i, key in enumerate(unique_keys, 1):
         # for i in range(1, 1000):
-            item = Item(key, "val")
+            item = self.make_item(key, "val")
             tree, _, _ = tree.insert(item, rank=1)
 
             inserted_count += 1
@@ -242,7 +241,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         for i, key in enumerate(range(4, 11), start=1):
             
             with self.subTest(f"Insert item with key {key * 500}"):
-                tree, inserted, _ = tree.insert(Item(key * 500, "val"), rank=1)
+                tree, inserted, _ = tree.insert(self.make_item(key * 500, "val"), rank=1)
                 self.assertTrue(inserted, f"Item with key {key * 500} should be inserted successfully")
 
                 max_dim = tree.get_max_dim()
@@ -267,10 +266,10 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
     def test_rank_mismatch_size_handling(self):
         """Test that size is correctly maintained when handling rank mismatches"""
         tree = self.tree_k4
-        tree, _, _ = tree.insert(Item(1000, "val"), rank=1)
+        tree, _, _ = tree.insert(self.make_item(1000, "val"), rank=1)
 
         # Insert an item with higher rank, triggering rank mismatch logic
-        tree, _, _ = tree.insert(Item(2000, "val"), rank=3)
+        tree, _, _ = tree.insert(self.make_item(2000, "val"), rank=3)
         self.assertEqual(3, tree.item_count())
 
         # Verify subtree sizes are consistent
@@ -285,7 +284,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             [1, 2, 3, 4, 2],  # Dimension 2
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k=k)
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
         for idx, item in enumerate(item_map.values()):
             rank = rank_lists[0][idx]
             tree, _, _ = tree.insert(item, rank=rank)
@@ -352,7 +351,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             [3, 1, 1],  # Dimension 3
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
         
         # (insert_key=614, rank_combo=[(3, 2, 2), (2, 1, 1), (3, 1, 1, 2, 1, 1, 3, 1)], keys=[613, 624, 642])
 
@@ -369,7 +368,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             tree, _, _ = tree.insert(item, rank=rank)
 
 
-        tree, _, _ = tree.insert(self.create_item(614), rank=2)
+        tree, _, _ = tree.insert(self.make_item(614), rank=2)
 
         # if logger.isEnabledFor(logging.DEBUG):
         #     logger.debug(f"Initial tree before splits: {print_pretty(tree)}")

@@ -9,9 +9,6 @@ from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 
-from gplus_trees.base import (
-    _create_replica
-)
 import logging
 from tests.logconfig import logger
 
@@ -20,7 +17,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         """Test size is 1 after inserting a single item"""
         tree = create_gkplus_tree(K=2)
         key = 1
-        item = self.create_item(key)
+        item = self.make_item(key)
         tree, _, _ = tree.insert(item, rank=1)
 
         self.assertFalse(tree.is_empty(), 
@@ -39,7 +36,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k)
         logger.debug(f"Keys: {keys}")
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
 
         for i in range(2):
             key = keys[i]
@@ -81,7 +78,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Right internal node size in dim 2 should be 2, got: {right_internal_size} for set: {print_pretty(right_internal.set)}")
             self._assert_internal_node_properties(
                 right_internal,
-                [self.dummy_map[-1], _create_replica(9)],
+                [self.dummy_map[-1], self.get_replica_from_key(9)],
                 2
             )
         with self.subTest("Dim 2 leaf 1"):
@@ -130,7 +127,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k)
         logger.debug(f"Keys: {keys}")
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
 
         for i in range(2):
             key = keys[i]
@@ -224,7 +221,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Right internal node size in dim 3 should be 2, got: {right_internal_size} for set: {print_pretty(right_internal.set)}")
             self._assert_internal_node_properties(
                 right_internal,
-                [self.dummy_map[-1], _create_replica(22)],
+                [self.dummy_map[-1], self.get_replica_from_key(22)],
                 2
             )
         
@@ -264,7 +261,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         logger.debug(f"Keys: {keys}")
 
         # Create items
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
         
         for i in range(2):
             key = keys[i]
@@ -289,7 +286,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             )
             self._assert_internal_node_properties(
                 root_d1,
-                [self.dummy_map[-2], self.dummy_map[-1], _create_replica(2), _create_replica(30)],
+                [self.dummy_map[-2], self.dummy_map[-1], self.get_replica_from_key(2), self.get_replica_from_key(30)],
                 2
             )
 
@@ -358,7 +355,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Right internal node size in dim 2 should be 2, got: {right_internal_d2_size} for set: {print_pretty(right_internal_d2.set)}")
             self._assert_internal_node_properties(
                 right_internal_d2,
-                [self.dummy_map[-1], _create_replica(30)],
+                [self.dummy_map[-1], self.get_replica_from_key(30)],
                 2
             )
         with self.subTest("Dim 2 leaf 2"):
@@ -370,7 +367,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 2 size in dim 2 should be 2, got: {leaf2_size} for set: {print_pretty(leaf2.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf2,
-                [self.dummy_map[-1], _create_replica(2)]
+                [self.dummy_map[-1], self.get_replica_from_key(2)]
             )
         with self.subTest("Dim 2 leaf 3"):
             # Check leaf 3 in dimension 2
@@ -380,7 +377,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 3 size in dim 2 should be 1, got: {leaf3_size} for set: {print_pretty(leaf3.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf3,
-                [_create_replica(30)]
+                [self.get_replica_from_key(30)]
             )
 
     def test_insertion_triggers_multiple_expansions_in_root(self):
@@ -393,7 +390,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             [1, 2],  # Dimension 3
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, k)
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
         
         for i in range(2):
             key = keys[i]
@@ -414,7 +411,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             )
             self._assert_internal_node_properties(
                 root_d1,
-                [self.dummy_map[-2], self.dummy_map[-1], _create_replica(15), _create_replica(69)],
+                [self.dummy_map[-2], self.dummy_map[-1], self.get_replica_from_key(15), self.get_replica_from_key(69)],
                 2
             )
 
@@ -460,7 +457,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Root size in dim 2 should be 5, got: {root_d2_size} for set: {print_pretty(root_d2.set)}")
             self._assert_internal_node_properties(
                 root_d2,
-                [self.dummy_map[-3], self.dummy_map[-2], self.dummy_map[-1], _create_replica(15), _create_replica(69)],
+                [self.dummy_map[-3], self.dummy_map[-2], self.dummy_map[-1], self.get_replica_from_key(15), self.get_replica_from_key(69)],
                 3
             )
 
@@ -495,7 +492,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 3 size in dim 2 should be 1, got: {leaf3_size} for set: {print_pretty(leaf3.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf3,
-                [_create_replica(15)],
+                [self.get_replica_from_key(15)],
             )
 
         with self.subTest("Dim 2 leaf 4"):
@@ -506,7 +503,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 4 size in dim 2 should be 1, got: {leaf4_size} for set: {print_pretty(leaf4.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf4,
-                [_create_replica(69)],
+                [self.get_replica_from_key(69)],
             )
 
         with self.subTest("Dim 3 root"):
@@ -540,7 +537,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Right internal node size in dim 3 should be 2, got: {right_internal_d3_size} for set: {print_pretty(right_internal_d3.set)}")
             self._assert_internal_node_properties(
                 right_internal_d3,
-                [self.dummy_map[-1], _create_replica(69)],
+                [self.dummy_map[-1], self.get_replica_from_key(69)],
                 2
             )
 
@@ -553,7 +550,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 2 size in dim 3 should be 1, got: {leaf2_size} for set: {print_pretty(leaf2.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf2,
-                [self.dummy_map[-1], _create_replica(15)],
+                [self.dummy_map[-1], self.get_replica_from_key(15)],
             )
 
         with self.subTest("Dim 3 leaf 3"):
@@ -564,5 +561,5 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
                              f"Leaf 3 size in dim 3 should be 1, got: {leaf3_size} for set: {print_pretty(leaf3.set)}")
             self._assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
                 leaf3,
-                [_create_replica(69)],
+                [self.get_replica_from_key(69)],
             )
