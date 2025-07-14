@@ -31,7 +31,7 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
                 sizes.append(sz)
             except Exception:
                 continue
-        sizes = sorted([s for s in sizes if s > key_count])
+        sizes = sorted([s for s in sizes if s >= key_count])
         if sizes:
             next_file = f"keys_sz{sizes[0]}_k{capacity}_d{dim_limit}.pkl"
             file_path = os.path.join(keys_dir, next_file)
