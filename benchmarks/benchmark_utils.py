@@ -13,7 +13,7 @@ from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calculate_group_si
 import numpy as np
 
 from gplus_trees.base import Item, Entry
-from tqdm import trange
+
 
 
 class BenchmarkUtils:
