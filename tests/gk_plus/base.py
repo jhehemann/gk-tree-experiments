@@ -1,7 +1,7 @@
 """Tests for GK+-trees with factory pattern"""
 
 from typing import List, Tuple, Optional
-from gplus_trees.g_k_plus.g_k_plus_base import Item, Entry, get_dummy
+from gplus_trees.base import Item, Entry
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger

@@ -7,13 +7,10 @@ retrieve() operations with various data patterns and sizes.
 """
 
 import gc
-import random
-from typing import List
 
-from gplus_trees.g_k_plus.factory import make_gkplustree_classes, create_gkplus_tree
+from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
-from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
 

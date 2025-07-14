@@ -12,7 +12,7 @@ import logging
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item, Entry
+from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.gplus_tree_base import print_pretty
@@ -50,7 +50,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         item = self.create_item(5)
         
         # Insert item at rank 1 (leaf level)
-        tree, inserted = tree.insert(item, rank=1)
+        tree, inserted, _ = tree.insert(item, rank=1)
         self.assertTrue(inserted, "Item should be inserted successfully")
         
         # Tree should have 1 real item (5) and 1 dummy item (-1)
@@ -72,7 +72,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         
         # Insert all items at rank 1 (leaf level)
         for item in items:
-            tree, inserted = tree.insert(item, rank=1)
+            tree, inserted, _ = tree.insert(item, rank=1)
             self.assertTrue(inserted, f"Item {item.key} should be inserted successfully")
         
         # Tree should have 3 real items and 1 dummy item
@@ -96,7 +96,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         ]
         
         for item, rank in items_and_ranks:
-            tree, inserted = tree.insert(item, rank=rank)
+            tree, inserted, _ = tree.insert(item, rank=rank)
             self.assertTrue(inserted, f"Item {item.key} should be inserted successfully")
         
         if logger.isEnabledFor(logging.DEBUG):
@@ -117,7 +117,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         
         # Create a leaf with only dummy
         tree.node = tree.NodeClass(1, tree.SetClass(), None)
-        tree.node.set, _ = tree.node.set.insert_entry(entry)
+        tree.node.set, _, _ = tree.node.set.insert_entry(entry)
         
         real_count = tree.real_item_count()
         total_count = tree.item_count()
@@ -133,7 +133,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         # Insert real items
         real_items = [self.create_item(i) for i in [5, 10, 15]]
         for item in real_items:
-            tree, inserted = tree.insert(item, rank=1)
+            tree, inserted, _ = tree.insert(item, rank=1)
             self.assertTrue(inserted, f"Item {item.key} should be inserted successfully")
         
         if logger.isEnabledFor(logging.DEBUG):
@@ -156,7 +156,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         items = [self.create_item(i) for i in range(1, 12)]  # 11 items: 1,2,3,4,5,6,7,8,9,10,11
         
         for item in items:
-            tree, inserted = tree.insert(item, rank=1)
+            tree, inserted, _ = tree.insert(item, rank=1)
             self.assertTrue(inserted, f"Item {item.key} should be inserted successfully")
         
         if logger.isEnabledFor(logging.DEBUG):
@@ -173,8 +173,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         
         # Insert initial item
         item1 = self.create_item(5)
-        tree, _ = tree.insert(item1, rank=1)
-        
+        tree, _, _ = tree.insert(item1, rank=1)
+
         # Get initial count (this caches the size)
         initial_count = tree.real_item_count()
         self.assertEqual(initial_count, 1, "Initial real item count should be 1")
@@ -182,8 +182,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         
         # Insert another item - this should invalidate the cache
         item2 = self.create_item(10)
-        tree, _ = tree.insert(item2, rank=1)
-        
+        tree, _, _ = tree.insert(item2, rank=1)
+
         # The cache should be invalidated after insertion
         self.assertIsNone(tree.size, "Size cache should be invalidated after insertion")
         
@@ -200,8 +200,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         # Insert various items
         items = [self.create_item(i) for i in [1, 5, 10, 15, 20]]
         for item in items:
-            tree, _ = tree.insert(item, rank=1)
-        
+            tree, _, _ = tree.insert(item, rank=1)
+
         # Count real items manually by iterating through all entries
         manual_count = 0
         for entry in tree:
@@ -222,8 +222,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         # Insert real items
         real_items = [self.create_item(i) for i in [3, 7, 11]]
         for item in real_items:
-            tree, _ = tree.insert(item, rank=1)
-        
+            tree, _, _ = tree.insert(item, rank=1)
+
         total_count = tree.item_count()
         real_count = tree.real_item_count()
         dummy_count = total_count - real_count
@@ -249,7 +249,7 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         
         for key, rank in test_data:
             item = self.create_item(key)
-            tree, inserted = tree.insert(item, rank=rank)
+            tree, inserted, _ = tree.insert(item, rank=rank)
             self.assertTrue(inserted, f"Item {key} should be inserted successfully")
         
         if logger.isEnabledFor(logging.DEBUG):
@@ -268,8 +268,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         # Insert some items
         items = [self.create_item(i) for i in [2, 8, 12, 16]]
         for item in items:
-            tree, _ = tree.insert(item, rank=1)
-        
+            tree, _, _ = tree.insert(item, rank=1)
+
         # Both methods should return the same result
         real_count = tree.real_item_count()
         size_count = tree.get_size()
@@ -290,8 +290,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         ]
         
         for item, rank in items_and_ranks:
-            tree, _ = tree.insert(item, rank=rank)
-        
+            tree, _, _ = tree.insert(item, rank=rank)
+
         # Should count only the real items, ignoring empty subtrees
         real_count = tree.real_item_count()
         self.assertEqual(real_count, 2, "Should count 2 real items regardless of empty subtrees")
@@ -306,8 +306,8 @@ class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):
         items = [self.create_item(i) for i in range(1, num_items + 1)]
         
         for item in items:
-            tree, _ = tree.insert(item, rank=1)
-        
+            tree, _, _ = tree.insert(item, rank=1)
+
         # Should count all real items efficiently
         real_count = tree.real_item_count()
         self.assertEqual(real_count, num_items, f"Should have {num_items} real items")

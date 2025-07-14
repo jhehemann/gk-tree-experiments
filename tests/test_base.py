@@ -4,7 +4,6 @@ from typing import Tuple, Optional, List, TYPE_CHECKING
 import unittest
 import hashlib
 from dataclasses import asdict
-from pprint import pformat
 
 from gplus_trees.utils import count_trailing_zero_bits, calc_rank_from_digest
 from gplus_trees.base import Item, Entry
@@ -18,9 +17,6 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
 # from gplus_trees.base import logger
-
-if TYPE_CHECKING:
-    from gplus_trees.gplus_tree_base import GPlusTreeBase
 
 from gplus_trees.logging_config import get_test_logger
 

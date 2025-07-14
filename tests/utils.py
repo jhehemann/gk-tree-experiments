@@ -5,7 +5,6 @@ from typing import Optional
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,
     Stats,
-    print_pretty
 )
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 

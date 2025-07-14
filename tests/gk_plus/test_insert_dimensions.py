@@ -34,7 +34,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         base_tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
 
         for key, rank in zip(keys, rank_combo):
-            base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
+            base_tree, _, _ = base_tree.insert(self.ITEMS[key], rank)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(base_tree)}")
@@ -49,7 +49,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
         # deep-copy and split
         tree_copy = copy.deepcopy(base_tree)
-        tree, _ = tree_copy.insert(self.ITEMS[insert_pair[0]], rank=insert_pair[1])
+        tree, _, _ = tree_copy.insert(self.ITEMS[insert_pair[0]], rank=insert_pair[1])
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after inserting {insert_pair[0]} with rank {insert_pair[1]}: {print_pretty(tree)}")
@@ -89,7 +89,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
                 continue
             item = Item(key, "val")
             rank = rank_lists[0][i]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
             inserted_count += 1
             max_dim = tree.get_max_dim()
             dummy_cnt = self.get_dummy_count(tree)
@@ -104,7 +104,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
-        tree, _ = tree.insert(insert_item, rank=rank_lists[0][insert_key_idx])
+        tree, _, _ = tree.insert(insert_item, rank=rank_lists[0][insert_key_idx])
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions + {insert_item.key}: {print_pretty(tree)}")
 
@@ -142,7 +142,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         for i, key in enumerate(keys):
             item = self.create_item(key)
             rank = ranks[i]
-            tree, _ = tree.insert(item, rank=rank)        
+            tree, _, _ = tree.insert(item, rank=rank)        
 
         dum_keys = self.get_dummies(tree)
         if logger.isEnabledFor(logging.DEBUG):

@@ -3,10 +3,8 @@ from typing import TYPE_CHECKING, Optional, Tuple, Type
 from bisect import bisect_left, insort_left
 
 from gplus_trees.base import (
-    Item,
     AbstractSetDataStructure,
     Entry,
-    InsertResult,
 )
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
@@ -61,7 +59,7 @@ class KListNodeBase:
             keys.append(x_key)
             if not is_dummy:
                 real_keys.append(x_key)
-            return InsertResult(None, True, next_entry)
+            return None, True, next_entry
 
         # Fast path: Append at end
         if x_key > entries[-1].item.key:
@@ -94,13 +92,13 @@ class KListNodeBase:
                         # If we find an exact match, we can choose to replace or ignore
                         # Here we choose to ignore the insertion if the key already exists
                         next_entry = entries[i+1] if i+1 < len(entries) else None
-                        return InsertResult(None, False, next_entry)
+                        return None, False, next_entry
             else:
                 # Binary search for larger lists - more efficient with higher capacities
                 i = bisect_left(keys, x_key)
                 if i < len(entries) and keys[i] == x_key:
                     next_entry = entries[i+1] if i+1 < len(entries) else None
-                    return InsertResult(None, False, next_entry)
+                    return None, False, next_entry
                 entries.insert(i, entry)
                 keys.insert(i, x_key)
                 # After insertion, the next entry is at position i+1
@@ -126,8 +124,8 @@ class KListNodeBase:
             keys.pop()
             if pop_entry.item.key >= 0:
                 real_keys.pop()
-            return InsertResult(pop_entry, True, next_entry)
-        return InsertResult(None, True, next_entry)
+            return pop_entry, True, next_entry
+        return None, True, next_entry
 
     def retrieve_entry(
         self, key: int
@@ -310,7 +308,7 @@ class KListBase(AbstractSetDataStructure):
             
             if node is self.tail and overflow is None:
                 self._rebuild_index()
-                return InsertResult(self, True, original_next_entry)
+                return self, True, original_next_entry
 
             MAX_OVERFLOW_DEPTH = 10000
             depth = 0
@@ -327,9 +325,9 @@ class KListBase(AbstractSetDataStructure):
                 if depth > MAX_OVERFLOW_DEPTH:
                     raise RuntimeError("KList insert_entry overflowed too deeply – likely infinite loop.")
             self._rebuild_index()
-            return InsertResult(self, True, original_next_entry)
+            return self, True, original_next_entry
 
-        return InsertResult(self, False, next_entry)
+        return self, False, next_entry
 
     def delete(self, key: int) -> "KListBase":
         node = self.head

@@ -184,10 +184,10 @@ class TestKListInsert(TestKListBase):
 
     def test_duplicate_keys(self):
         # Insert duplicate keys – they all should appear in order
-        _, inserted = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
+        _, inserted, _ = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
         self.assertTrue(inserted, "First insert should succeed")
         for _ in range(3):
-            _, inserted = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
+            _, inserted, _ = self.klist.insert_entry(Entry(Item(7, "duplicate"), None))
             self.assertFalse(inserted, "Subsequent inserts should fail for duplicates")
         self.assertEqual(self.extract_all_keys(), [7])
 

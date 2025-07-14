@@ -5,11 +5,9 @@ This module provides common utilities and base classes for ASV benchmarking
 that work optimally with ASV's built-in timing and stabilization mechanisms.
 """
 
-import hashlib
 import random
 import gc
 from typing import List, Tuple
-from gplus_trees.g_k_plus.utils import calc_rank_from_digest, calculate_group_size
 import numpy as np
 
 from gplus_trees.base import Item, Entry

@@ -2,9 +2,6 @@
 Adversarial benchmarks for GKPlusTree using keys with successive rank=1 across dimensions.
 """
 import gc
-import hashlib
-from typing import List
-import pathlib
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree

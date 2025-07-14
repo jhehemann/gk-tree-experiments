@@ -21,7 +21,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         tree = create_gkplus_tree(K=2)
         key = 1
         item = self.create_item(key)
-        tree, _ = tree.insert(item, rank=1)
+        tree, _, _ = tree.insert(item, rank=1)
 
         self.assertFalse(tree.is_empty(), 
                          "Tree should not be empty after insertion")
@@ -45,8 +45,8 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             key = keys[i]
             rank = rank_lists[0][i]
             item = item_map[key]
-            tree, _ = tree.insert(item, rank=rank)
-            
+            tree, _, _ = tree.insert(item, rank=rank)
+
         with self.subTest("Dim 1 single node"):
             self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
             if logger.isEnabledFor(logging.DEBUG):
@@ -136,7 +136,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             key = keys[i]
             rank = rank_lists[0][i]
             item = item_map[key]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after insertions: {print_pretty(tree)}")
@@ -270,7 +270,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             key = keys[i]
             rank = rank_lists[0][i]
             item = item_map[key]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after insertions: {print_pretty(tree)}")
@@ -399,7 +399,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             key = keys[i]
             rank = rank_lists[0][i]
             item = item_map[key]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
 
         self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
         

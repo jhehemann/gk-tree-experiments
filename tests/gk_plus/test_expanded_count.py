@@ -5,7 +5,6 @@ import random
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
@@ -28,7 +27,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
     def test_expansion_empty_tree_insertion(self):
         """Test that the count of expanded nodes is 0 after inserting a single item"""
         item = self.create_item(1)
-        tree, _ = self.tree_k2.insert(item, rank=1)
+        tree, _, _ = self.tree_k2.insert(item, rank=1)
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 0,
@@ -48,7 +47,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 1,
@@ -68,7 +67,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 0,
@@ -87,7 +86,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         keys = self.find_keys_for_rank_lists(rank_lists, k)
         items = [self.create_item(key) for key in keys]
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after insertions: {print_pretty(tree)}")
         self.assertIsNone(tree.expanded_cnt,
@@ -111,7 +110,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 1,
@@ -134,7 +133,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 2,
@@ -157,7 +156,7 @@ class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
         items = [self.create_item(key) for key in keys]
         # entries = self.create_entries(keys)
         for i, item in enumerate(items):
-            tree, _ = tree.insert(item, rank=rank_lists[0][i])
+            tree, _, _ = tree.insert(item, rank=rank_lists[0][i])
         self.assertIsNone(tree.expanded_cnt,
                           "expanded_cnt should be None before triggering expanded_count()")
         self.assertEqual(tree.expanded_count(), 5,
