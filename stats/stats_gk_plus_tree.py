@@ -174,6 +174,7 @@ def repeated_experiment(
             dim_limit=adversarial_dim
         )
         items = [Item(key, "val") for key in keys]
+        random.shuffle(items)
         ranks = [1] * len(keys)
 
     # Generate results from repeated experiments.

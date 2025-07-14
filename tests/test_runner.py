@@ -34,6 +34,7 @@ TEST_FILES = [
     'gk_plus.test_expanded_count.TestGKPlusTreeExpandedCountTracking.test_multi_expansion_different_dim_paths',
 
     'gk_plus/test_set_conversion.py',
+    'test_insert_result.py',
 
 
     # 'test_stats_gpltree.py',

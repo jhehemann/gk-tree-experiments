@@ -42,7 +42,7 @@
 #     def test_single_item_tree_slot_count(self):
 #         """Test slot count for a tree with a single item."""
 #         # Insert one item
-#         tree, _ = self.tree_k4.insert(Item(1000, "val"), rank=1)
+#         tree, _, _ = self.tree_k4.insert(Item(1000, "val"), rank=1)
         
 #         # A single leaf node will be created with K+1 slots (K=4)
 #         expected_slots = self.tree_k4.SetClass.KListNodeClass.CAPACITY
@@ -56,7 +56,7 @@
         
 #         # Insert item to fill the node to capacity (beware of dummy item)
 #         for i in range(1, cap-1):
-#             tree, _ = tree.insert(Item(i * 1000, "val"), rank=1)
+#             tree, _, _ = tree.insert(Item(i * 1000, "val"), rank=1)
         
 #         exp_item_count = cap
 #         expected_slots =  exp_item_count + (exp_item_count % tree.SetClass.KListNodeClass.CAPACITY)
@@ -69,13 +69,13 @@
         
 #         # Insert items that fit in a single leaf node (K=8)
 #         for i in range(1, 6):  # Insert 5 items
-#             tree, _ = tree.insert(Item(i * 1000, "val"), rank=1)
-        
+#             tree, _, _ = tree.insert(Item(i * 1000, "val"), rank=1)
+#
 #         # A single leaf node with K+1 slots
 #         expected_slots = self.tree_k8.SetClass.KListNodeClass.CAPACITY
 #         self.assertEqual(expected_slots, tree.item_slot_count(),
 #                          f"Expected {expected_slots} slots for a tree with 5 items in a single node")
-        
+#
 #     def test_multi_leaf_node_slot_count(self):
 #         """Test slot count for a tree with multiple leaf nodes."""
 #         tree = self.tree_k2  # K=2 to force splits quickly
@@ -84,8 +84,8 @@
 #         # Insert enough items to cause underlying KlistNode splits
 #         indices = [i for i in range(1, 2 * self.cap + 1)]
 #         for i in indices:
-#             tree, _ = tree.insert(Item(i * 1000, "val"), rank=1)
-        
+#             tree, _, _ = tree.insert(Item(i * 1000, "val"), rank=1)
+#
 #         exp_item_count = len(indices) + 1 # +1 for the dummy item
 #         expected_slots =  exp_item_count + (exp_item_count % self.tree_k2.SetClass.KListNodeClass.CAPACITY)
 #         self.assertEqual(expected_slots, tree.item_slot_count(),
@@ -97,15 +97,15 @@
         
 #         # Insert items with rank 1 to create leaf nodes
 #         for i in range(1, 8):
-#             tree, _ = tree.insert(Item(i * 1000, "val"), rank=1)
-            
+#             tree, _, _ = tree.insert(Item(i * 1000, "val"), rank=1)
+#
 #         # Insert items with rank 2 to create internal nodes
 #         for i in range(1, 4):
-#             tree, _ = tree.insert(Item(i * 500, "val"), rank=2)
-        
+#             tree, _, _ = tree.insert(Item(i * 500, "val"), rank=2)
+#
 #         # Count slots manually by traversing the tree
 #         total_expected_slots = self._count_slots_manually(tree)
-        
+#
 #         self.assertEqual(total_expected_slots, tree.item_slot_count(),
 #                         f"Expected {total_expected_slots} slots for a tree with internal nodes")
     
@@ -122,14 +122,14 @@
         
 #         # Insert all items
 #         for item, rank in items:
-#             tree, _ = tree.insert(item, rank)
-        
+#             tree, _, _ = tree.insert(item, rank)
+#
 #         # Count slots manually by traversing the tree
 #         total_expected_slots = self._count_slots_manually(tree)
-        
+#
 #         self.assertEqual(total_expected_slots, tree.item_slot_count(),
 #                         f"Expected {total_expected_slots} slots for a complex tree structure")
-    
+#
 #     def test_large_tree_slot_count(self):
 #         """Test slot count in a larger tree with random insertions."""
 #         tree = self.tree_k8
@@ -140,30 +140,30 @@
 #         # Insert all items
 #         for key, rank in zip(keys, ranks):
 #             item = Item(key, "val")
-#             tree, _ = tree.insert(item, rank=rank)
-        
+#             tree, _, _ = tree.insert(item, rank=rank)
+#
 #         # Count slots manually by traversing the tree
 #         total_expected_slots = self._count_slots_manually(tree)
-        
+#
 #         self.assertEqual(total_expected_slots, tree.item_slot_count(),
 #                         f"Expected {total_expected_slots} slots for a large tree")
-    
+#
 #     def test_slot_count_after_changing_tree_structure(self):
 #         """Test that slot count updates correctly when tree structure changes."""
 #         # Start with a tree with several items
 #         tree = self.tree_k4
 #         for i in range(1, 11):
-#             tree, _ = tree.insert(Item(i * 1000, "val"), rank=1)
-        
+#             tree, _, _ = tree.insert(Item(i * 1000, "val"), rank=1)
+#
 #         # Get initial slot count
 #         initial_slots = tree.item_slot_count()
-        
+#   
 #         # Insert an item that causes a node split
-#         tree, _ = tree.insert(Item(500, "val"), rank=2)
-        
+#         tree, _, _ = tree.insert(Item(500, "val"), rank=2)
+#
 #         # Get new slot count
 #         new_slots = tree.item_slot_count()
-        
+#
 #         # The slot count should increase after a split
 #         self.assertGreaterEqual(new_slots, initial_slots,
 #                               "Slot count should increase or stay the same after structure changes")

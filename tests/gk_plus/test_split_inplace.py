@@ -2,8 +2,8 @@ import sys
 import os
 import unittest
 import random
-from typing import List, TYPE_CHECKING
-from itertools import product, islice
+from typing import List
+from itertools import product
 from tqdm import tqdm
 import copy
 from statistics import median_low
@@ -22,8 +22,6 @@ from tests.test_base import GKPlusTreeTestCase
 from tests.logconfig import logger
 import logging
 
-if TYPE_CHECKING:
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
 class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     """Tests for the split_inplace method of the GKPlusTreeBase class."""
@@ -93,7 +91,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         # build the tree once
         tree = create_gkplus_tree(K=gnode_capacity)
         for key, rank in zip(keys, rank_combo):
-            tree, _ = tree.insert(self.ITEMS[key], rank)
+            tree, _, _ = tree.insert(self.ITEMS[key], rank)
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
@@ -128,7 +126,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         # build the tree once
         tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
         for key, rank in zip(keys, rank_combo):
-            tree, _ = tree.insert(self.ITEMS[key], rank)
+            tree, _, _ = tree.insert(self.ITEMS[key], rank)
 
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -193,7 +191,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         """Test splitting a tree with a single node."""        
         item = Item(500, "val")
         base_tree = create_gkplus_tree(K=4)
-        base_tree, _ = base_tree.insert(item, rank=1)
+        base_tree, _, _ = base_tree.insert(item, rank=1)
 
         with self.subTest("split point > only key"):
             tree = copy.deepcopy(base_tree)
@@ -225,7 +223,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         tree = create_gkplus_tree(K=8)
         keys = [100, 200, 300, 400, 500]
         for key in keys:
-            tree, _ = tree.insert(Item(key, "val"), rank=1)
+            tree, _, _ = tree.insert(Item(key, "val"), rank=1)
         exp_keys = [-1] + keys  # Include dummy key
         self.validate_tree(tree, exp_keys)
 
@@ -242,7 +240,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys = [100, 200, 300, 400, 500, 600, 700]
         ranks = [1, 1, 2, 1, 3, 2, 1]  # Mix of ranks to create internal nodes
         for key, rank in zip(keys, ranks):
-            tree, _ = tree.insert(Item(key, "val"), rank)
+            tree, _, _ = tree.insert(Item(key, "val"), rank)
         exp_keys = [-1] + keys  # Include dummy key
         self.validate_tree(tree, exp_keys)
 
@@ -259,7 +257,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys = list(range(100, 1100, 100))
         ranks = [1, 2, 1, 3, 1, 2, 1, 4, 1, 2]
         for key, rank in zip(keys, ranks):
-            tree, _ = tree.insert(Item(key, "val"), rank)
+            tree, _, _ = tree.insert(Item(key, "val"), rank)
         exp_keys = [-1] + keys  # Include dummy key
         self.validate_tree(tree, exp_keys)
 
@@ -279,7 +277,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         base_tree = create_gkplus_tree(K=k)
         keys = [100, 200, 300, 400, 500]
         for key in keys:
-            base_tree, _ = base_tree.insert(Item(key, "val"), rank=1)
+            base_tree, _, _ = base_tree.insert(Item(key, "val"), rank=1)
 
         with self.subTest("Split at non-existent key"):
             # Create and attach left subtrees of different dimensions to some items
@@ -288,7 +286,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 dim = type(tree).DIM + 1  if key == 200 else type(tree).DIM + 2
                 rank = 2 if key == 200 else 3
                 subtree = create_gkplus_tree(K=4, dimension=dim)
-                subtree, _ = subtree.insert(Item(key - 50, "subtree_val"), rank=rank)
+                subtree, _, _ = subtree.insert(Item(key - 50, "subtree_val"), rank=rank)
                 entry = tree.retrieve(key)[0]
                 entry.left_subtree = subtree
                 self.validate_tree(tree)
@@ -315,8 +313,8 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             # Create and attach left subtree of different dimension to an item
             tree = copy.deepcopy(base_tree)
             subtree = create_gkplus_tree(K=k, dimension=type(tree).DIM + 1)
-            subtree, _ = subtree.insert(Item(250, "subtree_val"), rank=1)
-            subtree, _ = subtree.insert(Item(275, "subtree_val"), rank=1)
+            subtree, _, _ = subtree.insert(Item(250, "subtree_val"), rank=1)
+            subtree, _, _ = subtree.insert(Item(275, "subtree_val"), rank=1)
             entry = tree.retrieve(300)[0]
             entry.left_subtree = subtree
             self.validate_tree(tree)
@@ -334,7 +332,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         base_tree = create_gkplus_tree(K=k)
         keys = [100, 200, 300, 400, 500]
         for key in keys:
-            base_tree, _ = base_tree.insert(Item(key, "val"), rank=1)
+            base_tree, _, _ = base_tree.insert(Item(key, "val"), rank=1)
 
         with self.subTest("Split at key smaller than smallest"):
             tree = copy.deepcopy(base_tree)
@@ -383,7 +381,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys = [100, 200, 300, 400, 500]
         ranks = [2, 1, 2, 3, 1]
         for key, rank in zip(keys, ranks):
-            base_tree, _ = base_tree.insert(Item(key, "val"), rank=rank)
+            base_tree, _, _ = base_tree.insert(Item(key, "val"), rank=rank)
 
         with self.subTest("Split at key smaller than smallest"):
             tree = copy.deepcopy(base_tree)
@@ -433,7 +431,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys = [100, 200, 300, 400, 500, 600]
         ranks = [1, 2, 2, 3, 1, 2]
         for key, rank in zip(keys, ranks):
-            tree, _ = tree.insert(Item(key, "val"), rank=rank)
+            tree, _, _ = tree.insert(Item(key, "val"), rank=rank)
         left, middle, right = tree.split_inplace(350)
         self.validate_tree(left, [-1, 100, 200, 300])
         self.assertIs(tree, left, "Left tree should be the original tree")
@@ -449,7 +447,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         keys = random.sample(range(1, 1000), num_items)
         ranks = [calc_rank_for_dim(key=key, k=k, dim=1) for key in keys]
         for key, rank in zip(keys, ranks):
-            tree, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
+            tree, _, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
 
         # Verify initial tree structure
         dummies = self.get_dummies(tree)
@@ -482,7 +480,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         item_map = { k: self.create_item(k) for k in keys}
         for idx, item in enumerate(item_map.values()):
             rank = rank_lists[0][idx]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
 
         with self.subTest("First split at 80"):
             left1, middle1, right1 = tree.split_inplace(80)
@@ -778,7 +776,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         base_tree = create_gkplus_tree(K=4, l_factor=1.0)
         msg = ""
         for item, rank in zip(items, ranks):
-            base_tree, _ = base_tree.insert(item, rank)
+            base_tree, _, _ = base_tree.insert(item, rank)
             msg += f"Tree after inserting {item.key}: {print_pretty(base_tree)}"
 
         exp_keys = keys
@@ -902,7 +900,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 msg = f"Keys:  {keys}"
                 msg += f"\nRanks: {ranks}"
                 for key, rank in zip(keys, ranks):
-                    tree, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
+                    tree, _, _ = tree.insert(Item(key, f"val_{key}"), rank=rank)
                 msg += f"\n\nTree before split: {print_pretty(tree)}"
 
                 # Verify initial tree structure

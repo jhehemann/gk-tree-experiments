@@ -1,13 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing import NamedTuple, Optional, TypeVar, Generic, Tuple
-import hashlib
+from typing import Optional, TypeVar, Generic, Tuple
 import logging
 
 from gplus_trees.logging_config import get_logger
-from gplus_trees.utils import calc_rank_from_digest
-
 
 # Get logger for this module
 logger = get_logger("GPlusTree")
@@ -125,23 +122,6 @@ class Entry:
 
     item: Item
     left_subtree: T
-
-
-class RetrievalResult(NamedTuple):
-    """
-    A container for the result of a lookup in an AbstractSetDataStructure.
-
-    Attributes:
-        found_entry (Optional[Entry]):
-            The entry corresponding to the searched key if found;
-            otherwise, None.
-        next_entry (Optional[Entry]):
-            The subsequent entry in the sorted order, which serves as a candidate for
-            further operations or in-order traversal; None if no subsequent entry exists.
-    """
-    found_entry: Optional[Entry]
-    next_entry: Optional[Entry]
-
 
 def _create_replica(key):
     """Create a replica item with given key and no value."""

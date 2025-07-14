@@ -17,7 +17,6 @@ from gplus_trees.base import (
 )
 
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
-
 from tests.logconfig import logger
 
 
@@ -1866,7 +1865,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
             key, rank = 1, 1
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)  # Create an Entry instance
-            tree, _ = tree._insert_empty(entry, rank)
+            tree, _, _ = tree._insert_empty(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1877,7 +1876,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
             key, rank = 1, 3
             item = Item(key, f"val_{key}")
             entry = Entry(item, None)
-            tree, _ = tree._insert_empty(entry, rank)
+            tree, _, _ = tree._insert_empty(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1902,7 +1901,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
                 tree = copy.deepcopy(base_tree)
                 item = Item(insert_key, f"val")
                 entry = Entry(item, None)
-                tree, _ = tree._insert_non_empty(entry, rank)
+                tree, _, _ = tree._insert_non_empty(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1917,7 +1916,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
                 tree = copy.deepcopy(base_tree)
                 item = Item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
-                tree, _ = tree._insert_non_empty(entry, rank)
+                tree, _, _ = tree._insert_non_empty(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
