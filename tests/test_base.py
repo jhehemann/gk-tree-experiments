@@ -1,12 +1,12 @@
 """Unified test base classes for all tree types."""
 
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Union
 import unittest
 import hashlib
 from dataclasses import asdict
 
 from gplus_trees.utils import count_trailing_zero_bits, calc_rank_from_digest
-from gplus_trees.base import Item, LeafItem, InternalItem, ItemData, Entry
+from gplus_trees.base import LeafItem, InternalItem, ItemData, Entry
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.klist_base import KListBase
@@ -26,7 +26,7 @@ logger = get_test_logger("TestBase")
 class BaseTestCase(unittest.TestCase):
     """Base class for all tests with common functionality."""
     
-    def make_item(self, key: int, value: str = "val") -> Item:
+    def make_item(self, key: int, value: str = "val") -> LeafItem:
         item_data = ItemData(key, value)
         return LeafItem(item_data)
     
@@ -145,7 +145,7 @@ class GPlusTreeTestCase(BaseTreeTestCase):
             logger.debug(f"Created GPlusTree test with K={self.K}, using class {self.TreeClass.__name__}")
 
     def _assert_internal_node_properties(
-        self, node, items: List[Item], rank: int
+        self, node, items: List[InternalItem], rank: int
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of internal nodes."""
         # Implementation from tests/gplus/base.py
@@ -190,7 +190,7 @@ class GPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Item]
+        self, node, items: List[Union[LeafItem, InternalItem]]
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of leaf nodes."""
         # Implementation from tests/gplus/base.py
@@ -461,7 +461,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
 
     # Extended assertion methods for GK+ trees
     def _assert_internal_node_properties(
-        self, node, items: List[Item], rank: int
+        self, node, items: List[InternalItem], rank: int
     ) -> Optional[Entry]:
         """Assert properties of internal nodes for GK+ trees."""
         self.assertIsNotNone(node, "Node should not be None")
@@ -510,7 +510,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Item]
+        self, node, items: List[Union[LeafItem, InternalItem]]
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of leaf nodes for GK+ trees."""
         expected_len = len(items)

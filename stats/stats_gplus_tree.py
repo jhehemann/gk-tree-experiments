@@ -16,7 +16,7 @@ import argparse
 # Add the project root to the Python path so we can import from tests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from gplus_trees.base import Item, LeafItem, ItemData
+from gplus_trees.base import LeafItem, ItemData
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,
     gtree_stats_,
@@ -28,7 +28,7 @@ from tests.utils import (
     assert_tree_invariants_raise,
 )
 
-# Assume create_gtree(items) builds a GPlusTree from a list of (Item, rank) pairs.
+# Assume create_gtree(items) builds a GPlusTree from a list of (LeafItem, rank) pairs.
 def create_gtree(items, K=16):
     """
     Mimics the Rust create_gtree: build a tree by inserting each (item, rank) pair.

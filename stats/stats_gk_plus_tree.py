@@ -21,7 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # random.seed(42)  # For reproducibility
 # np.random.seed(42)  # For reproducibility
 
-from gplus_trees.base import Item, ItemData, LeafItem
+from gplus_trees.base import ItemData, LeafItem
 from gplus_trees.gplus_tree_base import (
     gtree_stats_,
 )
@@ -37,7 +37,7 @@ from benchmarks.benchmark_gkplus_tree_adversarial import load_adversarial_keys_f
 from gplus_trees.g_k_plus.base import logger
 IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
 
-# Assume create_gtree(items) builds a GPlusTree from a list of (Item, rank) pairs.
+# Assume create_gtree(items) builds a GKPlusTree from a list of (LeafItem, rank) pairs.
 def create_gtree(items, K=16, l_factor=1.0) -> GKPlusTreeBase:
     """
     Mimics the Rust create_gtree: build a tree by inserting each (item, rank) pair.

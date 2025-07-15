@@ -8,9 +8,9 @@ import math
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
-    Item,
     ItemData,
     LeafItem,
+    InternalItem,
     DummyItem,
     Entry,
     _get_replica,
@@ -27,9 +27,9 @@ DUMMY_ITEM = DummyItem(ItemData(key=DUMMY_KEY))
 
 
 # Cache for dimension-specific dummy items
-_DUMMY_ITEM_CACHE: Dict[int, Item] = {}
+_DUMMY_ITEM_CACHE: Dict[int, DummyItem] = {}
 
-def get_dummy(dim: int) -> Item:
+def get_dummy(dim: int) -> DummyItem:
     """
     Get a dummy item for the specified dimension.
     This function caches created dummy items to avoid creating new instances
@@ -39,10 +39,8 @@ def get_dummy(dim: int) -> Item:
         dim (int): The dimension for which to get a dummy item.
         
     Returns:
-        Item: A dummy item with key=-(dim) and value=None
+        DummyItem: A dummy item with key=-(dim) and value=None
     """
-    # return Item(-1, None)
-
     # Check if we already have a dummy item for this dimension in cache
     if dim in _DUMMY_ITEM_CACHE:
         return _DUMMY_ITEM_CACHE[dim]
@@ -107,22 +105,22 @@ class GPlusTreeBase(AbstractSetDataStructure):
     __repr__ = __str__
     
     # Public API
-    def insert(self, x: Item, rank: int, x_left: Optional[GPlusTreeBase] = None) -> Tuple[t, bool, Optional[Entry]]:
+    def insert(self, x: Union[InternalItem, LeafItem], rank: int, x_left: Optional[GPlusTreeBase] = None) -> Tuple[t, bool, Optional[Entry]]:
         """
         Public method (average-case O(log n)): Insert an item into the G+-tree. 
         If the item already exists, updates its value at the leaf node.
         
         Args:
-            x_item (Item): The item (key, value) to be inserted.
+            x_item (Union[InternalItem, LeafItem]): The item (key, value) to be inserted.
             rank (int): The rank of the item. Must be a natural number > 0.
         Returns:
             Tuple[GPlusTreeBase, bool, Optional[Entry]]: The result containing the updated G+-tree, insertion status, and next entry.
 
         Raises:
-            TypeError: If x_item is not an Item or rank is not a positive int.
+            TypeError: If x_item is not an InternalItem or LeafItem or rank is not a positive int.
         """
-        if not isinstance(x, Union[Item, LeafItem]):
-            raise TypeError(f"insert(): expected Item, got {type(x).__name__}")
+        if not isinstance(x, Union[InternalItem, LeafItem]):
+            raise TypeError(f"insert(): expected InternalItem or LeafItem, got {type(x).__name__}")
         if not isinstance(rank, int) or rank <= 0:
             raise TypeError(f"insert(): rank must be a positive int, got {rank!r}")
         insert_entry = Entry(x, x_left)
@@ -340,7 +338,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
         return new_tree
 
     def _update_existing_item(
-        self, cur: GPlusTreeBase, new_item: Item, next_entry: Entry
+        self, cur: GPlusTreeBase, new_item: Union[InternalItem, LeafItem], next_entry: Entry
     ) -> GPlusTreeBase:
         """Traverse to leaf (rank==1) and update the entry in-place."""
         inserted = False

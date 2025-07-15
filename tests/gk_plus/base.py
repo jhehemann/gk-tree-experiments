@@ -1,7 +1,7 @@
 """Tests for GK+-trees with factory pattern"""
 
 from typing import List, Tuple, Optional
-from gplus_trees.base import Item, Entry
+from gplus_trees.base import Entry, LeafItem
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
@@ -35,7 +35,7 @@ class TreeTestCase(GKPlusTreeTestCase):
             logger.debug(f"Dimension {dim + 1}: {ranks}")
     
     def _assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
-        self, node, items: List[Item]
+        self, node, items: List[LeafItem]
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """
         Verify that `node` is a rank 1 leaf containing exactly `items` in order,

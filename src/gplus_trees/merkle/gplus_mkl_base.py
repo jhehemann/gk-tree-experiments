@@ -5,14 +5,11 @@ allowing each node to store and update cryptographic hashes of its subtrees.
 """
 
 import hashlib
-from typing import Optional, Type
+from typing import Optional, Type, Union
 import logging
 import struct
 
-from gplus_trees.base import (
-    Item, 
-    AbstractSetDataStructure, 
-)
+from gplus_trees.base import AbstractSetDataStructure, InternalItem, LeafItem
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase, 
     GPlusNodeBase,
@@ -213,12 +210,12 @@ class MerkleGPlusTreeBase(GPlusTreeBase):
             
 
     # Override insertion methods to update hashes
-    def insert(self, x: Item, rank: int) -> 'MerkleGPlusTreeBase':
+    def insert(self, x: Union[LeafItem, InternalItem], rank: int) -> 'MerkleGPlusTreeBase':
         """
         Insert an item with the given rank, then update Merkle hashes.
         
         Parameters:
-            x (Item): The item to insert
+            x (Union[LeafItem, InternalItem]): The item to insert
             rank (int): The rank to assign
             
         Returns:

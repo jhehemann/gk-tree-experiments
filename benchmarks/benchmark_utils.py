@@ -10,7 +10,7 @@ import gc
 from typing import List, Tuple
 import numpy as np
 
-from gplus_trees.base import Item, Entry
+from gplus_trees.base import Entry, LeafItem
 
 
 
@@ -82,13 +82,13 @@ class BenchmarkUtils:
     @staticmethod
     def create_test_entries(keys: List[int]) -> List[Entry]:
         """Create Entry objects from a list of keys."""
-        return [Entry(Item(key, f"value_{key}"), None) for key in keys]
+        return [Entry(LeafItem(key, f"value_{key}"), None) for key in keys]
     
     @staticmethod
-    def create_test_items(keys: List[int]) -> List[Item]:
-        """Create Item objects from a list of keys."""
-        return [Item(key, f"value_{key}") for key in keys]
-    
+    def create_test_items(keys: List[int]) -> List[LeafItem]:
+        """Create LeafItem objects from a list of keys."""
+        return [LeafItem(key, f"value_{key}") for key in keys]
+
     @staticmethod
     def create_lookup_keys(insert_keys: List[int], 
                           hit_ratio: float = 0.8,
