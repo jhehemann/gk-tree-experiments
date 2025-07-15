@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import hashlib
 from typing import Optional, TypeVar, Generic, Tuple, Union
 import logging
 
@@ -11,11 +12,11 @@ from gplus_trees.logging_config import get_logger
 logger = get_logger("GPlusTree")
 
 class ItemData:
-    __slots__ = ("key", "value", "dim_hashes")
+    __slots__ = ("key", "value", "dim_hash_map")
     def __init__(self, key, value=None):
         self.key   = key
         self.value = value
-        self.dim_hashes  = {}         # ← per-entry storage
+        self.dim_hash_map  = {}         # ← per-entry storage
 
 
 class InternalItem:
@@ -29,12 +30,49 @@ class InternalItem:
 
     @property
     def dim_hashes(self):
-        return self._item.dim_hashes
+        return self._item.dim_hash_map
 
     @property
     def value(self):
         return None
     
+    def get_digest_for_dim(self, dim: int) -> int:
+        """
+        Get the hash digest for the specified dimension.
+
+        Args:
+            dim: The dimension level to get the rank for.
+        
+        Returns:
+            The rank for the specified dimension.
+        """
+        # TODO: include the dimension when hashing to differentiate between dimensions
+        # TODO: use strings to avoid collisions with negative keys
+        digest = self._item.dim_hash_map.get(dim, None)
+        if digest is None:
+            key = self.key
+            # Find the next lower existing dim hash
+            lower_dims = [d for d in self._item.dim_hash_map if d < dim]
+            if not lower_dims:
+                # If no lower dims, create the digest for dim 1 and continue from there
+                digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
+                self._item.dim_hash_map[1] = digest
+                lower_dims = [1]
+
+            next_lower_dim = max(lower_dims)
+            digest = self._item.dim_hash_map[next_lower_dim]
+            # Rehash and store digest until dim is reached
+            for d in range(next_lower_dim + 1, dim + 1):
+                digest = hashlib.sha256(digest).digest()
+
+                # h = hashlib.sha256()
+                # h.update(digest)
+                # h.update(d.to_bytes(32, 'big'))
+                # digest = h.digest()
+                self._item.dim_hash_map[d] = digest
+
+        return digest
+
     def short_key(self) -> str:
         """Create a short representation of the key for display purposes."""
         if isinstance(self.key, (bytes, bytearray)):

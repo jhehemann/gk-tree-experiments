@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional, Type, TypeVar, Tuple, Union
 from itertools import islice
 
-from gplus_trees.utils import calculate_group_size
+from gplus_trees.utils import calc_rank_from_digest_k
 from gplus_trees.base import (
     AbstractSetDataStructure,
     LeafItem,
@@ -21,11 +21,6 @@ from gplus_trees.gplus_tree_base import (
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-from gplus_trees.g_k_plus.utils import (
-    calc_rank_for_dim,
-    calc_rank_from_group_size,
-    calculate_group_size,
-)
 
 class RankData:
     """Consolidated data structure for each rank level in bulk tree creation."""
@@ -420,7 +415,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def _insert_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Build the initial tree structure depending on rank."""
-        logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
         # Single-level leaf
         inserted = True
         if rank == 1:
@@ -437,7 +433,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
-        logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
         x_item = x_entry.item
         x_key = x_item.key
         
@@ -571,7 +568,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         return self.update(cur, x_entry)
                     node.set = check_and_convert_set(node.set) # only KLists can be extended
                 else:
-                    new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
+                    digest = x_item.get_digest_for_dim(self.DIM + 1)
+                    new_rank = calc_rank_from_digest_k(digest, capacity)
                     res = node.set.insert_entry(insert_entry, rank=new_rank)
                     node.set, inserted, next_entry = res[0], res[1], res[2]
                     if not inserted:
@@ -616,7 +614,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if right_item_count > 0 or is_leaf:
                 insert_entry = x_entry if is_leaf else Entry(replica, None)
                 if isinstance(right_split, GKPlusTreeBase):
-                    new_rank = calc_rank_for_dim(x_key, capacity, dim=self.DIM + 1)
+                    digest = x_item.get_digest_for_dim(self.DIM + 1)
+                    new_rank = calc_rank_from_digest_k(digest, capacity)
                     right_split, _, _ = right_split.insert_entry(insert_entry, rank=new_rank)
                     right_split._invalidate_tree_size()
                 else:
@@ -770,11 +769,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 
                 if is_gkplus_type:
                     # Calculate the new rank for the item in the next dimension - use cached values
-                    new_rank = calc_rank_for_dim(
-                        dummy_key,
-                        KListNodeCapacity,
-                        dim=tree_dim_plus_one
-                    )
+                    digest = dummy.get_digest_for_dim(tree_dim_plus_one)
+                    new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
                     right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                     right_split._invalidate_tree_size()
                     # TODO: Check why we need to invalidate size and why it is not done in insert_entry. Check it also for insert_entry()
@@ -818,7 +814,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     # Create a leaf with a single dummy item
                     if is_gkplus_type:
                         # Calculate new rank for item in the next dimension - use cached values
-                        new_rank = calc_rank_for_dim(dummy_key, KListNodeCapacity, dim=tree_dim_plus_one)
+                        digest = dummy.get_digest_for_dim(tree_dim_plus_one)
+                        new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
                         right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
                         right_split._invalidate_tree_size()
                     else:
@@ -1318,9 +1315,8 @@ def bulk_create_gkplus_tree(
     
     for entry in entries:
         entry_item = entry.item
-        entry_key = entry_item.key
-        insert_rank = calc_rank_from_group_size(entry_key, calculate_group_size(k), DIM)
-
+        digest = entry_item.get_digest_for_dim(DIM)
+        insert_rank = calc_rank_from_digest_k(digest, k)
 
         # Update max_rank early to avoid repeated comparisons
         if insert_rank > max_rank:
