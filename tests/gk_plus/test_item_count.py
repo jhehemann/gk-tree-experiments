@@ -55,9 +55,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         tree, _, _ = tree.insert(item1, rank=1)
         tree, _, _ = tree.insert(item2, rank=1)
         item_between = self.make_item(2)
-        logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(item_between, rank=1)
-        logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
 
         self.assertIsNone(tree.item_cnt, 
                           "item_cnt should be None before triggering item_count()")
@@ -74,9 +72,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         tree, _, _ = tree.insert(item1, rank=2)
         tree, _, _ = tree.insert(item2, rank=2)
         item_root = self.make_item(2)
-        logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(item_root, rank=1)
-        logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
 
         self.assertIsNone(tree.item_cnt, 
                           "item_cnt should be None before triggering item_count()")
@@ -103,9 +99,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             tree, _, _ = tree.insert(item, rank=rank)
 
         insert_item = self.make_item(30)
-        logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
         tree, _, _ = tree.insert(insert_item, rank=3)
-        logger.debug(f"Tree after initial insertions + key 310: {print_pretty(tree)}")
         
         cur = tree
         while cur.node.right_subtree is not None:
@@ -115,7 +109,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                 if entry.item.key == insert_item.key:
                     if entry.left_subtree is not None:
                         self.assertIsNone(entry.left_subtree.item_cnt,
-                                        f"item_cnt should be None for insert keys left subtree (left split), got {entry.left_subtree.item_cnt} for: {print_pretty(entry.left_subtree)}")
+                                        f"item_cnt should be None for insert keys left subtree (left split), got {entry.left_subtree.item_cnt}")
                 if entry.item.key > insert_item.key:
                     cur = entry.left_subtree
                     break
@@ -124,7 +118,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         
         exp_item_count = 1 + len(keys) + 1  # 1 dummy, len(keys) and 310
         self.assertEqual(tree.item_count(), exp_item_count,
-                        f"Item count should be {exp_item_count} after inserting item {insert_item.key}; tree: {print_pretty(tree)}")
+                        f"Item count should be {exp_item_count} after inserting item {insert_item.key}")
 
         cur = tree
         while True:
@@ -163,16 +157,8 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         max_dim = tree.get_max_dim()
         expanded_leafs = tree.get_expanded_leaf_count()
         expected_keys = [entry.item.key for entry in tree]
-        logger.debug(f"Tree after inserting {len(keys)} items: {print_pretty(tree)}")
-        logger.debug(f"Tree size should be {len(keys) + expanded_leafs + 1} after inserting {len(keys)} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
         self.assertEqual(len(keys) + expanded_leafs + 1, tree.item_count(), f"Tree size should be {len(keys) + expanded_leafs + 1} after inserting {len(keys)} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
-
-        # # Verify structure at each step
-        # expected_real_keys = [j * 500 for j in range(1, len(keys)+1)]
-        # real_keys = [entry.item.key for entry in tree.iter_real_entries()]
-        # self.assertEqual(expected_real_keys, real_keys, 
-        #                 f"Tree should contain keys {expected_real_keys} after {i} insertions")
 
         self.assertTrue(self.verify_subtree_sizes(tree))
 
@@ -228,7 +214,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                     logger.debug(f"tree: {print_pretty(tree.node.set.node.right_subtree)}")
                     logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
 
-            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}")
+            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
         self.validate_tree(tree)
     
@@ -339,53 +325,52 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             
 
     
-    # This test caused item_counts of the right split to be 0 during insertion
-    # Fixed by invalidating item_count after right split insertion again, as for the control flow item_count() was called and the tree was not updated
-    def test_insert_specific_rank_combo(self):
-        """Test that size is correctly maintained after splitting a tree"""
-        k = 2
-        tree = create_gkplus_tree(K=k)
-        rank_lists = [
-            [3, 2, 2],  # Dimension 1
-            [2, 1, 1],  # Dimension 2
-            [3, 1, 1],  # Dimension 3
-        ]
-        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
-        item_map = { k: self.make_item(k) for k in keys}
+    # # This test caused item_counts of the right split to be 0 during insertion
+    # # Fixed by invalidating item_count after right split insertion again, as for the control flow item_count() was called and the tree was not updated
+    # def test_insert_specific_rank_combo(self):
+    #     """Test that size is correctly maintained after splitting a tree"""
+    #     k = 2
+    #     tree = create_gkplus_tree(K=k)
+    #     rank_lists = [
+    #         [3, 2, 2],  # Dimension 1
+    #         [2, 1, 1],  # Dimension 2
+    #         [3, 1, 1],  # Dimension 3
+    #     ]
+    #     keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+    #     item_map = { k: self.make_item(k) for k in keys}
         
-        # (insert_key=614, rank_combo=[(3, 2, 2), (2, 1, 1), (3, 1, 1, 2, 1, 1, 3, 1)], keys=[613, 624, 642])
+    #     # (insert_key=614, rank_combo=[(3, 2, 2), (2, 1, 1), (3, 1, 1, 2, 1, 1, 3, 1)], keys=[613, 624, 642])
+
+    #     pairs = list(zip(keys, rank_lists[0]))
+
+    #     random.seed(42)  # For reproducibility in tests
+    #     # Shuffle in place
+    #     random.shuffle(pairs)
+    #     logger.debug(f"Shuffled pairs: {pairs}")
+
+    #     for idx, item in enumerate(item_map.values()):
+    #         rank = rank_lists[0][idx]
+    #         tree, _, _ = tree.insert(item, rank=rank)
 
 
-        pairs = list(zip(keys, rank_lists[0]))
+    #     tree, _, _ = tree.insert(self.make_item(614), rank=2)
 
-        random.seed(42)  # For reproducibility in tests
-        # Shuffle in place
-        random.shuffle(pairs)
-        logger.debug(f"Shuffled pairs: {pairs}")
+    #     if logger.isEnabledFor(logging.DEBUG):
+    #         logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
+    #     with self.subTest("First split at 391"):
+    #         left1, _, right1 = tree.split_inplace(391)
+    #         logger.debug(f"Left split after first split: {print_pretty(left1)}")
+    #         logger.debug(f"Right split after first split: {print_pretty(right1)}")
+    #         self.assertIsNone(left1.item_cnt, 
+    #                     "Left split item_cnt attr should be None before triggering item_count()")
+    #         self.assertEqual(left1.item_count(), 5,
+    #                             "Left split item count should be 5")
+    #         self.assertEqual(left1.item_cnt, 5,
+    #                         "Left split item_cnt should be 5 after item_count() is called")
 
-        for idx, item in enumerate(item_map.values()):
-            rank = rank_lists[0][idx]
-            tree, _, _ = tree.insert(item, rank=rank)
-
-
-        tree, _, _ = tree.insert(self.make_item(614), rank=2)
-
-        # if logger.isEnabledFor(logging.DEBUG):
-        #     logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
-        # with self.subTest("First split at 391"):
-        #     left1, _, right1 = tree.split_inplace(391)
-        #     logger.debug(f"Left split after first split: {print_pretty(left1)}")
-        #     logger.debug(f"Right split after first split: {print_pretty(right1)}")
-        #     self.assertIsNone(left1.item_cnt, 
-        #                 "Left split item_cnt attr should be None before triggering item_count()")
-        #     self.assertEqual(left1.item_count(), 5,
-        #                         "Left split item count should be 5")
-        #     self.assertEqual(left1.item_cnt, 5,
-        #                     "Left split item_cnt should be 5 after item_count() is called")
-
-        #     self.assertIsNone(right1.item_cnt, 
-        #                 "Right split item_cnt attr should be None before triggering item_count()")
-        #     self.assertEqual(right1.item_count(), 2,
-        #                         "Right split item count should be 2")
-        #     self.assertEqual(right1.item_cnt, 2,
-        #                     "Right split item_cnt should be 2 after item_count() is called")
+    #         self.assertIsNone(right1.item_cnt, 
+    #                     "Right split item_cnt attr should be None before triggering item_count()")
+    #         self.assertEqual(right1.item_count(), 2,
+    #                             "Right split item count should be 2")
+    #         self.assertEqual(right1.item_cnt, 2,
+    #                         "Right split item_cnt should be 2 after item_count() is called")

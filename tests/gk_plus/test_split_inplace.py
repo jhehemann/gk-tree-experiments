@@ -96,7 +96,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
+            # f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
         )
 
         # deep-copy and split
@@ -135,7 +135,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
+            # f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
         )
 
         left, middle, right = tree.split_inplace(split_key)
@@ -146,11 +146,11 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             logger.debug(f"Right after split: {print_pretty(right)}")
 
         msg = f"\n\nSplit at {case_name}" + msg_head
-        msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
-            left=print_pretty(left),
-            middle=print_pretty(middle),
-            right=print_pretty(right),
-        )
+        # msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
+        #     left=print_pretty(left),
+        #     middle=print_pretty(middle),
+        #     right=print_pretty(right),
+        # )
         dummies_left = self.get_dummies(left)
         exp_left = sorted(dummies_left + exp_left)
         dummies_right = self.get_dummies(right)
@@ -900,13 +900,13 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 msg += f"\nRanks: {ranks}"
                 for key, rank in zip(keys, ranks):
                     tree, _, _ = tree.insert(self.make_item(key, f"val_{key}"), rank=rank)
-                msg += f"\n\nTree before split: {print_pretty(tree)}"
+                # msg += f"\n\nTree before split: {print_pretty(tree)}"
 
                 # Verify initial tree structure
                 dummies = self.get_dummies(tree)
-                msg += f"\nDummies: {dummies}"
+                # msg += f"\nDummies: {dummies}"
                 expected_keys = sorted(dummies + keys)  # sort to handle dummy keys in other dimensions
-                msg += f"\nExpected keys: {expected_keys}"
+                # msg += f"\nExpected keys: {expected_keys}"
                 self.validate_tree(tree, expected_keys, msg)
 
                 split_cases = self._get_split_cases(keys)

@@ -46,7 +46,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE AFTER INITIAL INSERTIONS: {print_pretty(base_tree)}\n"
+            # f"\n\nTREE AFTER INITIAL INSERTIONS: {print_pretty(base_tree)}\n"
         )
 
         # deep-copy and split
@@ -102,7 +102,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
                 logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
                 logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
+            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
@@ -122,7 +122,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-        self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
+        self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
 
         text = " | ".join(str(e.item.key) for e in tree.node.set)
         logger.debug(f"Root set keys after all inserts: {text}")

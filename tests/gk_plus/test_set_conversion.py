@@ -625,7 +625,7 @@ class TestTreeToKList(TestSetConversion):
 
                 # Create original tree
                 original_tree = self.create_tree_from_entries(entries, ranks, DIM=initial_tree_dim)
-                msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
+                # msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
                 
                 # Get dummies and validate original tree
                 dummies = self.get_dummies(original_tree)
@@ -635,7 +635,7 @@ class TestTreeToKList(TestSetConversion):
                 
                 # Convert tree to klist
                 klist = _tree_to_klist(original_tree)
-                msg += f"\n\nklist = {print_pretty(klist)}"
+                # msg += f"\n\nklist = {print_pretty(klist)}"
                 
                 # Validate klist (entries should match original entries, not including dummies)
                 entries_sorted = sorted(entries, key=lambda e: e.item.key)
@@ -643,7 +643,7 @@ class TestTreeToKList(TestSetConversion):
                 
                 # Convert klist back to tree
                 new_tree = _klist_to_tree(klist, K=self.k, DIM=initial_tree_dim)
-                msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
+                # msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
                 self.validate_tree(new_tree, exp_keys, msg)
                 
                 # Check that original entries are present in new tree
@@ -681,7 +681,7 @@ class TestTreeToKList(TestSetConversion):
 
         # Create original tree
         original_tree = self.create_tree_from_entries(entries, ranks, DIM=initial_tree_dim)
-        msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
+        # msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
         
         # Get dummies and validate original tree
         dummies = self.get_dummies(original_tree)
@@ -691,7 +691,7 @@ class TestTreeToKList(TestSetConversion):
         
         # Convert tree to klist
         klist = _tree_to_klist(original_tree)
-        msg += f"\n\nklist = {print_pretty(klist)}"
+        # msg += f"\n\nklist = {print_pretty(klist)}"
         
         # Validate klist (entries should match original entries, not including dummies)
         entries_sorted = sorted(entries, key=lambda e: e.item.key)
@@ -699,7 +699,7 @@ class TestTreeToKList(TestSetConversion):
         
         # Convert klist back to tree
         new_tree = _klist_to_tree(klist, K=self.k, DIM=initial_tree_dim)
-        msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
+        # msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
         self.validate_tree(new_tree, exp_keys, msg)
         
         # Check that original entries are present in new tree

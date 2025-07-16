@@ -2,7 +2,6 @@ import sys
 import os
 
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
-from gplus_trees.utils import calculate_group_size
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -12,14 +11,9 @@ from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 
-import logging
 from tests.logconfig import logger
 
 class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):        
-    def setUp(self):
-        super().setUp()
-        self._log_ranks(2)
-
     def test_single_insertion_size(self):
         """Test size is 1 after inserting a single item"""
         tree = create_gkplus_tree(K=2)
@@ -152,7 +146,6 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             root_d1 = tree.node
             self.assertEqual(root_d1.rank, 1,
                              f"Root rank in dim 1 should be 1, got: {root_d1.rank}")
-            logger.debug(f"Root set in dim 1: {print_pretty(root_d1.set)}")
             node_size = root_d1.set.item_count()
             dummy_keys = self.get_dummies(tree)
             dummy_items = [self.make_dummy_item(k) for k in dummy_keys]
