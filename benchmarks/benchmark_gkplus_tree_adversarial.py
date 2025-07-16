@@ -5,6 +5,7 @@ import gc
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
+from gplus_trees.g_k_plus.utils import calc_ranks
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 import os
 import pickle
@@ -65,7 +66,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         self.keys = load_adversarial_keys_from_file(
                 key_count, capacity, dim_limit)
         self.items = BenchmarkUtils.create_test_items(self.keys)
-        self.ranks = [1] * len(self.keys)
+        self.ranks = calc_ranks(self.keys, capacity)
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.l_factor = l_factor
 

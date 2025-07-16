@@ -9,13 +9,13 @@ from typing import List
 from gplus_trees.base import InternalItem, ItemData
 from gplus_trees.utils import (
     count_trailing_zero_bits,
-    calculate_group_size,
+    get_group_size,
     calc_rank_from_digest,
     calc_rank_from_digest_k,
     find_keys_for_rank_lists
 )
 from gplus_trees.g_k_plus.utils import (
-    calc_rank_for_dim,
+    calc_rank,
     calc_rank_from_group_size,
     calc_ranks,
     calc_ranks_multi_dims
@@ -84,22 +84,24 @@ class TestUtilityFunctions(unittest.TestCase):
             def __init__(self, key):
                 self.key = key
         
-        entries = [MockEntry(key) for key in [1, 5, 10, 42]]
-        group_size = 3
+        # entries = [MockEntry(key) for key in [1, 5, 10, 42]]
+        keys = [1, 5, 10, 42]
+        k = 2
         DIM = 2
-        
-        ranks = calc_ranks(entries, group_size, DIM)
-        
+
+        ranks = calc_ranks(keys, k, DIM)
+
         # Verify we got the right number of ranks
-        self.assertEqual(len(ranks), len(entries))
-        
+        self.assertEqual(len(ranks), len(keys))
+
         # Verify each rank is valid
         for rank in ranks:
             self.assertGreaterEqual(rank, 1, "All ranks should be >= 1")
         
         # Verify ranks match individual calculations
-        for i, entry in enumerate(entries):
-            expected_rank = calc_rank_from_group_size(entry.item.key, group_size, DIM)
+        group_size = get_group_size(k)
+        for i, key in enumerate(keys):
+            expected_rank = calc_rank_from_group_size(key, group_size, DIM)
             self.assertEqual(ranks[i], expected_rank,
                            f"Rank for entry {i} should match individual calculation")
     
@@ -114,7 +116,7 @@ class TestUtilityFunctions(unittest.TestCase):
         # Verify each key has the correct rank
         for i, key in enumerate(keys):
             expected_rank = rank_lists[0][i]
-            actual_rank = calc_rank_for_dim(key, k, 1)
+            actual_rank = calc_rank(key, k, 1)
             self.assertEqual(actual_rank, expected_rank)
         
         # Single key, multiple dimensions
@@ -125,7 +127,7 @@ class TestUtilityFunctions(unittest.TestCase):
         key = keys[0]
         for dim in range(1, 4):
             expected_rank = rank_lists[dim-1][0]
-            actual_rank = calc_rank_for_dim(key, k, dim)
+            actual_rank = calc_rank(key, k, dim)
             self.assertEqual(actual_rank, expected_rank)
     
     def test_calc_ranks_multi_dims_edge_cases(self):
@@ -149,7 +151,7 @@ class TestUtilityFunctions(unittest.TestCase):
         
         # Verify consistency with individual calculations
         for dim in range(dimensions):
-            expected_rank = calc_rank_for_dim(keys[0], k, dim + 1)
+            expected_rank = calc_rank(keys[0], k, dim + 1)
             actual_rank = rank_lists[dim][0]
             self.assertEqual(actual_rank, expected_rank)
         
@@ -162,7 +164,7 @@ class TestUtilityFunctions(unittest.TestCase):
         
         # Verify consistency
         for i, key in enumerate(keys):
-            expected_rank = calc_rank_for_dim(key, k, 1)
+            expected_rank = calc_rank(key, k, 1)
             actual_rank = rank_lists[0][i]
             self.assertEqual(actual_rank, expected_rank)
     
@@ -227,14 +229,14 @@ class TestUtilityFunctions(unittest.TestCase):
             for dim in range(1, dimensions + 1):
                 with self.subTest(key=key, dim=dim):
                     # Method 1: Using g_k_plus utils
-                    rank1 = calc_rank_for_dim(key, k, dim)
+                    rank1 = calc_rank(key, k, dim)
                     
                     # Method 2: Using InternalItem + calc_rank_from_digest_k
                     digest = internal_item.get_digest_for_dim(dim)
                     rank2 = calc_rank_from_digest_k(digest, k)
                     
                     # Method 3: Using calc_rank_from_group_size
-                    group_size = calculate_group_size(k)
+                    group_size = get_group_size(k)
                     rank3 = calc_rank_from_group_size(key, group_size, dim)
                     
                     # All should be equal
@@ -271,7 +273,7 @@ class TestUtilityFunctions(unittest.TestCase):
         for key in large_keys:
             with self.subTest(key=key):
                 # Should not raise an error
-                rank = calc_rank_for_dim(key, k, 1)
+                rank = calc_rank(key, k, 1)
                 self.assertGreaterEqual(rank, 1)
                 
                 # Should be consistent with InternalItem
@@ -287,7 +289,7 @@ class TestUtilityFunctions(unittest.TestCase):
         keys = list(range(1, 101))  # 100 keys
         
         # Calculate ranks for all keys
-        ranks = [calc_rank_for_dim(key, k, 1) for key in keys]
+        ranks = [calc_rank(key, k, 1) for key in keys]
         
         # Should have variety in ranks
         unique_ranks = set(ranks)

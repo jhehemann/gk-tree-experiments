@@ -10,15 +10,14 @@ from typing import List
 from gplus_trees.base import InternalItem, ItemData
 from gplus_trees.utils import (
     count_trailing_zero_bits,
-    calculate_group_size,
+    get_group_size,
     calc_rank_from_digest,
     calc_rank_from_digest_k,
     find_keys_for_rank_lists
 )
 from gplus_trees.g_k_plus.utils import (
-    calc_rank_for_dim,
+    calc_rank,
     calc_rank_from_group_size,
-    calc_ranks,
     calc_ranks_multi_dims
 )
 
@@ -50,7 +49,7 @@ class TestRankHashConsistency(unittest.TestCase):
         
         for k, expected in expected_results.items():
             with self.subTest(k=k):
-                result = calculate_group_size(k)
+                result = get_group_size(k)
                 self.assertEqual(result, expected, 
                                f"calculate_group_size({k}) = {result}, expected {expected}")
     
@@ -61,7 +60,7 @@ class TestRankHashConsistency(unittest.TestCase):
         for k in invalid_k_values:
             with self.subTest(k=k):
                 with self.assertRaises(ValueError):
-                    calculate_group_size(k)
+                    get_group_size(k)
     
     def test_count_trailing_zero_bits(self):
         """Test count_trailing_zero_bits function."""
@@ -86,7 +85,7 @@ class TestRankHashConsistency(unittest.TestCase):
         
         for k in self.test_k_values:
             with self.subTest(k=k):
-                group_size = calculate_group_size(k)
+                group_size = get_group_size(k)
                 
                 rank1 = calc_rank_from_digest(test_digest, group_size)
                 rank2 = calc_rank_from_digest_k(test_digest, k)
@@ -101,9 +100,9 @@ class TestRankHashConsistency(unittest.TestCase):
             for k in self.test_k_values:
                 for dim in self.test_dimensions:
                     with self.subTest(key=key, k=k, dim=dim):
-                        group_size = calculate_group_size(k)
+                        group_size = get_group_size(k)
                         
-                        rank1 = calc_rank_for_dim(key, k, dim)
+                        rank1 = calc_rank(key, k, dim)
                         rank2 = calc_rank_from_group_size(key, group_size, dim)
                         
                         self.assertEqual(rank1, rank2,
@@ -167,7 +166,7 @@ class TestRankHashConsistency(unittest.TestCase):
         # Calculate individually for each key and dimension
         for key_idx, key in enumerate(keys):
             for dim_idx in range(dimensions):
-                expected_rank = calc_rank_for_dim(key, k, dim_idx + 1)
+                expected_rank = calc_rank(key, k, dim_idx + 1)
                 actual_rank = rank_lists[dim_idx][key_idx]
                 
                 self.assertEqual(actual_rank, expected_rank,
@@ -191,7 +190,7 @@ class TestRankHashConsistency(unittest.TestCase):
         for key_idx, key in enumerate(keys):
             for dim_idx, rank_list in enumerate(rank_lists):
                 expected_rank = rank_list[key_idx]
-                actual_rank = calc_rank_for_dim(key, k, dim_idx + 1)
+                actual_rank = calc_rank(key, k, dim_idx + 1)
                 
                 self.assertEqual(actual_rank, expected_rank,
                                f"Key {key} at position {key_idx} has rank {actual_rank} "
@@ -207,8 +206,8 @@ class TestRankHashConsistency(unittest.TestCase):
                 for dim in self.test_dimensions:
                     with self.subTest(neg_key=neg_key, pos_key=pos_key, k=k, dim=dim):
                         # Both should give same rank due to abs() in calculations
-                        rank_neg = calc_rank_for_dim(neg_key, k, dim)
-                        rank_pos = calc_rank_for_dim(pos_key, k, dim)
+                        rank_neg = calc_rank(neg_key, k, dim)
+                        rank_pos = calc_rank(pos_key, k, dim)
                         
                         self.assertEqual(rank_neg, rank_pos,
                                        f"Negative key {neg_key} and positive key {pos_key} "
@@ -221,7 +220,7 @@ class TestRankHashConsistency(unittest.TestCase):
         dim = 3
         
         # Calculate rank multiple times
-        ranks = [calc_rank_for_dim(key, k, dim) for _ in range(10)]
+        ranks = [calc_rank(key, k, dim) for _ in range(10)]
         
         # All should be the same
         self.assertTrue(all(r == ranks[0] for r in ranks),
@@ -233,7 +232,7 @@ class TestRankHashConsistency(unittest.TestCase):
             for k in self.test_k_values:
                 for dim in self.test_dimensions:
                     with self.subTest(key=key, k=k, dim=dim):
-                        rank = calc_rank_for_dim(key, k, dim)
+                        rank = calc_rank(key, k, dim)
                         self.assertGreaterEqual(rank, 1,
                                               f"Rank should be ≥ 1, got {rank} for key={key}, k={k}, dim={dim}")
     
@@ -244,7 +243,7 @@ class TestRankHashConsistency(unittest.TestCase):
         
         # Test with many keys to see distribution
         keys = list(range(1, 101))
-        ranks = [calc_rank_for_dim(key, k, dim) for key in keys]
+        ranks = [calc_rank(key, k, dim) for key in keys]
         
         # Should have variety in ranks (not all the same)
         unique_ranks = set(ranks)
@@ -279,17 +278,17 @@ class TestRankHashConsistency(unittest.TestCase):
         dim = 1
         
         # Should not raise an error
-        rank = calc_rank_for_dim(key, k, dim)
+        rank = calc_rank(key, k, dim)
         self.assertGreaterEqual(rank, 1)
         
         # Test with very large key
         large_key = 2**63 - 1
-        rank_large = calc_rank_for_dim(large_key, k, dim)
+        rank_large = calc_rank(large_key, k, dim)
         self.assertGreaterEqual(rank_large, 1)
         
         # Test with minimum k
         min_k = 2
-        rank_min_k = calc_rank_for_dim(key, min_k, dim)
+        rank_min_k = calc_rank(key, min_k, dim)
         self.assertGreaterEqual(rank_min_k, 1)
 
 

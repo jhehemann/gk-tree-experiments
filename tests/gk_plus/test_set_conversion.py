@@ -16,7 +16,7 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.klist_base import KListBase
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_to_klist, _klist_to_tree
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
-from gplus_trees.g_k_plus.utils import calc_rank_for_dim
+from gplus_trees.g_k_plus.utils import calc_rank
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 
 from gplus_trees.logging_config import get_test_logger
@@ -612,7 +612,7 @@ class TestTreeToKList(TestSetConversion):
                 keys = random.sample(range(1, 10000), num_entries)
                 keys = sorted(keys)
                 entries = self.create_entries(keys)
-                ranks = [calc_rank_for_dim(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
+                ranks = [calc_rank(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
                 
                 
                 msg = f"\n\n\nIteration {_}: dim = {initial_tree_dim}"
@@ -666,7 +666,7 @@ class TestTreeToKList(TestSetConversion):
         entries = self.create_entries(keys)
         logger.debug(f"Entries: {[entry.item.key for entry in entries]}")
 
-        ranks = [calc_rank_for_dim(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
+        ranks = [calc_rank(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
         logger.debug(f"Ranks: {ranks}")
         
         

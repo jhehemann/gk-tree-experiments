@@ -10,7 +10,7 @@ from gplus_trees.base import LeafItem, InternalItem, ItemData, Entry
 from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.klist_base import KListBase
-from gplus_trees.g_k_plus.utils import calculate_group_size
+from gplus_trees.g_k_plus.utils import get_group_size
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 
@@ -401,7 +401,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             k (int): Group size parameter (must be a power of 2).
             num_levels (int): How many times to re-hash.
         """
-        group_size = calculate_group_size(k)
+        group_size = get_group_size(k)
         current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -425,7 +425,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
 
     def validate_key_ranks(self, keys, rank_lists, k):
         """Validate that keys match expected rank lists, using dimension in hash calculation."""
-        group_size = calculate_group_size(k)
+        group_size = get_group_size(k)
         for key_idx, key in enumerate(keys):
             current_hash = hashlib.sha256(
                     key.to_bytes(32, 'big') + int(1).to_bytes(32, 'big')

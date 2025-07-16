@@ -18,7 +18,7 @@ def count_trailing_zero_bits(digest: bytes) -> int:
     return tz
 
 
-def calculate_group_size(k: int) -> int:
+def get_group_size(k: int) -> int:
     """
     Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).
     
@@ -46,17 +46,17 @@ def calc_rank_from_digest(digest: bytes, group_size: int) -> int:
 
 def calc_rank_from_digest_k(digest: bytes, k: int) -> int:
     """Calculate rank from a hash digest based on the group size derived from k."""
-    group_size = calculate_group_size(k)
+    group_size = get_group_size(k)
     return calc_rank_from_digest(digest, group_size)
 
 
 def find_keys_for_rank_lists(rank_lists: List[List[int]], k: int, spacing: bool = False) -> List[int]:
     """Find keys whose repeated hashes match the rank lists at their positions."""
-    group_size = calculate_group_size(k)
+    group_size = get_group_size(k)
     key_count = len(rank_lists[0])
     result_keys: List[int] = []
     next_candidate_key = 1  # Start from 1 to reserve 0 as non-existing split key option
-    MAX_SEARCH_LIMIT = 10_000_000
+    MAX_SEARCH_LIMIT = 10_000_000_000
 
     for key_idx in range(key_count):
         key = next_candidate_key

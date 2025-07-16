@@ -7,7 +7,7 @@ import os
 import pathlib
 import pickle
 from typing import List
-from gplus_trees.utils import calc_rank_from_digest, calculate_group_size
+from gplus_trees.utils import calc_rank_from_digest, get_group_size
 from tqdm import tqdm
 from tqdm import trange
 
@@ -18,7 +18,7 @@ def find_rank_keys(key_count: int, max_dim: int, k: int, rank: int) -> List[int]
     Updated to match the authoritative get_digest_for_dim() pattern.
     Optimized for computational efficiency.
     """
-    group_size = calculate_group_size(k)
+    group_size = get_group_size(k)
     result_keys = []
     key = 1
     
