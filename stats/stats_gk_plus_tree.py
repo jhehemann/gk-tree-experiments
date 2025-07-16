@@ -382,11 +382,11 @@ if __name__ == "__main__":
 
     for n in sizes:
         for K in Ks:
-            logger.info("")
-            logger.info("")
-            logger.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor}, repetitions = {repetitions}, adversarial_dim = {adversarial_dim} ----------------")
+            logging.info("")
+            logging.info("")
+            logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor}, repetitions = {repetitions}, adversarial_dim = {adversarial_dim} ----------------")
             t0 = time.perf_counter()
             # If you want to use adversarial or dim, you need to modify repeated_experiment and tree creation accordingly.
             repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor, adversarial_dim=adversarial_dim)
             elapsed = time.perf_counter() - t0
-            logger.info(f"Total experiment time: {elapsed:.3f} seconds")
+            logging.info(f"Total experiment time: {elapsed:.3f} seconds")
