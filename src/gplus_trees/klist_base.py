@@ -5,9 +5,8 @@ from itertools import chain
 import copy
 
 from gplus_trees.base import (
-    Item,
     AbstractSetDataStructure,
-    Entry
+    Entry,
 )
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
@@ -66,6 +65,7 @@ class KListNodeBase:
         real_keys = self.real_keys
         x_key = entry.item.key
         is_dummy = x_key < 0
+        next_entry = None
 
         # Empty list case
         if not entries:
@@ -73,7 +73,7 @@ class KListNodeBase:
             keys.append(-x_key)  # Store inverted key
             if not is_dummy:
                 real_keys.append(x_key)
-            return None, True
+            return None, True, next_entry
 
         # Fast path: Append at end (smallest key goes last)
         if x_key < entries[-1].item.key:
@@ -87,6 +87,7 @@ class KListNodeBase:
             keys.insert(0, -x_key)  # Store inverted key
             if not is_dummy:
                 real_keys.insert(0, x_key)
+            next_entry = entries[1]
         else:
             # Choose algorithm based on list length
             i = search_idx(x_key, keys)
@@ -111,9 +112,9 @@ class KListNodeBase:
             keys.pop()
             if pop_entry.item.key >= 0:
                 real_keys.pop()
-            return pop_entry, True
-        return None, True
-     
+            return pop_entry, True, next_entry
+        return None, True, next_entry
+
     def retrieve_entry(
         self, x_key: int
     ) -> Tuple[Optional[Entry], Optional[Entry], bool]:
@@ -366,9 +367,14 @@ class KListBase(AbstractSetDataStructure):
             if i < len(nodes):
                 node = nodes[i]
         
-        overflow, inserted = node.insert_entry(entry)
+        # overflow, inserted = node.insert_entry(entry)
+        res = node.insert_entry(entry)
+        overflow, inserted, next_entry = res[0], res[1], res[2]
 
         if not inserted:
+            # Preserve the original next_entry from the first insertion
+            original_next_entry = next_entry
+            
             return self, False
 
         # Handle successful insertion with potential overflow
@@ -377,7 +383,7 @@ class KListBase(AbstractSetDataStructure):
             self._prefix_counts_tot[-1] += 1
             if key >= 0:
                 self._prefix_counts_real[-1] += 1
-            return self, True
+            return self, True, original_next_entry
 
         MAX_OVERFLOW_DEPTH = 10000
         depth = 0

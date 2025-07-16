@@ -16,7 +16,7 @@ import argparse
 # Add the project root to the Python path so we can import from tests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from gplus_trees.base import Item
+from gplus_trees.base import LeafItem, ItemData
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,
     gtree_stats_,
@@ -28,7 +28,7 @@ from tests.utils import (
     assert_tree_invariants_raise,
 )
 
-# Assume create_gtree(items) builds a GPlusTree from a list of (Item, rank) pairs.
+# Assume create_gtree(items) builds a GPlusTree from a list of (LeafItem, rank) pairs.
 def create_gtree(items, K=16):
     """
     Mimics the Rust create_gtree: build a tree by inserting each (item, rank) pair.
@@ -45,7 +45,8 @@ def random_gtree_of_size(n: int, target_node_size: int) -> GPlusTreeBase:
     # cache globals
     # calc_rank = calculate_item_rank
     # group_size = calculate_group_size(target_node_size)
-    make_item = Item
+    make_item_data = ItemData
+    make_item = LeafItem
     p = 1.0 - (1.0 / (target_node_size))    # probability for geometric dist
     # logging.info(f"p = {p:.4f} for K = {target_node_size}")
 
@@ -66,7 +67,7 @@ def random_gtree_of_size(n: int, target_node_size: int) -> GPlusTreeBase:
         # Use the index directly as the key
         key = idx
         val = "val"
-        items[i] = (make_item(key, val), int(ranks[i]))
+        items[i] = (make_item(make_item_data(key, val)), int(ranks[i]))
 
     return create_gtree(items, K=target_node_size)
 

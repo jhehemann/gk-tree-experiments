@@ -7,11 +7,8 @@ retrieve() operations with various data patterns and sizes.
 """
 
 import gc
-import random
-from typing import List
 
 from gplus_trees.factory import make_gplustree_classes
-from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
 

@@ -5,11 +5,13 @@ import copy
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.utils import calc_rank_for_dim
+from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import print_pretty
-from tests.test_base import GKPlusTreeTestCase as TreeTestCase
+from tests.test_base import (
+    BaseTestCase,
+    GKPlusTreeTestCase as TreeTestCase,
+)
 
 from tests.logconfig import logger
 import logging
@@ -23,7 +25,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
     
     # Initialize items once to avoid re-creating them in each test
     _KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    ITEMS = {k: Item(k, "val") for k in _KEYS}
+    ITEMS = {k: BaseTestCase.make_item(BaseTestCase, k, "val") for k in _KEYS}
     
     def _run_insert_case_multi_dim(self, keys, rank_combo, insert_pair,
                         exp_keys, case_name, gnode_capacity=2, l_factor: float = 1.0):
@@ -34,7 +36,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         base_tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
 
         for key, rank in zip(keys, rank_combo):
-            base_tree, _ = base_tree.insert(self.ITEMS[key], rank)
+            base_tree, _, _ = base_tree.insert(self.ITEMS[key], rank)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(base_tree)}")
@@ -44,12 +46,12 @@ class TestInsertMultipleDimensions(TreeTestCase):
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
             f"R: {rank_combo}"
-            f"\n\nTREE AFTER INITIAL INSERTIONS: {print_pretty(base_tree)}\n"
+            # f"\n\nTREE AFTER INITIAL INSERTIONS: {print_pretty(base_tree)}\n"
         )
 
         # deep-copy and split
         tree_copy = copy.deepcopy(base_tree)
-        tree, _ = tree_copy.insert(self.ITEMS[insert_pair[0]], rank=insert_pair[1])
+        tree, _, _ = tree_copy.insert(self.ITEMS[insert_pair[0]], rank=insert_pair[1])
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after inserting {insert_pair[0]} with rank {insert_pair[1]}: {print_pretty(tree)}")
@@ -78,7 +80,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         logger.debug(f"Keys: {keys}")
         insert_key_idx = 0
         logger.debug(f"Insert key: {keys[insert_key_idx]}")
-        insert_item = self.create_item(keys[insert_key_idx])
+        insert_item = self.make_item(keys[insert_key_idx])
         
         # Insert all items
         inserted_count = 0
@@ -87,9 +89,9 @@ class TestInsertMultipleDimensions(TreeTestCase):
             if keys[i] == keys[insert_key_idx]:
                 logger.debug(f"Skipping key {keys[i]} as it is the insert key")
                 continue
-            item = Item(key, "val")
+            item = self.make_item(key, "val")
             rank = rank_lists[0][i]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
             inserted_count += 1
             max_dim = tree.get_max_dim()
             dummy_cnt = self.get_dummy_count(tree)
@@ -100,11 +102,11 @@ class TestInsertMultipleDimensions(TreeTestCase):
                 logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
                 logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
+            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
-        tree, _ = tree.insert(insert_item, rank=rank_lists[0][insert_key_idx])
+        tree, _, _ = tree.insert(insert_item, rank=rank_lists[0][insert_key_idx])
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions + {insert_item.key}: {print_pretty(tree)}")
 
@@ -120,7 +122,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
-        self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}, tree: {print_pretty(tree)}, node_set: {print_pretty(tree.node.set)}, tree structure: {tree.print_structure()}")
+        self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
 
         text = " | ".join(str(e.item.key) for e in tree.node.set)
         logger.debug(f"Root set keys after all inserts: {text}")
@@ -136,13 +138,13 @@ class TestInsertMultipleDimensions(TreeTestCase):
         k = 2
         tree = create_gkplus_tree(K=k)
         keys = [419, 533, 555, 719, 883, 120, 181, 389]
-        ranks = [calc_rank_for_dim(key=key, k=k, dim=1) for key in keys]
+        ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
 
         # Insert items into the tree
         for i, key in enumerate(keys):
-            item = self.create_item(key)
+            item = self.make_item(key)
             rank = ranks[i]
-            tree, _ = tree.insert(item, rank=rank)        
+            tree, _, _ = tree.insert(item, rank=rank)        
 
         dum_keys = self.get_dummies(tree)
         if logger.isEnabledFor(logging.DEBUG):

@@ -1,8 +1,7 @@
 import sys
 import os
-import unittest
 import random
-from typing import List, TYPE_CHECKING
+from typing import List
 from itertools import product
 from tqdm import tqdm
 import copy
@@ -11,19 +10,12 @@ from statistics import median_low
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Item, Entry
+from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from tests.logconfig import logger
 import logging
-from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
-
-if TYPE_CHECKING:
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-
-
 
 class TestGKPlusInsert(GKPlusTreeTestCase):
     # Class-level cache for frequently used items to avoid repeated creation
@@ -167,8 +159,8 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
 
         for key, rank in pairs:
             if key not in self.ITEMS:
-                self.ITEMS[key] = Item(key, "val")
-            tree, _ = tree.insert(self.ITEMS[key], rank)
+                self.ITEMS[key] = self.make_item(key, "val")
+            tree, _, _ = tree.insert(self.ITEMS[key], rank)
 
         msg_head = (
             f"\n\nKey-Rank combo:\n"
@@ -179,7 +171,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
 
         insert_key = insert_entry.item.key
         
-        new_tree, inserted = tree.insert_entry(insert_entry, insert_rank)
+        new_tree, inserted, _ = tree.insert_entry(insert_entry, insert_rank)
         self.assertTrue(inserted, f"Inserted entry should be True for new key {insert_key}")
         
         msg = msg_head + f"\n\nInsert {case_name}: {insert_key}\n"
@@ -204,9 +196,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         with self.subTest("Insert rank 1"):
             tree = create_gkplus_tree(K=4)
             key, rank = 1, 1
-            item = Item(key, f"val_{key}")
+            item = self.make_item(key, f"val_{key}")
             entry = Entry(item, None)
-            tree, _ = tree.insert_entry(entry, rank)
+            tree, _, _ = tree.insert_entry(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -215,9 +207,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         with self.subTest("Insert rank > 1"):
             tree = create_gkplus_tree(K=4)
             key, rank = 1, 3
-            item = Item(key, f"val_{key}")
+            item = self.make_item(key, f"val_{key}")
             entry = Entry(item, None)
-            tree, _ = tree.insert_entry(entry, rank)
+            tree, _, _ = tree.insert_entry(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -230,7 +222,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         ranks = [2, 3, 1, 2, 4]
         for i, k in enumerate(keys):
             rank = ranks[i]
-            base_tree.insert(Item(k, f"val_{k}"), rank=rank)
+            base_tree.insert(self.make_item(k, f"val_{k}"), rank=rank)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Base tree: {print_pretty(base_tree)}")
 
@@ -240,9 +232,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with None left subtree"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, None)
-                tree, _ = tree.insert_entry(entry, rank)
+                tree, _, _ = tree.insert_entry(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -255,9 +247,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with existing left subtree (empty)"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
-                tree, _ = tree.insert_entry(entry, rank)
+                tree, _, _ = tree.insert_entry(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -273,11 +265,12 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         ranks = [1, 1, 1, 1, 2]
         for i, k in enumerate(keys):
             rank = ranks[i]
-            tree.insert(Item(k, f"val_{k}"), rank=rank)
+            tree.insert(self.make_item(k, f"val_{k}"), rank=rank)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Base tree: {print_pretty(tree)}")
 
-        expected_keys = [-2, -1] + keys
+        dummy_keys = self.get_dummies(tree)
+        expected_keys = dummy_keys + keys
         self.validate_tree(tree, expected_keys)
 
     def test_insert_non_empty_no_extension(self):
@@ -294,7 +287,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         tree = create_gkplus_tree(K=k, dimension=col_dim)
         for i, k in enumerate(keys):
             rank = rank_lists[i]
-            tree.insert(Item(k, f"val_{k}"), rank=rank_lists[col_dim][i])
+            tree.insert(self.make_item(k, f"val_{k}"), rank=rank_lists[col_dim][i])
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f" tree: {print_pretty(tree)}")
         self.validate_tree(tree)
@@ -313,16 +306,45 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
         # self.validate_key_ranks(keys, rank_lists)
 
-        item_map = { k: self.create_item(k) for k in keys}
+        item_map = { k: self.make_item(k) for k in keys}
         for idx, item in enumerate(item_map.values()):
             rank = rank_lists[0][idx]
-            tree, _ = tree.insert(item, rank=rank)
+            tree, _, _ = tree.insert(item, rank=rank)
 
         insert_cases = self._get_insert_cases(keys)
         # for case_name, insert_key in insert_cases:
         #     logger.debug(f"  {case_name:20} | {insert_key:8}")
         for case_name, insert_key in insert_cases:
-            insert_entry = Entry(Item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+            insert_entry = Entry(self.make_item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+            exp_keys = sorted(keys + [insert_key])
+            with self.subTest(case=case_name, insert_key=insert_key):
+                self._run_insert_case(
+                    keys, rank_lists,
+                    insert_entry, insert_rank,
+                    exp_keys, case_name,
+                    gnode_capacity=k, l_factor=l_factor
+                )
+
+    def test_insert_a(self):
+        k = 2
+        l_factor = 1.0
+        tree = create_gkplus_tree(K=k)
+        rank_lists = [
+            [1, 2, 2],  # Dimension 1
+            [1, 2, 1],  # Dimension 2
+            [3, 1, 1],  # Dimension 3
+        ]
+        insert_rank = 2
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+
+        item_map = { k: self.make_item(k) for k in keys}
+        for idx, item in enumerate(item_map.values()):
+            rank = rank_lists[0][idx]
+            tree, _, _ = tree.insert(item, rank=rank)
+
+        insert_cases = [("before smallest", 66)]
+        for case_name, insert_key in insert_cases:
+            insert_entry = Entry(self.make_item(insert_key, value="val"), type(tree)(l_factor=l_factor))
             exp_keys = sorted(keys + [insert_key])
             with self.subTest(case=case_name, insert_key=insert_key):
                 self._run_insert_case(
@@ -347,8 +369,8 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         
         for key, rank in zip(keys, ranks):
             if key not in self.ITEMS:
-                self.ITEMS[key] = Item(key, f"val_{key}")
-                tree, _ = tree.insert(self.ITEMS[key], rank=rank)
+                self.ITEMS[key] = self.make_item(key, f"val_{key}")
+                tree, _, _ = tree.insert(self.ITEMS[key], rank=rank)
         self.validate_tree(tree)
        
     def test_many_rank_combinations_specific_keys(self):
@@ -405,7 +427,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                         if insert_key in self.ITEMS:
                             item = self.ITEMS[insert_key]
                         else:
-                            item = Item(insert_key, "val")
+                            item = self.make_item(insert_key, "val")
                             self.ITEMS[insert_key] = item
                             
                         entry_cache[insert_key] = Entry(item, empty_subtree)
@@ -432,7 +454,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         ranks = [2, 3, 1, 2, 4]
         for i, k in enumerate(keys):
             rank = ranks[i]
-            base_tree.insert(Item(k, f"val_{k}"), rank=rank)
+            base_tree.insert(self.make_item(k, f"val_{k}"), rank=rank)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Base tree: {print_pretty(base_tree)}")
 
@@ -442,9 +464,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with None left subtree"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, None)
-                tree, _ = tree.insert_entry(entry, rank)
+                tree, _, _ = tree.insert_entry(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -457,9 +479,9 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with existing left subtree (empty)"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
-                tree, _ = tree.insert_entry(entry, rank)
+                tree, _, _ = tree.insert_entry(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")

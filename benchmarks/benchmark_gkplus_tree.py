@@ -7,13 +7,10 @@ retrieve() operations with various data patterns and sizes.
 """
 
 import gc
-import random
-from typing import List
 
-from gplus_trees.g_k_plus.factory import make_gkplustree_classes, create_gkplus_tree
-from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
+from gplus_trees.g_k_plus.factory import make_gkplustree_classes
+from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
-from gplus_trees.base import Item, Entry
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
 
@@ -47,8 +44,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         
         # Calculate ranks for entries
-        group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
+        self.ranks = calc_ranks(self.keys, capacity)
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
@@ -79,9 +75,8 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     min_run_count = 5
     
-    # Class-level cache for trees and data
+    # Class-level cache for trees and associated data
     _tree_cache = {}
-    _data_cache = {}
     
     def setup(self, capacity, size, hit_ratio, l_factor):
         """Setup populated GKPlusTree and lookup keys for benchmarking."""
@@ -91,12 +86,12 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         distribution = 'sequential'
         
         # Create cache key for tree (hit_ratio doesn't affect tree structure)
-        tree_cache_key = (capacity, size, l_factor, distribution)
+        tree_cache_key = (capacity, size, l_factor)
         
-        # Check if we have a cached tree for these parameters
+        # Check if we have a cached tree and its data for these parameters
         if tree_cache_key not in self._tree_cache:
             # Create and populate GKPlusTree (only when not cached)
-            tree_class, _, klist_class, _ = make_gkplustree_classes(capacity)
+            _, _, klist_class, _ = make_gkplustree_classes(capacity)
             
             # Generate and insert test data
             base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
@@ -111,13 +106,11 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             # Use bulk_create_gkplus_tree for efficient initial tree construction
             tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
             
-            # Cache the tree and associated data
-            self._tree_cache[tree_cache_key] = tree
-            self._data_cache[tree_cache_key] = insert_keys
-            
+            # Cache the tree and associated data together
+            self._tree_cache[tree_cache_key] = (tree, insert_keys)
+        
         # Reuse cached tree and data
-        self.tree = self._tree_cache[tree_cache_key]
-        self.insert_keys = self._data_cache[tree_cache_key]
+        self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
         
         # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
         base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
@@ -160,10 +153,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
-        # Calculate ranks for entries
-        group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
+        self.ranks = calc_ranks(self.keys, capacity, DIM=1)
         
         # Store l_factor for tree creation
         self.l_factor = l_factor

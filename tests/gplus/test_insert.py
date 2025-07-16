@@ -10,14 +10,9 @@ from gplus_trees.gplus_tree_base import (
     DUMMY_ITEM,
     print_pretty,
 )
-from gplus_trees.base import (
-    Item,
-    Entry,
-    _create_replica,
-)
+from gplus_trees.base import Entry
 
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
-
 from tests.logconfig import logger
 
 
@@ -32,7 +27,7 @@ class TestInsertInTree(TreeTestCase):
 class TestInsertInEmptyTree(TestInsertInTree):    
     def test_insert_rank_1_creates_single_node(self):
         key, rank = 1, 1
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node      
         
@@ -51,14 +46,14 @@ class TestInsertInEmptyTree(TestInsertInTree):
         
     def test_insert_rank_gt_1_creates_root_and_two_leaves(self):
         key, rank = 1, 3
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
 
         with self.subTest("root"):
             _, replica = self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(key)],
                 rank
             )
             
@@ -85,7 +80,7 @@ class TestInsertInNonEmptyTreeLeaf(TestInsertInTree):
         # Create a tree with two items
         keys = [2, 4]
         ranks = [1, 1]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }  
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -100,7 +95,7 @@ class TestInsertInNonEmptyTreeLeaf(TestInsertInTree):
 
     def test_insert_lowest_key(self):
         key, rank = 1, 1
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         self._assert_leaf_node_properties(
@@ -111,7 +106,7 @@ class TestInsertInNonEmptyTreeLeaf(TestInsertInTree):
 
     def test_insert_highest_key(self):
         key, rank = 5, 1
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         self._assert_leaf_node_properties(
@@ -122,7 +117,7 @@ class TestInsertInNonEmptyTreeLeaf(TestInsertInTree):
 
     def test_insert_middle_key(self):
         key, rank = 3, 1
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         self._assert_leaf_node_properties(
@@ -138,7 +133,7 @@ class TestInsertInNonEmptyTreeGTMaxRankCreatesRoot(TestInsertInTree):
         # Create a tree with 1 node and two full items
         keys = [2, 4]
         ranks = [1, 1]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -151,13 +146,13 @@ class TestInsertInNonEmptyTreeGTMaxRankCreatesRoot(TestInsertInTree):
 
     def test_insert_lowest_key(self):
         key, rank = 1, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         with self.subTest("root"):
             _, replica = self._assert_internal_node_properties(
                 self.tree.node,
-                [DUMMY_ITEM, _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(key)],
                 rank
             )
         with self.subTest("left leaf"):
@@ -180,13 +175,13 @@ class TestInsertInNonEmptyTreeGTMaxRankCreatesRoot(TestInsertInTree):
 
     def test_insert_highest_key(self):
         key, rank = 5, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         with self.subTest("root"):
             _, replica = self._assert_internal_node_properties(
                 self.tree.node,
-                [DUMMY_ITEM, _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(key)],
                 rank
             )
         with self.subTest("left leaf"):
@@ -210,13 +205,13 @@ class TestInsertInNonEmptyTreeGTMaxRankCreatesRoot(TestInsertInTree):
     
     def test_insert_middle_key(self):
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
 
         with self.subTest("root"):
             _, replica = self._assert_internal_node_properties(
                 self.tree.node,
-                [DUMMY_ITEM, _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(key)],
                 rank
             )
         with self.subTest("left leaf"):
@@ -245,7 +240,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
         # Create a tree with two items
         keys = [2, 4, 6]
         ranks = [1, 3, 1]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -258,7 +253,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
 
     def test_insert_lowest_key_splits_leaf(self):
         key, rank = 1, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -266,7 +261,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(key), _create_replica(4)],
+                [DUMMY_ITEM, self.get_replica_from_key(key), self.get_replica_from_key(4)],
                 rank
             )
 
@@ -298,7 +293,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
 
     def test_insert_lowest_key_no_leaf_split(self):
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -306,7 +301,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(3), _create_replica(4)],
+                [DUMMY_ITEM, self.get_replica_from_key(3), self.get_replica_from_key(4)],
                 rank
             )
 
@@ -341,7 +336,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
             
     def test_insert_highest_key_splits_leaf(self):
         key, rank = 5, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -349,7 +344,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(4), _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(4), self.get_replica_from_key(key)],
                 rank
             )
         
@@ -384,7 +379,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
 
     def test_insert_highest_key_no_leaf_split(self):
         key, rank = 7, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -392,7 +387,7 @@ class TestInsertInNonEmptyTreeRankGT1(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(4), _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(4), self.get_replica_from_key(key)],
                 rank
             )
         
@@ -432,7 +427,7 @@ class TestInsertInNonEmptyTreeCollapsedLayerCreatesInternal(TestInsertInTree):
         # Create a tree with two items
         keys = [2, 4]
         ranks = [1, 3, 1]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -445,14 +440,14 @@ class TestInsertInNonEmptyTreeCollapsedLayerCreatesInternal(TestInsertInTree):
 
     def test_insert_lowest_key(self):
         key, rank = 1, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
 
         with self.subTest("root"):
             _, r_replica = self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(4)],
+                [DUMMY_ITEM, self.get_replica_from_key(4)],
                 3
             )
         
@@ -460,7 +455,7 @@ class TestInsertInNonEmptyTreeCollapsedLayerCreatesInternal(TestInsertInTree):
             new_internal = r_replica.left_subtree.node
             _, i_replica = self._assert_internal_node_properties(
                 new_internal,
-                [DUMMY_ITEM, _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(key)],
                 self.insert_rank
             )
         
@@ -495,20 +490,20 @@ class TestInsertInNonEmptyTreeCollapsedLayerCreatesInternal(TestInsertInTree):
 
     def test_insert_highest_key(self):
         key, rank = 5, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         with self.subTest("root"):
             _, r_replica = self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(4)],
+                [DUMMY_ITEM, self.get_replica_from_key(4)],
                 3
             )
         with self.subTest("created internal"):
             new_internal = root.right_subtree.node
             _, i_replica = self._assert_internal_node_properties(
                 new_internal,
-                [_create_replica(4), _create_replica(key)],
+                [self.get_replica_from_key(4), self.get_replica_from_key(key)],
                 self.insert_rank
             )
         
@@ -548,7 +543,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
         # Create a tree with two items
         keys = [2, 4, 6, 8]
         ranks = [1, 2, 2, 3]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -559,7 +554,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
 
     def test_insert_lowest_key_splits_child_lowest_collapses_left_split(self):
         key, rank = 1, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -570,7 +565,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(key), _create_replica(8)],
+                [DUMMY_ITEM, self.get_replica_from_key(key), self.get_replica_from_key(8)],
                 3
             )
         
@@ -579,9 +574,9 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
             self._assert_internal_node_properties(
                 c_right,
                 [
-                    _create_replica(key),
-                    _create_replica(4),
-                    _create_replica(6)
+                    self.get_replica_from_key(key),
+                    self.get_replica_from_key(4),
+                    self.get_replica_from_key(6)
                 ],
                 2
             )
@@ -637,7 +632,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
 
     def test_insert_lowest_key_splits_child_middle(self):
         key, rank = 5, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -648,7 +643,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(key), _create_replica(8)],
+                [DUMMY_ITEM, self.get_replica_from_key(key), self.get_replica_from_key(8)],
                 3
             )
 
@@ -656,7 +651,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
             c_left = root_entries[1].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [DUMMY_ITEM, _create_replica(4)],
+                [DUMMY_ITEM, self.get_replica_from_key(4)],
                 2
             )
             c_left_entries = list(c_left.set)
@@ -665,7 +660,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
             c_right = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(6)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(6)],
                 2
             )
             c_right_entries = list(c_right.set)
@@ -719,7 +714,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
 
     def test_insert_lowest_key_splits_child_highest(self):
         key, rank = 7, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -730,7 +725,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM,  _create_replica(key), _create_replica(8)],
+                [DUMMY_ITEM,  self.get_replica_from_key(key), self.get_replica_from_key(8)],
                 3
             )
 
@@ -738,7 +733,7 @@ class TestInsertInNonEmptyTreeRankGT2LowestKey(TestInsertInTree):
             c_left = root_entries[1].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [DUMMY_ITEM, _create_replica(4), _create_replica(6)],
+                [DUMMY_ITEM, self.get_replica_from_key(4), self.get_replica_from_key(6)],
                 2
             )
             c_left_entries = list(c_left.set)
@@ -797,7 +792,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
         super().setUp()
         keys = [1, 3, 5]
         ranks = [3, 2, 2]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -809,7 +804,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
     def test_insert_highest_key_splits_child_low_collapses_left_split(self):
         # print("\nSelf.tree before insert:\n", self.tree.print_structure())
         key, rank = 2, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print("\n\nSelf.tree after insert:\n", self.tree.print_structure())
         root = self.tree.node
@@ -821,7 +816,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(1), _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(1), self.get_replica_from_key(key)],
                 3
             )
         
@@ -830,9 +825,9 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
             self._assert_internal_node_properties(
                 c_right,
                 [
-                    _create_replica(key),
-                    _create_replica(3),
-                    _create_replica(5)
+                    self.get_replica_from_key(key),
+                    self.get_replica_from_key(3),
+                    self.get_replica_from_key(5)
                 ],
                 2
             )
@@ -888,7 +883,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
 
     def test_insert_highest_key_splits_child_mid(self):
         key, rank = 4, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -899,7 +894,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(1), _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(1), self.get_replica_from_key(key)],
                 3
             )
 
@@ -907,7 +902,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
             c_left = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [_create_replica(1), _create_replica(3)],
+                [self.get_replica_from_key(1), self.get_replica_from_key(3)],
                 2
             )
             c_left_entries = list(c_left.set)
@@ -916,7 +911,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
             c_right = root.right_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(5)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(5)],
                 2
             )
             c_right_entries = list(c_right.set)
@@ -970,7 +965,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
 
     def test_insert_highest_key_splits_child_high_collapses_right_split(self):
         key, rank = 6, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         root = self.tree.node
         root_entries = list(root.set)
@@ -980,7 +975,7 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
         with self.subTest("root"):
             self._assert_internal_node_properties(
                 root,
-                [DUMMY_ITEM, _create_replica(1), _create_replica(key)],
+                [DUMMY_ITEM, self.get_replica_from_key(1), self.get_replica_from_key(key)],
                 3
             )
         with self.subTest("child left split (internal)"):
@@ -988,9 +983,9 @@ class TestInsertInNonEmptyTreeRankGT2HighestKey(TestInsertInTree):
             self._assert_internal_node_properties(
                 c_left,
                 [
-                    _create_replica(1),
-                    _create_replica(3),
-                    _create_replica(5)
+                    self.get_replica_from_key(1),
+                    self.get_replica_from_key(3),
+                    self.get_replica_from_key(5)
                 ],
                 2
             )
@@ -1050,7 +1045,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesRightLeft(TestInsertInTree):
         super().setUp()
         keys = [1, 2, 4, 5]
         ranks = [4, 3, 1, 2]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -1062,7 +1057,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesRightLeft(TestInsertInTree):
     def test_insert_high_collapse_rank_3_right_rank_2_left_split_leaf(self):
         # print(f"\n\n\nSelf before insert: {self.tree.print_structure()}")
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print(f"\n\n\nSelf after insert: {self.tree.print_structure()}")
         root = self.tree.node
@@ -1076,8 +1071,8 @@ class TestInsertNonemptyTreeHighCollapsingNodesRightLeft(TestInsertInTree):
                 root,
                 [
                     DUMMY_ITEM,
-                    _create_replica(1), 
-                    _create_replica(key)
+                    self.get_replica_from_key(1), 
+                    self.get_replica_from_key(key)
                 ],
                 4
             )
@@ -1086,7 +1081,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesRightLeft(TestInsertInTree):
             c_left = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [_create_replica(1), _create_replica(2)],
+                [self.get_replica_from_key(1), self.get_replica_from_key(2)],
                 3
             )
             c_left_entries = list(c_left.set)
@@ -1095,7 +1090,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesRightLeft(TestInsertInTree):
             c_right = root.right_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(5)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(5)],
                 2
             )
             c_right_entries = list(c_right.set)
@@ -1153,7 +1148,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesRightLeft(TestInsertInTree):
         super().setUp()
         keys = [1, 2, 4, 5, 6]
         ranks = [4, 3, 1, 2, 4]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -1166,7 +1161,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesRightLeft(TestInsertInTree):
         
         # print(f"\n\n\nSelf before insert: {self.tree.print_structure()}")
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print(f"\n\n\nSelf after insert: {self.tree.print_structure()}")
         root = self.tree.node
@@ -1180,9 +1175,9 @@ class TestInsertNonemptyTreeMidCollapsingNodesRightLeft(TestInsertInTree):
                 root,
                 [
                     DUMMY_ITEM,
-                    _create_replica(1), 
-                    _create_replica(key),
-                    _create_replica(6)
+                    self.get_replica_from_key(1), 
+                    self.get_replica_from_key(key),
+                    self.get_replica_from_key(6)
                 ],
                 4
             )
@@ -1191,7 +1186,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesRightLeft(TestInsertInTree):
             c_left = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [_create_replica(1), _create_replica(2)],
+                [self.get_replica_from_key(1), self.get_replica_from_key(2)],
                 3
             )
             c_left_entries = list(c_left.set)
@@ -1200,7 +1195,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesRightLeft(TestInsertInTree):
             c_right = root_entries[3].left_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(5)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(5)],
                 2
             )
             c_right_entries = list(c_right.set)
@@ -1267,7 +1262,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesLeftRight(TestInsertInTree):
         super().setUp()
         keys = [1, 2, 4]
         ranks = [4, 2, 3]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -1279,7 +1274,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesLeftRight(TestInsertInTree):
     def test_insert_high_collapse_rank_3_left_rank_2_right_split_leaf(self):
         # print(f"\n\n\nSelf before insert: {self.tree.print_structure()}")
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print(f"\n\n\nSelf after insert: {self.tree.print_structure()}")
         root = self.tree.node
@@ -1293,8 +1288,8 @@ class TestInsertNonemptyTreeHighCollapsingNodesLeftRight(TestInsertInTree):
                 root,
                 [
                     DUMMY_ITEM,
-                    _create_replica(1), 
-                    _create_replica(key)
+                    self.get_replica_from_key(1), 
+                    self.get_replica_from_key(key)
                 ],
                 4
             )
@@ -1303,7 +1298,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesLeftRight(TestInsertInTree):
             c_right = root.right_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(4)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(4)],
                 3
             )
             c_right_entries = list(c_right.set)
@@ -1312,7 +1307,7 @@ class TestInsertNonemptyTreeHighCollapsingNodesLeftRight(TestInsertInTree):
             c_left = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [_create_replica(1), _create_replica(2)],
+                [self.get_replica_from_key(1), self.get_replica_from_key(2)],
                 2
             )
             c_left_entries = list(c_left.set)
@@ -1370,7 +1365,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesLeftRight(TestInsertInTree):
         super().setUp()
         keys = [1, 2, 4, 5]
         ranks = [4, 2, 3, 4]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -1382,7 +1377,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesLeftRight(TestInsertInTree):
     def test_insert_mid_collapse_rank_3_left_rank_2_right_split_leaf(self):
         # print(f"\n\n\nSelf before insert: {self.tree.print_structure()}")
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print(f"\n\n\nSelf after insert: {self.tree.print_structure()}")
         root = self.tree.node
@@ -1396,9 +1391,9 @@ class TestInsertNonemptyTreeMidCollapsingNodesLeftRight(TestInsertInTree):
                 root,
                 [
                     DUMMY_ITEM,
-                    _create_replica(1), 
-                    _create_replica(key),
-                    _create_replica(5)
+                    self.get_replica_from_key(1), 
+                    self.get_replica_from_key(key),
+                    self.get_replica_from_key(5)
                 ],
                 4
             )
@@ -1407,7 +1402,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesLeftRight(TestInsertInTree):
             c_right = root_entries[3].left_subtree.node
             self._assert_internal_node_properties(
                 c_right,
-                [_create_replica(key), _create_replica(4)],
+                [self.get_replica_from_key(key), self.get_replica_from_key(4)],
                 3
             )
             c_right_entries = list(c_right.set)
@@ -1416,7 +1411,7 @@ class TestInsertNonemptyTreeMidCollapsingNodesLeftRight(TestInsertInTree):
             c_left = root_entries[2].left_subtree.node
             self._assert_internal_node_properties(
                 c_left,
-                [_create_replica(1), _create_replica(2)],
+                [self.get_replica_from_key(1), self.get_replica_from_key(2)],
                 2
             )
             c_left_entries = list(c_left.set)
@@ -1483,7 +1478,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
         super().setUp()
         keys = [1, 2, 4, 5]
         ranks = [2, 3, 1, 4]
-        self.item_map = { k: (Item(k, f"val_{k}")) for k in keys}
+        self.item_map = { k: (self.make_item(k, f"val_{k}")) for k in keys}
         self.rank_map = { key: rank for key, rank in zip(keys, ranks) }
         for k in keys:
             item, rank = self.item_map[k], self.rank_map[k]
@@ -1498,7 +1493,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
     def test_insert_split_leaf(self):
         # print(f"\n\n\nSelf before insert: {self.tree.print_structure()}")
         key, rank = 3, self.insert_rank
-        item = Item(key, f"val_{key}")
+        item = self.make_item(key, f"val_{key}")
         self.tree.insert(item, rank)
         # print(f"\n\n\nSelf after insert: {self.tree.print_structure()}")
         root = self.tree.node
@@ -1509,7 +1504,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
                 root,
                 [
                     DUMMY_ITEM,
-                    _create_replica(5)
+                    self.get_replica_from_key(5)
                 ],
                 4
             )
@@ -1518,7 +1513,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
             internal_3 = root_entries[1].left_subtree.node
             self._assert_internal_node_properties(
                 internal_3,
-                [DUMMY_ITEM, _create_replica(2)],
+                [DUMMY_ITEM, self.get_replica_from_key(2)],
                 3
             )
             internal_3_entries = list(internal_3.set)
@@ -1527,7 +1522,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
             internal_2_left = internal_3_entries[1].left_subtree.node
             self._assert_internal_node_properties(
                 internal_2_left,
-                [DUMMY_ITEM, _create_replica(1)],
+                [DUMMY_ITEM, self.get_replica_from_key(1)],
                 2
             )
             internal_2_left_entries = list(internal_2_left.set)
@@ -1536,7 +1531,7 @@ class TestInsertNonemptyRank4TreeUnfoldRank2(TestInsertInTree):
             internal_2_right = internal_3.right_subtree.node
             self._assert_internal_node_properties(
                 internal_2_right,
-                [_create_replica(2), _create_replica(key)],
+                [self.get_replica_from_key(2), self.get_replica_from_key(key)],
                 2
             )
             internal_2_right_entries = list(internal_2_right.set)
@@ -1595,7 +1590,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 1, 1, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 1   # 1 root/leaf
         self.expected_item_count = 5    # currently incl. replicas & dummys
@@ -1606,7 +1601,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 1, 1, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 1   # 1 root/leaf
         self.expected_item_count = 5    # currently incl. replicas & dummys
@@ -1617,7 +1612,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 1, 1, 1, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 1   # 1 root/leaf
         self.expected_item_count = 6   # currently incl. replicas & dummys
@@ -1628,7 +1623,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 2]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 3   # 1 root, 2 leaves
         self.expected_item_count = 5    # currently incl. replicas & dummys
@@ -1639,7 +1634,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 2, 3]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 5   # 1 root, 1 internal, 3 leaves
         self.expected_item_count = 8    # currently incl. replicas & dummys
@@ -1650,7 +1645,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 2, 3]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 5   # 1 root, 1 internal, 3 leaves
         self.expected_item_count = 8    # currently incl. replicas & dummys
@@ -1659,8 +1654,8 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
     def test_insert_internal_rank_2_left_creates_node(self):
         keys = [1, 3, 2]
         ranks = [1, 3, 2]
-        item_map = {k: (Item(k, f"val_{k}"), r) for k, r in zip(keys, ranks)}
-        replica_map = {k: Item(k, None) for k in keys}
+        item_map = {k: (self.make_item(k, f"val_{k}"), r) for k, r in zip(keys, ranks)}
+        replica_map = {k: self.make_item(k, None) for k in keys}
         for k in keys:
             item, rank = item_map[k]
             self.tree.insert(item, rank=rank)
@@ -1717,8 +1712,8 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
     def test_insert_internal_rank_2_right_creates_node(self):
         keys = [3, 1, 2]
         ranks = [1, 3, 2]
-        item_map = {k: (Item(k, f"val_{k}"), r) for k, r in zip(keys, ranks)}
-        replica_map = {k: Item(k, None) for k in keys}
+        item_map = {k: (self.make_item(k, f"val_{k}"), r) for k, r in zip(keys, ranks)}
+        replica_map = {k: self.make_item(k, None) for k in keys}
         for k in keys:
             item, rank = item_map[k]
             self.tree.insert(item, rank=rank)
@@ -1775,7 +1770,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [3, 2, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 5   # 1 root, 1 internal, 3 leaves
         self.expected_item_count = 8    # currently incl. replicas & dummys
@@ -1786,7 +1781,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [3, 2, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 5   # 1 root, 1 internal, 3 leaves
         self.expected_item_count = 8    # currently incl. replicas & dummys
@@ -1797,7 +1792,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [3, 3, 3, 3]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 6   # 1 root, 5 leaves 
         self.expected_item_count = 10   # currently incl. replicas & dummys
@@ -1808,7 +1803,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [3, 3, 3, 3]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 6   # 1 root, 5 leaves 
         self.expected_item_count = 10   # currently incl. replicas & dummys
@@ -1819,7 +1814,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 1, 2]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 3   # 1 root, 2 leaves
         self.expected_item_count = 6    # currently incl. replicas & dummys
@@ -1837,7 +1832,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [1, 1]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, values[i]), ranks[i])
+            self.tree.insert(self.make_item(k, values[i]), ranks[i])
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 1
         self.expected_item_count = 2    # currently incl. replicas & dummys
@@ -1853,7 +1848,7 @@ class TestInsertInNonEmptyTree(TestInsertInTree):
         ranks = [2, 2, 2]
         for i, k in enumerate(keys):
             calculated_rank = ranks[i]
-            self.tree.insert(Item(k, f"val_{k}"), rank=calculated_rank)
+            self.tree.insert(self.make_item(k, f"val_{k}"), rank=calculated_rank)
         self.expected_root_rank = max(ranks)
         self.expected_gnode_count = 5   # 1 root, 2 leaves
         self.expected_item_count = 8    # currently incl. replicas & dummys
@@ -1864,9 +1859,9 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         with self.subTest("Insert with rank 1"):
             tree = self.tree
             key, rank = 1, 1
-            item = Item(key, f"val_{key}")
+            item = self.make_item(key, f"val_{key}")
             entry = Entry(item, None)  # Create an Entry instance
-            tree, _ = tree._insert_empty(entry, rank)
+            tree, _, _ = tree._insert_empty(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1875,9 +1870,9 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         with self.subTest("Insert with rank > 1"):
             tree = self.TreeClass()
             key, rank = 1, 3
-            item = Item(key, f"val_{key}")
+            item = self.make_item(key, f"val_{key}")
             entry = Entry(item, None)
-            tree, _ = tree._insert_empty(entry, rank)
+            tree, _, _ = tree._insert_empty(entry, rank)
             inserted_entry = tree.retrieve(key)[0]
             self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
             self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1890,7 +1885,7 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         ranks = [2, 3, 1, 2, 4]
         for i, k in enumerate(keys):
             rank = ranks[i]
-            base_tree.insert(Item(k, f"val_{k}"), rank=rank)
+            base_tree.insert(self.make_item(k, f"val_{k}"), rank=rank)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Base tree: {print_pretty(base_tree)}")
 
@@ -1900,9 +1895,9 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with None left subtree"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, None)
-                tree, _ = tree._insert_non_empty(entry, rank)
+                tree, _, _ = tree._insert_non_empty(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")
@@ -1915,9 +1910,9 @@ class TestInternalMethodsWithEntryInsert(TestInsertInTree):
         for rank in test_ranks:
             with self.subTest(f"Insert rank {rank} with existing left subtree (empty)"):
                 tree = copy.deepcopy(base_tree)
-                item = Item(insert_key, f"val")
+                item = self.make_item(insert_key, f"val")
                 entry = Entry(item, left_subtree)
-                tree, _ = tree._insert_non_empty(entry, rank)
+                tree, _, _ = tree._insert_non_empty(entry, rank)
                 inserted_entry = tree.retrieve(insert_key)[0]
                 self.assertIsNotNone(inserted_entry, "Inserted entry should not be None")
                 self.assertIs(inserted_entry, entry, "Inserted entry should match the original entry")

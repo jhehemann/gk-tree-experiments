@@ -1,30 +1,22 @@
 """Unified test base classes for all tree types."""
 
-from typing import Tuple, Optional, List, TYPE_CHECKING
+from typing import Tuple, Optional, List, Union
 import unittest
 import hashlib
 from dataclasses import asdict
-from pprint import pformat
 
-
-from gplus_trees.base import Item, Entry
+from gplus_trees.utils import count_trailing_zero_bits, calc_rank_from_digest
+from gplus_trees.base import LeafItem, InternalItem, ItemData, Entry
 from gplus_trees.factory import make_gplustree_classes
-from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-from gplus_trees.g_k_plus.utils import (
-    calc_rank_from_digest,
-    calc_ranks_multi_dims,
-    calculate_group_size,
-    count_trailing_zero_bits,
-)
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.klist_base import KListBase
+from gplus_trees.g_k_plus.utils import get_group_size
+from gplus_trees.g_k_plus.factory import create_gkplus_tree
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
+
 from stats.stats_gplus_tree import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
 # from gplus_trees.base import logger
-
-if TYPE_CHECKING:
-    from gplus_trees.gplus_tree_base import GPlusTreeBase
 
 from gplus_trees.logging_config import get_test_logger
 
@@ -34,6 +26,18 @@ logger = get_test_logger("TestBase")
 class BaseTestCase(unittest.TestCase):
     """Base class for all tests with common functionality."""
     
+    def make_item(self, key: int, value: str = "val") -> LeafItem:
+        item_data = ItemData(key, value)
+        return LeafItem(item_data)
+    
+    def get_replica_from_key(self, key: int) -> InternalItem:
+        item_data = ItemData(key, value="val")
+        return InternalItem(item_data)
+    
+    def make_dummy_item(self, key: int) -> InternalItem:
+        item_data = ItemData(key, value="dummy")
+        return InternalItem(item_data)
+
     def validate_klist(
         self,
         klist: KListBase,
@@ -73,10 +77,6 @@ class BaseTestCase(unittest.TestCase):
 
 class BaseTreeTestCase(BaseTestCase):
     """Base class for all tree tests with common functionality."""
-    
-    def create_item(self, key: int, value: str = "val") -> Item:
-        """Helper to create test items."""
-        return Item(key, value)
     
     def tearDown(self):
         """Common tearDown logic for tree tests."""
@@ -149,7 +149,7 @@ class GPlusTreeTestCase(BaseTreeTestCase):
             logger.debug(f"Created GPlusTree test with K={self.K}, using class {self.TreeClass.__name__}")
 
     def _assert_internal_node_properties(
-        self, node, items: List[Item], rank: int
+        self, node, items: List[InternalItem], rank: int
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of internal nodes."""
         # Implementation from tests/gplus/base.py
@@ -194,7 +194,7 @@ class GPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Item]
+        self, node, items: List[Union[LeafItem, InternalItem]]
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of leaf nodes."""
         # Implementation from tests/gplus/base.py
@@ -401,7 +401,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             k (int): Group size parameter (must be a power of 2).
             num_levels (int): How many times to re-hash.
         """
-        group_size = calculate_group_size(k)
+        group_size = get_group_size(k)
         current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -419,88 +419,30 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             current_hash = hashlib.sha256(current_hash).digest()
 
     def find_keys_for_rank_lists(self, rank_lists, k, spacing=False):
-        """Find keys whose repeated hashes match the rank lists at their positions."""
-        
-        group_size = calculate_group_size(k)
-        key_count = len(rank_lists[0])
-        result_keys = []
-        next_candidate_key = 1 # Start from 1 to reserve 0 as a non-existing split key option
-        MAX_SEARCH_LIMIT = 10_000_000
-
-        for key_idx in range(key_count):
-            key = next_candidate_key
-            search_limit = next_candidate_key + MAX_SEARCH_LIMIT
-            found_between_key = False
-            
-            while key < search_limit:  # Use fixed search_limit
-                current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-                match = True
-                
-                for rank_list in rank_lists:
-                    desired_rank = rank_list[key_idx]
-                    calculated_rank = calc_rank_from_digest(current_hash, group_size)
-                    if calculated_rank != desired_rank:
-                        match = False
-                        break
-                    current_hash = hashlib.sha256(current_hash).digest()
-                
-                if match:
-                    if not spacing or found_between_key:
-                        result_keys.append(key)
-                        next_candidate_key = key + 1  # Update for next key_idx
-                        break
-                    else:
-                        found_between_key = True  # Continue searching
-                
-                key += 1
-            else:
-                raise ValueError(f"No matching key found for rank_lists[{key_idx}]")
-        # logger.debug(f"Found keys matching rank lists (spacing={spacing}): {result_keys}")
-        return result_keys
-    
-    def sort_and_calculate_rank_lists_from_keys(self, keys, k, dim_limit):
-        """Validate that keys match expected rank lists."""
-        group_size = calculate_group_size(k)
-        keys = sorted(keys)
-        logger.debug(f"Sorted keys: {keys}")
-        
-        # Create a list to hold rank lists for each dimension
-        if dim_limit < 1:
-            raise ValueError("dim_limit must be at least 1")
-
-        rank_lists = [[] for _ in range(dim_limit)]
-        for key_idx, key in enumerate(keys):
-            current_dim = 1
-            current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-            while current_dim <= dim_limit:
-                rank = calc_rank_from_digest(current_hash, group_size)
-                rank_lists[current_dim - 1].append(rank)
-                current_hash = hashlib.sha256(current_hash).digest()
-                current_dim += 1
-        
-        # Ensure all rank lists are of equal length
-        for dim_idx, dim in enumerate(rank_lists):
-            if len(dim) != len(keys):
-                raise ValueError(f"Rank list for dimension {dim_idx + 1} has length "
-                                 f"{len(dim)}, expected {len(keys)}")
-
-        return rank_lists
+        """Delegate to the library utility for finding keys matching rank lists."""
+        from gplus_trees.utils import find_keys_for_rank_lists as util_find
+        return util_find(rank_lists, k, spacing)
 
     def validate_key_ranks(self, keys, rank_lists, k):
-        """Validate that keys match expected rank lists."""
-        group_size = calculate_group_size(k)
+        """Validate that keys match expected rank lists, using dimension in hash calculation."""
+        group_size = get_group_size(k)
         for key_idx, key in enumerate(keys):
-            current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-            for dim_idx, dim in enumerate(rank_lists):
-                expected_rank = dim[key_idx]
+            current_hash = hashlib.sha256(
+                    key.to_bytes(32, 'big') + int(1).to_bytes(32, 'big')
+                ).digest()
+            for dim_idx, rank_list in enumerate(rank_lists):
+                expected_rank = rank_list[key_idx]
                 actual_rank = calc_rank_from_digest(current_hash, group_size)
                 self.assertEqual(actual_rank, expected_rank,
                                f"Key {key} in dimension {dim_idx+1}: expected rank {expected_rank}, got {actual_rank}")
-                current_hash = hashlib.sha256(current_hash).digest()
+                current_hash = hashlib.sha256(
+                    current_hash
+                    + (dim_idx + 2).to_bytes(32, 'big')
+                ).digest()
 
     # Extended assertion methods for GK+ trees
     def _assert_internal_node_properties(
-        self, node, items: List[Item], rank: int
+        self, node, items: List[InternalItem], rank: int
     ) -> Optional[Entry]:
         """Assert properties of internal nodes for GK+ trees."""
         self.assertIsNotNone(node, "Node should not be None")
@@ -549,7 +491,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Item]
+        self, node, items: List[Union[LeafItem, InternalItem]]
     ) -> Tuple[Optional[Entry], Optional[Entry]]:
         """Assert properties of leaf nodes for GK+ trees."""
         expected_len = len(items)

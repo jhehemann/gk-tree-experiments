@@ -1,24 +1,22 @@
 """Tests for GK+ tree utility functions"""
-from pprint import pformat
 import sys
 import os
 import unittest
 import random
 from typing import List, Optional
 
-from gplus_trees.factory import make_gplustree_classes
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from gplus_trees.base import Entry, Item
+from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 # from gplus_trees.g_k_plus.utils import _tree_to_klist, _klist_to_tree
 from gplus_trees.klist_base import KListBase
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_to_klist, _klist_to_tree
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
-from gplus_trees.g_k_plus.utils import calc_rank_for_dim, calc_ranks_multi_dims
+from gplus_trees.g_k_plus.utils import calc_rank
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 
 from gplus_trees.logging_config import get_test_logger
@@ -32,13 +30,13 @@ class TestSetConversion(GKPlusTreeTestCase):
         """
         if not with_subtrees:
             # Create entries without subtrees
-            return [Entry(Item(key, f"val_{key}"), None) for key in keys]
+            return [Entry(self.make_item(key, f"val_{key}"), None) for key in keys]
         
-        items = [Item(key, f"val_{key}") for key in keys]
+        items = [self.make_item(key, f"val_{key}") for key in keys]
         subtrees = [create_gkplus_tree(K=self.k, dimension=1) for _ in items]
         # for i, subtree in enumerate(subtrees):
         #     # Set the dummy item for the subtree
-        #     subtrees[i] = subtree.insert(Item(1000 + i, "subtree_val"), 1)[0]
+        #     subtrees[i] = subtree.insert(self.make_item(1000 + i, "subtree_val"), 1)[0]
         return [Entry(item, subtree) for item, subtree in zip(items, subtrees)]
     
     def assert_entries_present_same_instance(
@@ -85,10 +83,10 @@ class TestKListToTree(TestSetConversion):
             [1, 1], # Dimension 3 (Test 2: conversion and stopping)
         ]  
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
-        items = [Item(key, f"val_{i}") for i, key in enumerate(keys)]
+        items = [self.make_item(key, f"val_{i}") for i, key in enumerate(keys)]
         entries = [Entry(item, None) for item in items]
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
 
         with self.subTest("Conversion to DIM 1"):
             tree = _klist_to_tree(self.klist, self.k, DIM=1)
@@ -99,7 +97,7 @@ class TestKListToTree(TestSetConversion):
             self.assertIsInstance(tree.node.set, KListBase)
         with self.subTest("Conversion to DIM 3 (with other dimensions dummy as a normal item)"):
             # Use -2 as dummy representative as it has rank 1 in DIM 3 for k = 4
-            self.klist, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
+            self.klist, _, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
             tree = _klist_to_tree(self.klist, self.k, DIM=3)
             self.assertIsInstance(tree, GKPlusTreeBase)
             self.assertEqual(tree.DIM, 3)
@@ -117,7 +115,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, 4)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
 
         with self.subTest("Conversion to DIM 1"):
             tree = _klist_to_tree(self.klist, self.k, DIM=1)
@@ -128,7 +126,7 @@ class TestKListToTree(TestSetConversion):
             self.assertIsInstance(tree.node.set, KListBase)
         with self.subTest("Conversion to DIM 3 (with other dimensions dummy as a normal item)"):
             # Use -2 as dummy representative as it has rank 1 in DIM 3 -> no expansion
-            self.klist, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
+            self.klist, _, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
             tree = _klist_to_tree(self.klist, self.k, DIM=3)
             self.assertIsInstance(tree, GKPlusTreeBase)
             self.assertEqual(tree.DIM, 3)
@@ -145,7 +143,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=1)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 1)
@@ -166,10 +164,10 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
 
         # Use -2 as dummy representative as it has rank 1 in DIM 3
-        self.klist, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
+        self.klist, _, _ = self.klist.insert_entry(Entry(get_dummy(2), None))
         tree = _klist_to_tree(self.klist, self.k, DIM=3)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 3)
@@ -188,7 +186,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=1)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 1)
@@ -208,7 +206,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=2)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 2)
@@ -226,21 +224,18 @@ class TestKListToTree(TestSetConversion):
             [2, 1, 1, 1], # Dimension 3 (expansion and stopping)
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+        self.validate_key_ranks(keys, rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=1)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 1)
-        self.validate_tree(tree, [-3, -2, -1] + keys)
+        dummy_keys = self.get_dummies(tree)
+        self.validate_tree(tree, dummy_keys + keys)
         self.assert_entries_present_same_instance(entries, list(tree))
-        self.assertIsInstance(tree.node.set, GKPlusTreeBase)
         self.assertEqual(tree.node.set.DIM, 2)
-        self.validate_tree(tree.node.set, [-3, -2, -1] + keys)
-        self.assertIsInstance(tree.node.set.node.set, KListBase)
-        
-        # -1 has rank 2 in DIM 2, so the root here is of type KListBase
-        self.assertIsInstance(tree.node.set.node.set, KListBase) 
+        self.validate_tree(tree.node.set, dummy_keys + keys)
 
     def test_multi_expansion_rank_1_dim_gt_1(self):
         rank_lists = [
@@ -252,22 +247,18 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=2)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 2)
-        self.validate_tree(tree, [-4, -3, -2] + keys)
+        dummy_keys = self.get_dummies(tree)
+        self.validate_tree(tree, dummy_keys + keys)
         self.assert_entries_present_same_instance(entries, list(tree))
-        self.assertIsInstance(tree.node.set, GKPlusTreeBase)
         self.assertEqual(tree.node.set.DIM, 3)
-        self.validate_tree(tree.node.set, [-4, -3, -2] + keys)
-
-        # -2 has rank 1 in DIM 3, so the tree here consists of a single node (the root)
-        # It is expanded in DIM 4, so it is of type GKPlusTreeBase 
-        self.assertIsInstance(tree.node.set.node.set, GKPlusTreeBase)
+        self.validate_tree(tree.node.set, dummy_keys + keys)
         self.assertEqual(tree.node.set.node.set.DIM, 4)
-        self.validate_tree(tree.node.set.node.set, [-4, -3, -2] + keys)
-        self.assertIsInstance(tree.node.set.node.set.node.set, KListBase)
+        self.validate_tree(tree.node.set.node.set, dummy_keys + keys)
+
 
     def test_multi_expansion_rank_gt_1_dim_1(self):
         rank_lists = [
@@ -276,9 +267,11 @@ class TestKListToTree(TestSetConversion):
             [2, 1, 1, 1], # Dimension 3 (expansion and stopping)
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+        self.validate_key_ranks(keys, rank_lists, self.k)
+
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=1)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 1)
@@ -289,7 +282,7 @@ class TestKListToTree(TestSetConversion):
         self.validate_tree(tree.node.set, [-2, -1] + keys)
         self.assertIsInstance(tree.node.set, GKPlusTreeBase)
         self.assertEqual(tree.node.set.node.set.DIM, 3)
-        self.validate_tree(tree.node.set.node.set, [-3, -2, -1] + keys)
+        self.validate_tree(tree.node.set.node.set, [-3, -2] + keys)
         self.assertIsInstance(tree.node.set.node.set.node.set, KListBase)
 
     def test_multi_expansion_rank_gt_1_dim_gt_1(self):
@@ -302,7 +295,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
         for entry in entries:
-            self.klist, _ = self.klist.insert_entry(entry)
+            self.klist, _, _ = self.klist.insert_entry(entry)
         tree = _klist_to_tree(self.klist, self.k, DIM=2)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 2)
@@ -330,7 +323,7 @@ class TestKListToTree(TestSetConversion):
         keys = self.find_keys_for_rank_lists(rank_lists, k)
         entries = self.create_entries(keys)
         for entry in entries:
-            klist, _ = klist.insert_entry(entry)
+            klist, _, _ = klist.insert_entry(entry)
         tree = _klist_to_tree(klist, k, DIM=2, l_factor=l_factor)
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertEqual(tree.DIM, 2)
@@ -367,7 +360,7 @@ class TestTreeToKList(TestSetConversion):
         """Create a GKPlusTree for a given dimension from a list of entries"""
         tree = create_gkplus_tree(K=self.k, dimension=DIM)
         for i, entry in enumerate(entries):
-            tree, _ = tree.insert_entry(entry, ranks[i])
+            tree, _, _ = tree.insert_entry(entry, ranks[i])
         return tree
 
     def test_tree_to_klist_type_validation(self):
@@ -561,11 +554,11 @@ class TestTreeToKList(TestSetConversion):
         col_dim = 5
         rank_lists = [
             [1, 2, 1, 1, 1], # Dimension 1 
-            [1, 2, 1, 1, 1], # Dimension 2 (collapse multiple expanded)
-            [1, 1, 1, 2, 1], # Dimension 3 (additional expansion in leaf)
+            [1, 2, 1, 1, 1], # Dimension 2 
+            [1, 1, 1, 2, 1], # Dimension 3 
             [3, 2, 1, 1, 1], # Dimension 4
-            [1, 1, 1, 1, 2], # Dimension 5
-            [1, 1, 1, 1, 2], # Dimension 6
+            [1, 1, 1, 1, 2], # Dimension 5 (collapse multiple expanded)
+            [1, 1, 1, 1, 2], # Dimension 6 (additional expansion in leaf)
             [1, 1, 1, 1, 2], # Dimension 7
             [1, 2, 1, 2, 1], # Dimension 8
             [1, 2, 1, 5, 1], # Dimension 9
@@ -607,63 +600,6 @@ class TestTreeToKList(TestSetConversion):
         self.klist = _tree_to_klist(tree)
         self.validate_klist(self.klist, entries)
 
-    def test_roundtrip_tree_to_klist_to_tree_dim_5_new(self):
-        """Test the round trip from tree to KList and back to tree"""
-        iterations = 10
-        initial_tree_dim = 5
-        self.k = 4
-        num_entries = 50
-        
-        # Use a fixed seed for reproducibility
-        # random.seed(42)
-        
-        for iteration in range(iterations):
-            with self.subTest(iteration=iteration):
-                # Generate unique keys deterministically 
-                keys = random.sample(range(1, 10000), num_entries)
-                keys = sorted(keys)
-                entries = self.create_entries(keys)
-                ranks = [calc_rank_for_dim(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
-                
-                msg = f"\n\nIteration {iteration}: dim = {initial_tree_dim}"
-                msg += f"\nkeys = {keys}"
-                msg += f"\nranks = {ranks}"
-                # logger.info(msg)
-                
-                # Log rank information for debugging
-                if hasattr(self, '_log_ranks'):
-                    self._log_ranks(self.k, keys, 10)
-                    self._log_ranks(self.k, list(range(-11, 0, -1)))
-                
-                # Create original tree
-                original_tree = self.create_tree_from_entries(entries, ranks, DIM=initial_tree_dim)
-                msg += f"\noriginal_tree = {print_pretty(original_tree)}"
-                
-                # Get dummies and validate original tree
-                dummies = self.get_dummies(original_tree)
-                exp_keys = sorted(dummies + keys)
-                self.validate_tree(original_tree, exp_keys, msg)
-                
-                # Convert tree to klist
-                klist = _tree_to_klist(original_tree)
-                msg += f"\nklist = {print_pretty(klist)}"
-                
-                # Validate klist (entries should match original entries, not including dummies)
-                self.validate_klist(klist, entries, msg)
-                
-                # Convert klist back to tree
-                new_tree = _klist_to_tree(klist, K=self.k, DIM=initial_tree_dim)
-                msg += f"\nnew_tree = {print_pretty(new_tree)}"
-                
-                # Validate new tree structure and keys
-                new_dummies = self.get_dummies(new_tree)
-                new_exp_keys = sorted(new_dummies + keys)
-                self.validate_tree(new_tree, new_exp_keys, msg)
-                
-                # Check that original entries are present in new tree
-                # Note: We compare the original entries (not sorted) with the new tree
-                self.assert_entries_present_same_instance(entries, list(new_tree))
-
     def test_roundtrip_tree_to_klist_to_tree_dim_5_old(self):
         """Test the round trip from tree to KList and back to tree"""
         # Create a random tree
@@ -673,12 +609,10 @@ class TestTreeToKList(TestSetConversion):
         num_entries = 50
         for _ in range(iterations):
             with self.subTest(iteration=_):
-                keys = set()
-                while len(keys) < num_entries:
-                    keys.add(random.randint(1, 10000))
-                keys = sorted(list(keys))
+                keys = random.sample(range(1, 10000), num_entries)
+                keys = sorted(keys)
                 entries = self.create_entries(keys)
-                ranks = [calc_rank_for_dim(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
+                ranks = [calc_rank(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
                 
                 
                 msg = f"\n\n\nIteration {_}: dim = {initial_tree_dim}"
@@ -691,7 +625,7 @@ class TestTreeToKList(TestSetConversion):
 
                 # Create original tree
                 original_tree = self.create_tree_from_entries(entries, ranks, DIM=initial_tree_dim)
-                msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
+                # msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
                 
                 # Get dummies and validate original tree
                 dummies = self.get_dummies(original_tree)
@@ -701,7 +635,7 @@ class TestTreeToKList(TestSetConversion):
                 
                 # Convert tree to klist
                 klist = _tree_to_klist(original_tree)
-                msg += f"\n\nklist = {print_pretty(klist)}"
+                # msg += f"\n\nklist = {print_pretty(klist)}"
                 
                 # Validate klist (entries should match original entries, not including dummies)
                 entries_sorted = sorted(entries, key=lambda e: e.item.key)
@@ -709,7 +643,7 @@ class TestTreeToKList(TestSetConversion):
                 
                 # Convert klist back to tree
                 new_tree = _klist_to_tree(klist, K=self.k, DIM=initial_tree_dim)
-                msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
+                # msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
                 self.validate_tree(new_tree, exp_keys, msg)
                 
                 # Check that original entries are present in new tree
@@ -732,7 +666,7 @@ class TestTreeToKList(TestSetConversion):
         entries = self.create_entries(keys)
         logger.debug(f"Entries: {[entry.item.key for entry in entries]}")
 
-        ranks = [calc_rank_for_dim(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
+        ranks = [calc_rank(key=key, k=self.k, dim=initial_tree_dim) for key in keys]
         logger.debug(f"Ranks: {ranks}")
         
         
@@ -747,7 +681,7 @@ class TestTreeToKList(TestSetConversion):
 
         # Create original tree
         original_tree = self.create_tree_from_entries(entries, ranks, DIM=initial_tree_dim)
-        msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
+        # msg += f"\n\noriginal_tree = {print_pretty(original_tree)}"
         
         # Get dummies and validate original tree
         dummies = self.get_dummies(original_tree)
@@ -757,7 +691,7 @@ class TestTreeToKList(TestSetConversion):
         
         # Convert tree to klist
         klist = _tree_to_klist(original_tree)
-        msg += f"\n\nklist = {print_pretty(klist)}"
+        # msg += f"\n\nklist = {print_pretty(klist)}"
         
         # Validate klist (entries should match original entries, not including dummies)
         entries_sorted = sorted(entries, key=lambda e: e.item.key)
@@ -765,66 +699,12 @@ class TestTreeToKList(TestSetConversion):
         
         # Convert klist back to tree
         new_tree = _klist_to_tree(klist, K=self.k, DIM=initial_tree_dim)
-        msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
+        # msg += f"\n\nnew_tree = {print_pretty(new_tree)}"
         self.validate_tree(new_tree, exp_keys, msg)
         
         # Check that original entries are present in new tree
         # Note: We compare the original entries (not sorted) with the new tree
         self.assert_entries_present_same_instance(entries, list(new_tree))
-
-    # def test_klist_to_tree_populated_klist(self):
-    #     """Test that _klist_to_tree correctly converts a populated KList to a tree"""
-    #     # Create a tree with some items and convert to KList
-    #     # tree = self.empty_tree
-    #     tree = create_gkplus_tree(K=2, dimension=1)
-    #     num_items = 8
-        
-    #     # create random items
-    #     keys, items = [], []
-    #     random.seed(44)  # For reproducibility
-    #     for i in range(num_items):
-    #         keys.append(random.randint(1, 1000))
-    #         items.append(Item(keys[-1], f"val_{i}"))
-    #     ranks = [calc_rank_for_dim(key=key, k=2, dim=1) for key in keys]
-    #     logger.debug(f"Keys: {[item.key for item in items]}")
-    #     logger.debug(f"Ranks: {ranks}")
-    #     for item, rank in zip(items, ranks):
-    #         tree, _ = tree.insert(item, rank)
-
-    #     logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
-    #     tree_keys = [entry.item.key for entry in tree]
-    #     logger.debug(f"Tree keys: {tree_keys}")
-        
-    #     dum_keys = self.get_dummies(tree)
-    #     logger.debug(f"Dummies: {[dum_key for dum_key in dum_keys]}")
-    #     exp_keys = sorted(dum_keys + [item.key for item in items])
-    #     logger.debug(f"Expected keys: {exp_keys}")
-
-    #     self.validate_tree(tree, exp_keys)
-
-    #     dum_count_tree = self.get_dummy_count(tree)
-    #     exp_tree_count = num_items + dum_count_tree
-    #     logger.debug(f"\nInitial tree: {print_pretty(tree)}")
-    #     klist = _tree_to_klist(tree)
-    #     logger.debug(f"\nKList: {print_pretty(klist)}")
-
-    #     # Convert back to tree
-    #     new_tree = _klist_to_tree(klist, self.k, 1)
-    #     logger.debug(f"\nNew tree: {print_pretty(new_tree)}")
-
-    #     # Check that the result is a GKPlusTreeBase
-    #     self.assertIsInstance(new_tree, GKPlusTreeBase)
-
-    #     init_tree_keys = [entry.item.key for entry in tree]
-    #     new_tree_keys = [entry.item.key for entry in new_tree]
-    #     logger.debug(f"Original tree keys: {init_tree_keys}")
-    #     logger.debug(f"New tree keys: {new_tree_keys}")
-        
-    #     self.assertEqual(len(new_tree_keys), exp_tree_count, 
-    #                      f"New tree should contain {exp_tree_count} items")
-    #     self.assertEqual(init_tree_keys, new_tree_keys,
-    #                      "New tree should contain the same items as the original")
-
 
 if __name__ == '__main__':
     unittest.main()

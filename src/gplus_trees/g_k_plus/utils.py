@@ -1,103 +1,36 @@
 """Pure utility functions for rank calculation without circular dependencies."""
 
 import hashlib
-import numpy as np
-from typing import List
+from typing import List, Union
+from gplus_trees.utils import get_group_size, calc_rank_from_digest
 
 
-def get_rand_rank(K: int) -> int:
+def get_digest(hash_input: Union[int, bytes], dim: int) -> bytes:
     """
-    Generate a random rank for an item in a GKPlus tree.
+    Generates a SHA-256 digest from an input value and a dimension integer.
     
     Args:
-        K: The capacity of the KList, used to determine the probability distribution.
-        
-    Returns:
-        A random rank as an integer.
-    """
-    p = 1.0 - (1.0 / K)
-    return np.random.geometric(p)
-
-
-def count_trailing_zero_bits(digest: bytes) -> int:
-    tz = 0
-    # look at each byte, starting from least-significant (rightmost)
-    for byte in reversed(digest):
-        if byte == 0:
-            tz += 8
-        else:
-            # (byte & -byte) isolates the lowest set bit, 
-            # bit_length()-1 gives its zero-based position within the byte
-            tz += (byte & -byte).bit_length() - 1
-            break
-    return tz
-
-
-def calculate_group_size(k: int) -> int:
-    """
-    Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).
-    
-    Parameters:
-        k (int): The expected gplus node size, must be a positive power of 2.
+        hash_input (Union[int, bytes]): The input value to hash
+        dim (int): The dimension level to incorporate into the digest.
     
     Returns:
-        int: The group size, which is log2(k).
+        bytes: The resulting SHA-256 digest of the input value and the dimension.
     
     Raises:
-        ValueError: If k is not a positive power of 2.
+        TypeError: If hash_input is not of type int or bytes.
     """
-    if k <= 0 or (k & (k - 1)) != 0:
-        raise ValueError("k must be a positive power of 2")
+    if isinstance(hash_input, bytes):
+        digest = hashlib.sha256(
+            hash_input + int(dim).to_bytes(32, 'big')
+        ).digest()
+    elif isinstance(hash_input, int):
+        digest = hashlib.sha256(
+            abs(hash_input).to_bytes(32, 'big') + int(dim).to_bytes(32, 'big')
+        ).digest()
+    else:
+        raise TypeError("key_or_digest must be int or bytes")
     
-    return k.bit_length() - 1
-
-
-def calculate_rank(key, group_size: int) -> int:
-    """
-    Calculate the rank for an item by counting the number of complete groups of trailing zero-bits in the SHA-256 hash of its key.
-    
-    Parameters:
-        k (int): The desired g-node size, must be a positive power of 2.
-        group_size (int): The size of the groups to count (log2(k)).
-    
-    Returns:
-        int: The rank calculated for this item.
-    """
-
-    key_bytes = key.to_bytes(32, 'big')
-
-    digest = hashlib.sha256(key_bytes).digest()
-    
-    tz = count_trailing_zero_bits(digest)
-    
-    return (tz // group_size) + 1
-
-
-def calc_rank_from_digest(digest: bytes, group_size: int) -> int:
-    """Calculate rank from a hash digest."""
-    tz = count_trailing_zero_bits(digest)
-    return (tz // group_size) + 1
-
-
-def calc_rank_for_dim(key: int, k: int, dim: int) -> int:
-    """
-    Calculate rank for a key at a given dimension. If a key is negative, its absolute value is used for hashing to make dummy keys hashable.
-    
-    Args:
-        key: The key to calculate rank for
-        k: The capacity parameter
-        dim: The dimension level
-        
-    Returns:
-        The calculated rank
-    """
-    group_size = calculate_group_size(k)
-    # Use keys' absolute value to hash to account for dummy keys (in testing)
-    digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
-    for _ in range(dim - 1):
-        # Rehash the digest for each dimension
-        digest = hashlib.sha256(digest).digest()
-    return calc_rank_from_digest(digest, group_size)
+    return digest
 
 
 def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
@@ -113,51 +46,72 @@ def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
         The calculated rank
     """
     # Use keys' absolute value to hash to account for dummy keys (in testing)
-    digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
-    for _ in range(dim - 1):
-        # Rehash the digest for each dimension
-        digest = hashlib.sha256(digest).digest()
+    # Start with dimension 1: hash(abs(key) + 1)
+    digest = get_digest(key, 1)
+    
+    # For subsequent dimensions, hash(prev_digest + dim)
+    for d in range(2, dim + 1):
+        digest = get_digest(digest, d)
+    
     return calc_rank_from_digest(digest, group_size)
 
 
-def calc_ranks(entries: List[int], group_size: int, DIM: int) -> List[int]:
+def calc_rank(key: int, k: int, dim: int) -> int:
     """
-    Calculate ranks for a list of keys based on hashing.
+    Calculate the rank for a key for a specific dimension based on repeated hashing.
     
-    Parameters:
-        keys (List[int]): List of integer keys to calculate ranks for.
-        k (int): Must be a power of 2, used to derive group size.
+    Args:
+        key (int): The key to calculate rank for.
+        k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
+        dim (int): The dimension level to calculate rank for.
 
     Returns:
-        List[int]: Ranks for each key.
+        int: The calculated rank in the specified dimension.
     """
+    group_size = get_group_size(k)
+    return calc_rank_from_group_size(key, group_size, dim)
+
+def calc_ranks(keys: List[int], k: int, DIM: int = 1) -> List[int]:
+    """
+    Calculate ranks for a list of keys for a specific dimension based on repeated hashing.
+    
+    Args:
+        keys (List[int]): List of integer keys to calculate ranks for.
+        k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
+        DIM (int): The dimension to calculate ranks for.
+
+    Returns:
+        List[int]: Rank for each key in the specified dimension.
+    """
+
+    group_size = get_group_size(k)
     ranks = []
-    for entry in entries:
-        ranks.append(calc_rank_from_group_size(entry.item.key, group_size, DIM))
+    for key in keys:
+        ranks.append(calc_rank_from_group_size(key, group_size, DIM))
     return ranks
 
 
 def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
     """
-    Calculate ranks for a list of keys based on repeated hashing.
+    Calculate ranks for a list of keys based on repeated hashing. 
     
-    Parameters:
+    Args:
         keys (List[int]): List of integer keys to calculate ranks for.
-        k (int): Must be a power of 2, used to derive group size.
+        k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
         dimensions (int): Number of hashing levels to apply.
 
     Returns:
         List[List[int]]: Ranks for each dimension, where each inner list contains ranks for all keys at that dimension.
     """
-    group_size = calculate_group_size(k)
-    # Initialize a list for each dimension
-    rank_lists = [[] for _ in range(dimensions)]
+    group_size = get_group_size(k)
+    num_keys = len(keys)
+    rank_lists = [[0] * num_keys for _ in range(dimensions)] # Initialize rank_lists[dim][key_idx]
 
-    for key in keys:
-        current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-        for dim in range(dimensions):
-            rank = calc_rank_from_digest(current_hash, group_size)
-            rank_lists[dim].append(rank)
-            current_hash = hashlib.sha256(current_hash).digest()
+    for key_idx, key in enumerate(keys):
+        current_hash = get_digest(key, 1)
+        rank_lists[0][key_idx] = calc_rank_from_digest(current_hash, group_size)
+        for dim in range(1, dimensions):
+            current_hash = get_digest(current_hash, dim + 1)
+            rank_lists[dim][key_idx] = calc_rank_from_digest(current_hash, group_size)
 
     return rank_lists
