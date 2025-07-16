@@ -6,6 +6,7 @@ from typing import Optional, TypeVar, Generic, Tuple, Union
 import logging
 
 # from gplus_trees.klist_base import KListBase
+from gplus_trees.utils import get_digest
 from gplus_trees.logging_config import get_logger
 
 # Get logger for this module
@@ -57,10 +58,7 @@ class InternalItem:
         
         # Ensure dim 1 is always present
         if 1 not in dim_hash_map:
-            dim_hash_map[1] = hashlib.sha256(
-                abs(key).to_bytes(32, 'big')
-                + int(1).to_bytes(32, 'big')
-                ).digest()
+            dim_hash_map[1] = get_digest(key, 1)
 
         # Find the next lower existing dim hash
         # Find the closest lower dimension
@@ -71,10 +69,7 @@ class InternalItem:
         # Only hash for missing dimensions
         # For dimension d, hash the previous dimension's digest with d itself
         for target_dim in range(next_lower_dim + 1, dim + 1):
-            digest = hashlib.sha256(
-                digest
-                + target_dim.to_bytes(32, 'big')
-                ).digest()
+            digest = get_digest(digest, target_dim)
             dim_hash_map[target_dim] = digest
 
         return digest

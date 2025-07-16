@@ -2,7 +2,36 @@
 Utility functions for GPlusTree operations, including key discovery based on hash ranks.
 """
 import hashlib
-from typing import List
+from typing import List, Union
+
+
+def get_digest(hash_input: Union[int, bytes], dim: int) -> bytes:
+    """
+    Generates a SHA-256 digest from an input value and a dimension integer.
+    
+    Args:
+        hash_input (Union[int, bytes]): The input value to hash
+        dim (int): The dimension level to incorporate into the digest.
+    
+    Returns:
+        bytes: The resulting SHA-256 digest of the input value and the dimension.
+    
+    Raises:
+        TypeError: If hash_input is not of type int or bytes.
+    """
+    if isinstance(hash_input, bytes):
+        digest = hashlib.sha256(
+            hash_input + int(dim).to_bytes(32, 'big')
+        ).digest()
+    elif isinstance(hash_input, int):
+        digest = hashlib.sha256(
+            abs(hash_input).to_bytes(32, 'big') + int(dim).to_bytes(32, 'big')
+        ).digest()
+    else:
+        raise TypeError("key_or_digest must be int or bytes")
+    
+    return digest
+
 
 
 def count_trailing_zero_bits(digest: bytes) -> int:
