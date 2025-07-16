@@ -1023,7 +1023,7 @@ class TestKListBinarySearchPaths(TestKListBase):
     
     def insert_key(self, key):
         """Helper to insert a single key."""
-        self.klist.insert_entry(Entry(Item(key, f"val_{key}"), None))
+        self.klist.insert_entry(Entry(self.make_item(key, f"val_{key}"), None))
 
     def test_insert_entry_binary_search_path(self):
         """Test that binary search path in insert_entry works correctly"""
@@ -1049,7 +1049,7 @@ class TestKListBinarySearchPaths(TestKListBase):
         keys = list(range(10))  # [0, 1, 2, ..., 9]
         entries = []
         for key in keys:
-            item = Item(key=key)
+            item = self.make_item(key=key)
             entry = Entry(item=item, left_subtree=None)
             entries.append(entry)
             self.klist.insert_entry(entry)

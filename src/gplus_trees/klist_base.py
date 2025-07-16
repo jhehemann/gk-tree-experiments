@@ -81,20 +81,22 @@ class KListNodeBase:
             keys.append(-x_key)  # Store inverted key
             if not is_dummy:
                 real_keys.append(x_key)
+            next_entry = entries[-2]
         # Fast path: Insert at beginning (largest key goes first)
         elif x_key > entries[0].item.key:
             entries.insert(0, entry)
             keys.insert(0, -x_key)  # Store inverted key
             if not is_dummy:
                 real_keys.insert(0, x_key)
-            next_entry = entries[1]
         else:
             # Choose algorithm based on list length
             i = search_idx(x_key, keys)
+            next_entry = entries[i-1] if i > 0 else None
             if -keys[i] == x_key:  # Compare with inverted key
-                return None, False
+                return None, False, next_entry
             entries.insert(i, entry)
             keys.insert(i, -x_key)  # Store inverted key
+            
 
             if not is_dummy:
                 # Insert into real_keys in descending order
@@ -294,7 +296,7 @@ class KListBase(AbstractSetDataStructure):
         self._prefix_counts_tot.append(1)
         self._prefix_counts_real.append(1 if key >= 0 else 0)
         self._bounds.append(key)
-        return self, True
+        return self, True, None
 
     def _handle_min_insert(self, entry: Entry) -> 'KListBase':
         key = entry.item.key
@@ -302,6 +304,7 @@ class KListBase(AbstractSetDataStructure):
         tail_entries = tail.entries
         is_real = key >= 0
         if len(tail_entries) >= self.KListNodeClass.CAPACITY:
+            next_entry = tail_entries[-1]
             tail.next = self.KListNodeClass(
                 entries=[entry],
                 keys=[-key],  # Store inverted key
@@ -315,8 +318,9 @@ class KListBase(AbstractSetDataStructure):
             if is_real:
                 self._prefix_counts_real.append(self._prefix_counts_real[-1] + 1)
             self._bounds.append(key)
-            return self, True
+            return self, True, next_entry
 
+        next_entry = tail_entries[-1]
         tail_entries.append(entry)
         tail.keys.append(-key)  # Store inverted key
         if is_real:  # Only add to real_keys if it's not a dummy key
@@ -327,7 +331,7 @@ class KListBase(AbstractSetDataStructure):
         self._prefix_counts_tot[-1] += 1
         self._bounds[-1] = key
 
-        return self, True
+        return self, True, next_entry
 
 
     def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
@@ -360,23 +364,29 @@ class KListBase(AbstractSetDataStructure):
             return self._handle_min_insert(entry)
         elif key > self._nodes[0].entries[0].item.key:
             node = self.head
+            node_idx = 0
         else:
             nodes = self._nodes
             node = tail  # Default fallback
-            i = search_idx_descending(key, bounds)
-            if i < len(nodes):
-                node = nodes[i]
-        
+            node_idx = -1 # Default fallback
+            node_idx = search_idx_descending(key, bounds)
+            if node_idx < len(nodes):
+                node = nodes[node_idx]
+
+        node = self._nodes[node_idx]
         # overflow, inserted = node.insert_entry(entry)
         res = node.insert_entry(entry)
         overflow, inserted, next_entry = res[0], res[1], res[2]
 
-        if not inserted:
-            # Preserve the original next_entry from the first insertion
-            original_next_entry = next_entry
+        if next_entry is None and node_idx > 0:
+            # If next_entry is None, we need to find the next larger entry in the previous node
+            next_entry = self._nodes[node_idx - 1].entries[-1]
             
-            return self, False
+        if not inserted:
+            return self, False, next_entry
 
+
+        original_next_entry = next_entry
         # Handle successful insertion with potential overflow
         if node is tail and overflow is None:
             # manually update index
@@ -399,15 +409,16 @@ class KListBase(AbstractSetDataStructure):
                 )
                 self.tail = node.next
                 self._rebuild_index()
-                return self, True
+                return self, True, original_next_entry
 
             node = node.next
-            overflow, inserted = node.insert_entry(overflow)
+            res = node.insert_entry(overflow)
+            overflow, inserted, _ = res[0], res[1], res[2]  # Ignore next_entry from overflow
             depth += 1
             if depth > MAX_OVERFLOW_DEPTH:
                 raise RuntimeError("KList insert_entry overflowed too deeply – likely infinite loop.")
         self._rebuild_index()
-        return self, True
+        return self, True, original_next_entry
         
     def delete(self, key: int) -> "KListBase":
         node = self.head

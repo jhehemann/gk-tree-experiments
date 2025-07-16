@@ -188,23 +188,6 @@ class Entry:
     def __lt__(self, other: 'Entry') -> bool:
         return self.item.key < other.item.key
 
-
-class RetrievalResult(NamedTuple):
-    """
-    A container for the result of a lookup in an AbstractSetDataStructure.
-
-    Attributes:
-        found_entry (Optional[Entry]):
-            The entry corresponding to the searched key if found;
-            otherwise, None.
-        next_entry (Optional[Entry]):
-            The subsequent entry in the sorted order, which serves as a candidate for
-            further operations or in-order traversal; None if no subsequent entry exists.
-    """
-    found_entry: Optional[Entry]
-    next_entry: Optional[Entry]
-
-
 def _create_replica(key):
     """Create a replica item with given key and no value."""
     return InternalItem(ItemData(key=key))
