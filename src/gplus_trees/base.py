@@ -48,28 +48,34 @@ class InternalItem:
         """
         # TODO: include the dimension when hashing to differentiate between dimensions
         # TODO: use strings to avoid collisions with negative keys
-        digest = self._item.dim_hash_map.get(dim, None)
-        if digest is None:
-            key = self.key
-            # Find the next lower existing dim hash
-            lower_dims = [d for d in self._item.dim_hash_map if d < dim]
-            if not lower_dims:
-                # If no lower dims, create the digest for dim 1 and continue from there
-                digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
-                self._item.dim_hash_map[1] = digest
-                lower_dims = [1]
+        digest = self._item.dim_hash_map.get(dim)
+        if digest is not None:
+            return digest
+        
+        key = self.key
+        dim_hash_map = self._item.dim_hash_map
+        
+        # Ensure dim 1 is always present
+        if 1 not in dim_hash_map:
+            dim_hash_map[1] = hashlib.sha256(
+                abs(key).to_bytes(32, 'big')
+                + int(1).to_bytes(32, 'big')
+                ).digest()
 
-            next_lower_dim = max(lower_dims)
-            digest = self._item.dim_hash_map[next_lower_dim]
-            # Rehash and store digest until dim is reached
-            for d in range(next_lower_dim + 1, dim + 1):
-                digest = hashlib.sha256(digest).digest()
-
-                # h = hashlib.sha256()
-                # h.update(digest)
-                # h.update(d.to_bytes(32, 'big'))
-                # digest = h.digest()
-                self._item.dim_hash_map[d] = digest
+        # Find the next lower existing dim hash
+        # Find the closest lower dimension
+        lower_dims = [d for d in dim_hash_map if d < dim]
+        next_lower_dim = max(lower_dims) if lower_dims else 1
+        digest = dim_hash_map[next_lower_dim]
+        
+        # Only hash for missing dimensions
+        # For dimension d, hash the previous dimension's digest with d itself
+        for target_dim in range(next_lower_dim + 1, dim + 1):
+            digest = hashlib.sha256(
+                digest
+                + target_dim.to_bytes(32, 'big')
+                ).digest()
+            dim_hash_map[target_dim] = digest
 
         return digest
 

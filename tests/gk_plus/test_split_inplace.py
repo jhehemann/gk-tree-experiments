@@ -481,29 +481,29 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             rank = rank_lists[0][idx]
             tree, _, _ = tree.insert(item, rank=rank)
 
-        with self.subTest("First split at 80"):
-            left1, middle1, right1 = tree.split_inplace(80)
-            exp_left1 = [-1] + [k for k in keys if k < 80]
+        with self.subTest("First split at 337"):
+            left1, middle1, right1 = tree.split_inplace(337)
+            exp_left1 = [-1] + [k for k in keys if k < 337]
             self.validate_tree(left1, exp_left1)
             self.assertIs(tree, left1, "Left tree should be the original tree")
-            exp_right1 = [-1] + [k for k in keys if k > 80]
+            exp_right1 = [-1] + [k for k in keys if k > 337]
             self.validate_tree(right1, exp_right1)
             self.assertIsNone(middle1)
-        with self.subTest("Second split at 7 on left part"):
+        with self.subTest("Second split at 148 on left part"):
             # Second split on the left part
-            left2, middle2, right2 = left1.split_inplace(7)
-            exp_left2 = [k for k in exp_left1 if k < 7]
+            left2, middle2, right2 = left1.split_inplace(148)
+            exp_left2 = [k for k in exp_left1 if k < 148]
             self.validate_tree(left2, exp_left2)
             self.assertIs(left1, left2, "Left tree should be the original tree")
-            exp_right2 = [-1] + [k for k in exp_left1 if k > 7]
+            exp_right2 = [-1] + [k for k in exp_left1 if k > 148]
             self.validate_tree(right2, exp_right2)
             self.assertIsNone(middle2)
-        with self.subTest("Third split at 212 on right part"):
-            left3, middle3, right3 = right1.split_inplace(212)
-            exp_left3 = [k for k in exp_right1 if k < 212]
+        with self.subTest("Third split at 450 on right part"):
+            left3, middle3, right3 = right1.split_inplace(450)
+            exp_left3 = [k for k in exp_right1 if k < 450]
             self.validate_tree(left3, exp_left3)
             self.assertIs(right1, left3, "Left tree should be the original tree")
-            exp_right3 = [-1] + [k for k in exp_right1 if k > 212]
+            exp_right3 = [-1] + [k for k in exp_right1 if k > 450]
             self.validate_tree(right3, exp_right3)
             self.validate_tree(left3, exp_left3)
             self.assertIsNone(middle3)

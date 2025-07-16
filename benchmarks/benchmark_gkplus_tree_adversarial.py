@@ -15,7 +15,7 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
     """
     Load adversarial keys from a pickle file corresponding to the given parameters.
     """
-    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys')
+    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys_new')
     file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
     file_path = os.path.join(keys_dir, file_name)
     if not os.path.exists(file_path):

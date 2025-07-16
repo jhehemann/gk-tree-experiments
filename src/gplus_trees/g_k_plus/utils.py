@@ -19,10 +19,14 @@ def calc_rank_for_dim(key: int, k: int, dim: int) -> int:
     """
     group_size = calculate_group_size(k)
     # Use keys' absolute value to hash to account for dummy keys (in testing)
-    digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
-    for _ in range(dim - 1):
-        # Rehash the digest for each dimension
-        digest = hashlib.sha256(digest).digest()
+    digest = hashlib.sha256(
+        abs(key).to_bytes(32, 'big') + int(1).to_bytes(32, 'big')
+    ).digest()
+    # Apply hash increments 2, 3, 4, ..., dim to match get_digest_for_dim pattern
+    for d in range(2, dim + 1):
+        digest = hashlib.sha256(
+            digest + d.to_bytes(32, 'big')
+        ).digest()
     return calc_rank_from_digest(digest, group_size)
 
 
@@ -39,10 +43,17 @@ def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
         The calculated rank
     """
     # Use keys' absolute value to hash to account for dummy keys (in testing)
-    digest = hashlib.sha256(abs(key).to_bytes(32, 'big')).digest()
-    for _ in range(dim - 1):
-        # Rehash the digest for each dimension
-        digest = hashlib.sha256(digest).digest()
+    # Start with dimension 1: hash(abs(key) + 1)
+    digest = hashlib.sha256(
+        abs(key).to_bytes(32, 'big') + int(1).to_bytes(32, 'big')
+    ).digest()
+    
+    # For subsequent dimensions, hash(prev_digest + dim)
+    for d in range(2, dim + 1):
+        digest = hashlib.sha256(
+            digest + d.to_bytes(32, 'big')
+        ).digest()
+    
     return calc_rank_from_digest(digest, group_size)
 
 
@@ -80,10 +91,21 @@ def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[
     rank_lists = [[] for _ in range(dimensions)]
 
     for key in keys:
-        current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
-        for dim in range(dimensions):
+        # Start with dimension 1: hash(abs(key) + 1)
+        current_hash = hashlib.sha256(
+            abs(key).to_bytes(32, 'big') + int(1).to_bytes(32, 'big')
+        ).digest()
+        
+        # Calculate rank for dimension 1
+        rank = calc_rank_from_digest(current_hash, group_size)
+        rank_lists[0].append(rank)
+        
+        # For subsequent dimensions, hash(prev_digest + dim)
+        for dim in range(1, dimensions):
+            current_hash = hashlib.sha256(
+                current_hash + (dim + 1).to_bytes(32, 'big')
+            ).digest()
             rank = calc_rank_from_digest(current_hash, group_size)
             rank_lists[dim].append(rank)
-            current_hash = hashlib.sha256(current_hash).digest()
 
     return rank_lists
