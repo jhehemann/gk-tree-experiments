@@ -269,7 +269,8 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Base tree: {print_pretty(tree)}")
 
-        expected_keys = [-2, -1] + keys
+        dummy_keys = self.get_dummies(tree)
+        expected_keys = dummy_keys + keys
         self.validate_tree(tree, expected_keys)
 
     def test_insert_non_empty_no_extension(self):

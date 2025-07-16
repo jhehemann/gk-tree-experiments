@@ -9,7 +9,7 @@ retrieve() operations with various data patterns and sizes.
 import gc
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
-from gplus_trees.g_k_plus.utils import calc_rank_from_group_size, calculate_group_size
+from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
@@ -44,8 +44,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         
         # Calculate ranks for entries
-        group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
+        self.ranks = calc_ranks(self.keys, capacity)
         
         # Store l_factor for tree creation
         self.l_factor = l_factor
@@ -154,10 +153,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
-        # Calculate ranks for entries
-        group_size = calculate_group_size(capacity)
-        self.ranks = [calc_rank_from_group_size(key, group_size) for key in self.keys]
+        self.ranks = calc_ranks(self.keys, capacity, DIM=1)
         
         # Store l_factor for tree creation
         self.l_factor = l_factor

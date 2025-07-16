@@ -19,24 +19,19 @@ TEST_FILES = [
     'gplus/test_retrieve.py',
     'gk_plus/test_counts_and_sizes.py',
     
+    'gk_plus/test_expanded_count.py',
     'gk_plus/test_get_max_dim.py',
     'gk_plus/test_insert_dimensions.py',
     'gk_plus/test_insert.py',
     'gk_plus/test_item_count.py',
-    
+    'gk_plus/test_set_conversion.py',
     'gk_plus/test_split_inplace.py',
-    'gk_plus.test_split_inplace.TestGKPlusSplitInplace.test_split_root_highest_and_two_consecutive_internal_after_first',
-    'gk_plus.test_item_count.TestGKPlusTreeItemCountTracking.test_large_tree_size',
 
     'test_gp_mkl_tree.py',
-    'test_klist.py',
-    'test_klist::TestKListCountGE',
-    'gk_plus/test_expanded_count.py',
-    'gk_plus.test_expanded_count.TestGKPlusTreeExpandedCountTracking.test_multi_expansion_different_dim_paths',
-
-    'gk_plus/test_set_conversion.py',
     'test_insert_result.py',
-
+    'test_klist.py',
+    'test_rank_hash_consistency.py',
+    'test_utility_functions.py',
 
     # 'test_stats_gpltree.py',
     # 'test_gk_plus_tree.py',

@@ -5,6 +5,7 @@ import gc
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
+from gplus_trees.g_k_plus.utils import calc_ranks
 from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 import os
 import pickle
@@ -15,7 +16,7 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
     """
     Load adversarial keys from a pickle file corresponding to the given parameters.
     """
-    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys')
+    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys_new')
     file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
     file_path = os.path.join(keys_dir, file_name)
     if not os.path.exists(file_path):
@@ -65,7 +66,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         self.keys = load_adversarial_keys_from_file(
                 key_count, capacity, dim_limit)
         self.items = BenchmarkUtils.create_test_items(self.keys)
-        self.ranks = [1] * len(self.keys)
+        self.ranks = calc_ranks(self.keys, capacity)
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         self.l_factor = l_factor
 
