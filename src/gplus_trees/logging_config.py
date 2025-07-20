@@ -6,7 +6,7 @@ from typing import Optional
 
 
 def setup_logging(
-    level: int = logging.INFO,
+    level: int = logging.DEBUG,
     format_string: Optional[str] = None,
     handler_type: str = "stream"
 ) -> logging.Logger:

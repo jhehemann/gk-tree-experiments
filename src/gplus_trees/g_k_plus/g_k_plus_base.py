@@ -435,7 +435,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
         if IS_DEBUG:
-            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
+            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} with rank {rank} into tree {print_pretty(self)}")
         x_item = x_entry.item
         x_key = x_item.key
         
@@ -487,6 +487,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Returns:
             GKPlusTreeBase: The updated G+-tree.
         """
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Handling rank mismatch: current rank {cur.node.rank}, target rank {rank}")
+        
         TreeClass = type(self)
 
         if parent is None and left_parent is None:
@@ -606,6 +609,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Cache retrieve result to avoid redundant method calls
             res = node.set.retrieve(x_key)
             next_entry = res[1]
+
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Subsequent iteration: Inserting {x_key} into node {print_pretty(node.set)} with next entry {next_entry.item.key if next_entry else None}")
 
             # Perform split operation and immediately cache converted results
             left_split, _, right_split = node.set.split_inplace(x_key)
@@ -749,7 +755,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         cur = left_return
         key_node_found = False
 
-        # logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] tree before split: {print_pretty(self)}")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] tree before split: {print_pretty(self)}")
 
         while True:
             # Cache node reference and minimize repeated attribute access
@@ -760,7 +767,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Split node at key - cache results immediately
             left_split, key_subtree, right_split = node.set.split_inplace(key)
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] Left split: {print_pretty(left_split)}")
+                logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] Right split: {print_pretty(right_split)}")
+                logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] Key subtree: {print_pretty(key_subtree)}")
             left_split = check_and_convert_set(left_split)
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] Left split after conversion: {print_pretty(left_split)}")
 
             # Cache item counts and next entry
             l_count = left_split.item_count()
@@ -1001,6 +1014,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         threshold = int(k * self.l_factor)
 
         if klist.item_count() > threshold:
+            if IS_DEBUG:
+                logger.debug(f"DIM[{self.DIM}] Expanding klist: {print_pretty(klist)}")
             # Convert to GKPlusTree with increased dimension
             new_dim = type(self).DIM + 1
             return _klist_to_tree(klist, k, new_dim, self.l_factor)
@@ -1037,6 +1052,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         # Fast path: no dummy items in the tree
         if expected_klist_size == real_item_count:
             if expected_klist_size <= threshold:
+                if IS_DEBUG:
+                    logger.debug(f"DIM[{self.DIM}] Collapsing tree: {print_pretty(tree)}")
                 return _tree_to_klist(tree)
             return tree
         
@@ -1045,6 +1062,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         expected_klist_size -= expanded_leafs_count
 
         if expected_klist_size <= threshold:
+            if IS_DEBUG:
+                logger.debug(f"DIM[{self.DIM}] Collapsing tree: {print_pretty(tree)}")
             return _tree_to_klist(tree)
         return tree
 
@@ -1063,7 +1082,10 @@ def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
         raise TypeError("tree must be an instance of GKPlusTreeBase")
 
     if tree.is_empty():
-        return tree.KListClass()
+        klist = tree.KListClass()
+        if IS_DEBUG:
+            logger.debug(f"DIM[{tree.DIM}] Converted empty tree to KList: {print_pretty(klist)}")
+        return klist
     
     klist = tree.KListClass()
 
@@ -1075,6 +1097,8 @@ def _tree_to_klist(tree: GKPlusTreeBase) -> KListBase:
         tree_dummy = get_dummy(tree.DIM)
         if entry.item.key > tree_dummy.key:
             klist, _, _ = klist.insert_entry(entry)
+    if IS_DEBUG:
+        logger.debug(f"DIM[{tree.DIM}] Converted tree to KList: {print_pretty(klist)}")
     return klist
 
 
@@ -1095,8 +1119,14 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0) ->
         raise TypeError("klist must be an instance of KListBase")
     
     if klist.is_empty():
-        return _get_create_gkplus_tree()(K, DIM, l_factor)
-    return bulk_create_gkplus_tree(klist, DIM, l_factor, type(klist))
+        tree = _get_create_gkplus_tree()(K, DIM, l_factor)
+        if IS_DEBUG:
+            logger.debug(f"DIM[{DIM}] Converted empty KList to GKPlusTree: {print_pretty(tree)}")
+        return tree
+    tree = bulk_create_gkplus_tree(klist, DIM, l_factor, type(klist))
+    if IS_DEBUG:
+        logger.debug(f"DIM[{DIM}] Converted KList to GKPlusTree: {print_pretty(tree)}")
+    return tree
 
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
