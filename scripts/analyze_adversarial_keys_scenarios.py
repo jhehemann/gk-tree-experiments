@@ -62,7 +62,7 @@ def create_uniform_rank_lists(dimensions=10, size=10, rank=1):
 def generate_and_populate_tree(keys, k):
     """Create a GKPlusTree, insert items based on rank_lists, and return the tree."""
     tree = create_gkplus_tree(K=k)
-    random.seed(42)  # For reproducibility
+    random.seed(1)  # For reproducibility
     random.shuffle(keys)
     ranks = calc_ranks(keys, k)
     base_test = BaseTestCase()
@@ -114,6 +114,22 @@ def create_middle_pattern_rank_lists(dimensions=10, size=10):
     return rank_lists
 
 
+def create_middle_pattern_rank_lists_single_2(dimensions=10, size=10):
+    """
+    Create rank lists with a pattern:
+    - First list: middle position is 2, rest are 1.
+    - All other lists: all ranks are 1.
+    """
+    rank_lists = []
+    middle = size // 2
+    for i in range(dimensions):
+        rank_list = [1] * size
+        if i == 0:
+            rank_list[middle] = 2
+        rank_lists.append(rank_list)
+    return rank_lists
+
+
 def create_shifted_rank_lists(dimensions=10, size=10, k=4):
     """
     Create rank lists where in the first list, the kth and kth last positions are 2, rest are 1.
@@ -136,10 +152,30 @@ def create_shifted_rank_lists(dimensions=10, size=10, k=4):
     return rank_lists
 
 
+def create_two_middle_twos_rank_lists(dimensions=10, size=10):
+    """
+    Generate rank lists where:
+    - First list: two middle positions are 1, positions left and right of those are 2, rest are 1.
+    - All other lists: all ranks are 1.
+    """
+    rank_lists = []
+    middle1 = (size - 1) // 2
+    middle2 = middle1 + 1
+    for i in range(dimensions):
+        rank_list = [1] * size
+        if i == 0 and size >= 4:
+            if middle1 - 1 >= 0:
+                rank_list[middle1 - 1] = 2
+            if middle2 + 1 < size:
+                rank_list[middle2 + 1] = 2
+        rank_lists.append(rank_list)
+    return rank_lists
+
+
 if __name__ == "__main__":
     # Adversarial rank lists
     k = 4  # K-list node capacity
-    rank_lists = create_shifted_rank_lists(dimensions=30, size=20, k=k)
+    rank_lists = create_middle_pattern_rank_lists_single_2(dimensions=10, size=10)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         colored_rl = [
@@ -179,8 +215,8 @@ if __name__ == "__main__":
 
     print("\nProfiling output for find_keys_for_rank_lists:")
     stats1 = pstats.Stats(profiler1)
-    stats1.sort_stats('cumtime').print_stats()
+    stats1.sort_stats('cumtime').print_stats(20)
 
     print("\nProfiling output for generate_and_populate_tree and print_tree_nodes:")
     stats2 = pstats.Stats(profiler2)
-    stats2.sort_stats('cumtime').print_stats()
+    stats2.sort_stats('cumtime').print_stats(20)
