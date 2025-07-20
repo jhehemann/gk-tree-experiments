@@ -471,7 +471,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         cur: GKPlusTreeBase,
         parent: GKPlusTreeBase,
         p_next: Entry,
-        rank: int
+        rank: int,
+        left_parent: Optional[GKPlusTreeBase] = None,
     ) -> GKPlusTreeBase:
         """
         If the current node's rank < rank, we need to create or unfold a
@@ -487,7 +488,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """
         TreeClass = type(self)
 
-        if parent is None:
+        if parent is None and left_parent is None:
 
             # create a new root node
             old_node = self.node
@@ -512,6 +513,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             p_next.left_subtree = new_tree
         else:
             parent.node.right_subtree = new_tree
+
+        if left_parent is not None:
+            # If we have a left parent, we need to link the new tree to it
+            left_parent.node.right_subtree = new_tree
 
         return new_tree
 
