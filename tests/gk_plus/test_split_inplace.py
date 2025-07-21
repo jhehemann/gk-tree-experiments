@@ -92,6 +92,9 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         for key, rank in zip(keys, rank_combo):
             tree, _, _ = tree.insert(self.ITEMS[key], rank)
 
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Tree before split: {print_pretty(tree)}")
+
         msg_head = (
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
@@ -100,7 +103,8 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         )
 
         # deep-copy and split
-        left, middle, right = tree.split_inplace(split_key)
+        left, middle, right, next_entry = tree.split_inplace(split_key)
+        
 
         msg = f"\n\nSplit at {case_name}" + msg_head
         msg += self.ASSERTION_MESSAGE_TEMPLATE.format(
@@ -108,6 +112,10 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             middle=print_pretty(middle),
             right=print_pretty(right),
         )
+        msg += f"\nNext entry after split: {next_entry.item.key if next_entry else 'None'}\n"
+        if exp_right:
+            self.assertIsNotNone(next_entry, msg)
+            self.assertEqual(next_entry.item.key, exp_right[0])
         exp_left = [-1] + exp_left if exp_left else []
         exp_right = [-1] + exp_right if exp_right else []
 
@@ -138,7 +146,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             # f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
         )
 
-        left, middle, right = tree.split_inplace(split_key)
+        left, middle, right, next_entry = tree.split_inplace(split_key)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Left after split: {print_pretty(left)}")
@@ -178,7 +186,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     def test_empty_tree_split(self):
         """Test splitting an empty tree."""
         tree = create_gkplus_tree(K=4)
-        left, middle, right = tree.split_inplace(500)
+        left, middle, right, next_entry = tree.split_inplace(500)
         self.validate_tree(left)
         self.assertIs(tree, left, "Left tree should be the original empty tree")
         self.validate_tree(right)
@@ -194,14 +202,14 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
 
         with self.subTest("split point > only key"):
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(1000)
+            left, middle, right, next_entry = tree.split_inplace(1000)
             self.validate_tree(left, [-1, 500])
             self.assertIs(tree, left)
             self.validate_tree(right)
             self.assertIsNone(middle)
         with self.subTest("split point < only key"):
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(100)
+            left, middle, right, next_entry = tree.split_inplace(100)
             self.validate_tree(right, [-1, 500])
             self.validate_tree(left)
             self.assertIs(tree, left)
@@ -209,7 +217,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.assertIsNone(middle)
         with self.subTest("split point == only key"):
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(500)
+            left, middle, right, next_entry = tree.split_inplace(500)
             self.validate_tree(left)
             self.assertIs(tree, left)
             self.validate_tree(right)
@@ -227,7 +235,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         self.validate_tree(tree, exp_keys)
 
         # Split in the middle (between keys)
-        left, middle, right = tree.split_inplace(250)
+        left, middle, right, next_entry = tree.split_inplace(250)
         self.validate_tree(left, [-1, 100, 200])
         self.assertIs(left, tree, "Left tree should be the original tree")
         self.validate_tree(right, [-1, 300, 400, 500])
@@ -244,7 +252,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         self.validate_tree(tree, exp_keys)
 
         # Split at a key that requires traversing internal nodes
-        left, middle, right = tree.split_inplace(450)
+        left, middle, right, next_entry = tree.split_inplace(450)
         self.assertIs(tree, left, "Left tree should be the original tree")
         self.validate_tree(left, [-1, 100, 200, 300, 400])
         self.validate_tree(right, [-1, 500, 600, 700])
@@ -262,7 +270,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
 
         # Split in the middle and validate the split
         split_key = 550
-        left, middle, right = tree.split_inplace(split_key)
+        left, middle, right, next_entry = tree.split_inplace(split_key)
         exp_left = [-1] + [k for k in keys if k < split_key]
         exp_right = [-1] + [k for k in keys if k > split_key]        
         self.validate_tree(left, exp_left)
@@ -291,7 +299,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                 self.validate_tree(tree)
             
             # Split tree and check results
-            left, middle, right = tree.split_inplace(250)
+            left, middle, right, next_entry = tree.split_inplace(250)
             self.validate_tree(left, [-1, 100, 200])
             self.assertIs(tree, left, "Left tree should be the original tree")
             self.assertIsNone(middle)
@@ -319,7 +327,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.validate_tree(tree)
             
             # Split at key 300 with left subtree
-            left, middle, right = tree.split_inplace(300)
+            left, middle, right, next_entry = tree.split_inplace(300)
             self.validate_tree(left, [-1, 100, 200])
             self.assertIs(tree, left, "Left tree should be the original tree")
             self.validate_tree(middle, [-2, 250, 275])
@@ -335,7 +343,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
 
         with self.subTest("Split at key smaller than smallest"):
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(50)
+            left, middle, right, next_entry = tree.split_inplace(50)
             self.validate_tree(left)
             self.assertIs(tree, left, "Left tree should be the original tree")
             self.assertTrue(left.is_empty())
@@ -345,7 +353,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at key larger than largest"):
             # Split at a key larger than all keys in the tree
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(600)
+            left, middle, right, next_entry = tree.split_inplace(600)
             exp_left = [-1] + keys
             self.validate_tree(left, exp_left)
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -355,7 +363,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at minimum key"):
             # Split at the minimum key
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(100)
+            left, middle, right, next_entry = tree.split_inplace(100)
             self.validate_tree(left)
             self.assertTrue(left.is_empty())
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -365,7 +373,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at maximum key"):
             # Split at the maximum key
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(500)
+            left, middle, right, next_entry = tree.split_inplace(500)
             exp_left = [-1] + keys[:-1]  # Exclude the maximum key
             self.validate_tree(left, exp_left)
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -384,7 +392,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
 
         with self.subTest("Split at key smaller than smallest"):
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(50)
+            left, middle, right, next_entry = tree.split_inplace(50)
             self.validate_tree(left)
             self.assertIs(tree, left, "Left tree should be the original tree")
             self.assertTrue(left.is_empty())
@@ -394,7 +402,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at key larger than largest"):
             # Split at a key larger than all keys in the tree
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(600)
+            left, middle, right, next_entry = tree.split_inplace(600)
             exp_left = [-1] + keys
             self.validate_tree(left, exp_left)
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -404,7 +412,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at minimum key"):
             # Split at the minimum key
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(100)
+            left, middle, right, next_entry = tree.split_inplace(100)
             self.validate_tree(left)
             self.assertTrue(left.is_empty())
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -414,7 +422,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         with self.subTest("Split at maximum key"):
             # Split at the maximum key
             tree = copy.deepcopy(base_tree)
-            left, middle, right = tree.split_inplace(500)
+            left, middle, right, next_entry = tree.split_inplace(500)
             exp_left = [-1] + keys[:-1]  # Exclude the maximum key
             self.validate_tree(left, exp_left)
             self.assertIs(tree, left, "Left tree should be the original tree")
@@ -431,7 +439,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         ranks = [1, 2, 2, 3, 1, 2]
         for key, rank in zip(keys, ranks):
             tree, _, _ = tree.insert(self.make_item(key, "val"), rank=rank)
-        left, middle, right = tree.split_inplace(350)
+        left, middle, right, next_entry = tree.split_inplace(350)
         self.validate_tree(left, [-1, 100, 200, 300])
         self.assertIs(tree, left, "Left tree should be the original tree")
         self.assertIsNone(middle)
@@ -455,7 +463,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         
         # Choose a random split point and split the tree
         split_key = random.choice(range(1, 1000))
-        left, middle, right = tree.split_inplace(split_key)
+        left, middle, right, next_entry = tree.split_inplace(split_key)
         exp_left = [k for k in keys if k < split_key]
         dummies_left = self.get_dummies(left)
         exp_left = sorted(dummies_left + exp_left)
@@ -482,7 +490,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             tree, _, _ = tree.insert(item, rank=rank)
 
         with self.subTest("First split at 337"):
-            left1, middle1, right1 = tree.split_inplace(337)
+            left1, middle1, right1, next_entry = tree.split_inplace(337)
             exp_left1 = [-1] + [k for k in keys if k < 337]
             self.validate_tree(left1, exp_left1)
             self.assertIs(tree, left1, "Left tree should be the original tree")
@@ -491,7 +499,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.assertIsNone(middle1)
         with self.subTest("Second split at 148 on left part"):
             # Second split on the left part
-            left2, middle2, right2 = left1.split_inplace(148)
+            left2, middle2, right2, next_entry = left1.split_inplace(148)
             exp_left2 = [k for k in exp_left1 if k < 148]
             self.validate_tree(left2, exp_left2)
             self.assertIs(left1, left2, "Left tree should be the original tree")
@@ -499,7 +507,7 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
             self.validate_tree(right2, exp_right2)
             self.assertIsNone(middle2)
         with self.subTest("Third split at 450 on right part"):
-            left3, middle3, right3 = right1.split_inplace(450)
+            left3, middle3, right3, next_entry = right1.split_inplace(450)
             exp_left3 = [k for k in exp_right1 if k < 450]
             self.validate_tree(left3, exp_left3)
             self.assertIs(right1, left3, "Left tree should be the original tree")

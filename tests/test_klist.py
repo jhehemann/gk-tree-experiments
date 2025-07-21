@@ -711,11 +711,12 @@ class TestSplitInplace(TestKListBase):
         return keys
 
     def test_empty_split(self):
-        left, subtree, right = self.klist.split_inplace(5)
+        left, subtree, right, next_entry = self.klist.split_inplace(5)
         # both sides empty
         self.assertEqual(self.extract_keys(left), [])
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), [])
+        self.assertIsNone(next_entry)
         # invariants hold
         left.check_invariant()
         right.check_invariant()
@@ -726,10 +727,11 @@ class TestSplitInplace(TestKListBase):
         for k in keys:
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # split before smallest
-        left, subtree, right = self.klist.split_inplace(5)
+        left, subtree, right, next_entry = self.klist.split_inplace(5)
         self.assertEqual(self.extract_keys(left), [])
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), keys)
+        self.assertEqual(next_entry.item.key, 10)
         left.check_invariant()
         right.check_invariant()
 
@@ -738,10 +740,11 @@ class TestSplitInplace(TestKListBase):
         for k in keys:
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # split after largest
-        left, subtree, right = self.klist.split_inplace(10)
+        left, subtree, right, next_entry = self.klist.split_inplace(10)
         self.assertEqual(self.extract_keys(left), keys)
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), [])
+        self.assertIsNone(next_entry)
         left.check_invariant()
         right.check_invariant()
 
@@ -750,10 +753,11 @@ class TestSplitInplace(TestKListBase):
         for k in keys:
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # split on 3
-        left, subtree, right = self.klist.split_inplace(3)
+        left, subtree, right, next_entry = self.klist.split_inplace(3)
         self.assertEqual(self.extract_keys(left), [1, 2])
         self.assertIsNone(subtree)  # default left_subtree None
         self.assertEqual(self.extract_keys(right), [4, 5])
+        self.assertEqual(next_entry.item.key, 4)
         left.check_invariant()
         right.check_invariant()
 
@@ -762,10 +766,11 @@ class TestSplitInplace(TestKListBase):
         for k in keys:
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # split on a key not present but between 20 and 30
-        left, subtree, right = self.klist.split_inplace(25)
+        left, subtree, right, next_entry = self.klist.split_inplace(25)
         self.assertEqual(self.extract_keys(left), [10, 20])
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), [30, 40])
+        self.assertEqual(next_entry.item.key, 30)
         left.check_invariant()
         right.check_invariant()
 
@@ -776,11 +781,12 @@ class TestSplitInplace(TestKListBase):
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # first node has keys 0..cap-1, second has [cap+1]
         # split exactly at cap (first of second node)
-        left, subtree, right = self.klist.split_inplace(self.cap)
+        left, subtree, right, next_entry = self.klist.split_inplace(self.cap)
 
         self.assertEqual(self.extract_keys(left), list(range(self.cap)))
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), [])
+        self.assertIsNone(next_entry)
         left.check_invariant()
         right.check_invariant()
 
@@ -791,11 +797,12 @@ class TestSplitInplace(TestKListBase):
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # first node has keys 0..cap-1, second has [cap+1]
         # split exactly at cap (first of second node)
-        left, subtree, right = self.klist.split_inplace(self.cap)
+        left, subtree, right, next_entry = self.klist.split_inplace(self.cap)
 
         self.assertEqual(self.extract_keys(left), list(range(self.cap)))
         self.assertIsNone(subtree)
         self.assertEqual(self.extract_keys(right), [self.cap + 1])
+        self.assertEqual(next_entry.item.key, self.cap + 1)
         left.check_invariant()
         right.check_invariant()
 
@@ -811,11 +818,12 @@ class TestSplitInplace(TestKListBase):
         found = self.klist.retrieve(2)[0]
         self.assertIsNotNone(found)
         found.left_subtree = subtree
-        left, st, right = self.klist.split_inplace(2)
+        left, st, right, next_entry = self.klist.split_inplace(2)
         # left contains [1], subtree returned
         self.assertEqual(self.extract_keys(left), [1])
         self.assertIs(st, subtree)
         self.assertEqual(self.extract_keys(right), [3])
+        self.assertEqual(next_entry.item.key, 3)
         left.check_invariant()
         right.check_invariant()
 
@@ -825,9 +833,11 @@ class TestSplitInplace(TestKListBase):
         for k in keys:
             self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
         # split on 2
-        l1, _, r1 = self.klist.split_inplace(2)
+        l1, _, r1, next_entry = self.klist.split_inplace(2)
+        self.assertEqual(next_entry.item.key, 3)
         # split r1 on 4
-        l2, _, r2 = r1.split_inplace(4)
+        l2, _, r2, next_entry = r1.split_inplace(4)
+        self.assertEqual(next_entry.item.key, 5)
         self.assertEqual(self.extract_keys(l1), [0, 1])
         self.assertEqual(self.extract_keys(l2), [3])
         self.assertEqual(self.extract_keys(r2), [5])
@@ -1006,7 +1016,7 @@ class TestKListCompactionInvariant(TestKListBase):
                 test_klist.insert_entry(Entry(self.make_item(i, f"val_{i}"), None))
 
             # Perform split
-            left, subtree, right = test_klist.split_inplace(split_key)
+            left, subtree, right, next_entry = test_klist.split_inplace(split_key)
             
             # Check both resulting klists
             for name, klist in [("left", left), ("right", right)]:

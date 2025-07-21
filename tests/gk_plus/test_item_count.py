@@ -278,7 +278,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
         with self.subTest("First split at 337"):
-            left1, _, right1 = tree.split_inplace(337)
+            left1, _, right1, next_entry = tree.split_inplace(337)
             self.assertIsNone(left1.item_cnt, 
                           "item_cnt should be None before triggering item_count()")
             self.assertEqual(left1.item_count(), 3,
@@ -294,7 +294,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                             "item_cnt should be 4 after item_count() is called") 
         with self.subTest("Second split at 148 on left part"):
             # Second split on the left part
-            left2, middle2, right2 = left1.split_inplace(148)
+            left2, middle2, right2, next_entry = left1.split_inplace(148)
             self.assertIsNone(left2.item_cnt,
                           "item_cnt should be None before triggering item_count()")
             self.assertEqual(left2.item_count(), 2,
@@ -309,7 +309,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                             "item_cnt should be 2 after item_count() is called")
 
         with self.subTest("Third split at 450 on right part"):
-            left3, _, right3 = right1.split_inplace(450)
+            left3, _, right3, next_entry = right1.split_inplace(450)
             self.assertIsNone(left3.item_cnt,
                           "item_cnt should be None before triggering item_count()")
             self.assertEqual(left3.item_count(), 3,

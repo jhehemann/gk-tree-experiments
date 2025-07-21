@@ -548,7 +548,7 @@ class KListBase(AbstractSetDataStructure):
         if self.head is None:                        # ··· (1) empty
             self = type(self)()  # Create new instances of the same class
             right = type(self)()
-            return self, None, right
+            return self, None, right, None
 
         # --- locate split node ------------------------------------------------
         # Using bisect_left to find the first node that contains a key >= split key
@@ -557,11 +557,12 @@ class KListBase(AbstractSetDataStructure):
         # If key is greater than any key in the list
         if node_idx >= len(self._nodes):             # ··· (2) key > max
             right = type(self)()
-            return self, None, right
+            return self, None, right, None
 
         split_node = self._nodes[node_idx]
         prev_node = self._nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
+        next_entry = None
 
         # --- bisect inside that node -----------------------------------------
         node_entries = split_node.entries
@@ -600,6 +601,7 @@ class KListBase(AbstractSetDataStructure):
         # ------------- build RIGHT -------------------------------------------
         right = type(self)()
         if right_entries:
+            next_entry = right_entries[0]
             if left_entries:                         # both halves non-empty
                 new_node = self.KListNodeClass()
                 new_node.entries   = right_entries
@@ -615,6 +617,8 @@ class KListBase(AbstractSetDataStructure):
                 right.head           = split_node
         else:                                        # no right_entries
             right.head = original_next
+            if right.head is not None:
+                next_entry = right.head.entries[0]
 
         # find right.tail
         tail = right.head
@@ -630,7 +634,7 @@ class KListBase(AbstractSetDataStructure):
         self._rebuild_index()
         right._rebuild_index()
 
-        return self, left_subtree, right
+        return self, left_subtree, right, next_entry
         
     def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
         """

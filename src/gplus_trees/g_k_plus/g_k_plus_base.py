@@ -600,14 +600,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 # left_x_entry = x_entry
                 cur = subtree
                 continue
-            
-            # Complex path: Node splitting required
-            # Cache retrieve result to avoid redundant method calls
-            res = node.set.retrieve(x_key)
-            next_entry = res[1]
 
             # Perform split operation and immediately cache converted results
-            left_split, _, right_split = node.set.split_inplace(x_key)
+            left_split, _, right_split, next_entry = node.set.split_inplace(x_key)
             left_split = check_and_convert_set(left_split)
             
             # Cache item counts early to avoid repeated method calls in conditionals
@@ -734,7 +729,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # Case 1: Empty tree - return None left, right and key's subtree
         if self.is_empty():
-            return self, None, TreeClass(l_factor=cached_l_factor)
+            return self, None, TreeClass(l_factor=cached_l_factor), None
 
         # Initialize left and right return trees
         left_return = self
@@ -758,13 +753,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             is_leaf = node_rank == 1
 
             # Split node at key - cache results immediately
-            left_split, key_subtree, right_split = node.set.split_inplace(key)
+            left_split, key_subtree, right_split, next_entry = node.set.split_inplace(key)
             left_split = check_and_convert_set(left_split)
 
             # Cache item counts and next entry
             l_count = left_split.item_count()
             r_count = right_split.item_count()
-            next_entry = right_split.retrieve(key)[1]
 
             # --- Handle right side of the split ---
             # Determine if we need a new tree for the right split
@@ -931,10 +925,17 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Main return logic
             if is_leaf:
+                if next_entry is None and not right_return.is_empty():
+                    pivot, pivot_next = right_return.find_pivot()
+                    if pivot and pivot.item.key > dummy_key:
+                        next_entry = pivot
+                    else:
+                        next_entry = pivot_next
+
                 if l_last_leaf: # unlink leaf nodes
                     l_last_leaf.next = None
                 return_subtree = key_subtree
-                return self, return_subtree, right_return
+                return self, return_subtree, right_return, next_entry
 
             if key_subtree:
                 # Do not update left parent reference from this point on

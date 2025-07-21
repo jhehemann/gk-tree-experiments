@@ -418,7 +418,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 next_entry = res[1]
 
                 # Split node at x_key
-                left_split, _, right_split = node.set.split_inplace(x_key)
+                left_split, _, right_split, next_entry = node.set.split_inplace(x_key)
 
                 # --- Handle right side of the split ---
                 # Determine if we need a new tree for the right split
