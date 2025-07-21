@@ -784,7 +784,7 @@ def gtree_stats_(t: GPlusTreeBase,
             if stats.is_search_tree:
                 if not cs.is_search_tree:
                     stats.is_search_tree = False
-                elif cs.least_item and cs.least_item.key < prev_key:
+                elif cs.least_item and prev_key and cs.least_item.key < prev_key:
                     if hasattr(t, 'DIM'):
                         if cs.least_item.key >= get_dummy(t.DIM).key:
                             stats.is_search_tree = False
