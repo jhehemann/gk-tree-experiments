@@ -959,151 +959,187 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
 
+        # Early return for empty tree
+        if self.is_empty():
+            TreeClass = type(self)
+            return self, None, TreeClass(l_factor=self.l_factor), None
+
+        node = self.node
+        rank = node.rank
+        is_leaf = rank == 1
+        right_subtree = node.right_subtree
+        
+        self._invalidate_tree_size()
+
         if IS_DEBUG:
             logger.debug(f"[DIM {self.DIM}] Unzipping tree at key {key}: {print_pretty(self)}")
 
-        if self.is_empty():
-            return self, None, GKPlusTreeBase(l_factor=self.l_factor), None
-        
-        next_entry = None
-        rank = self.node.rank
-        is_leaf = rank == 1
-        self._invalidate_tree_size()
-        
-        if isinstance(self.node.set, KListBase):
-            # If the set is a KList, we can directly split it
-            left_set, left_subtree_of_key, right_set, next_entry = self.node.set.split_inplace(key)
-            if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Unzipped GKPlusTreeBase at key {key}: ")
-                logger.debug(f"[DIM {self.DIM}] Left_set: {print_pretty(left_set)}, ")
-                logger.debug(f"[DIM {self.DIM}] Left_subtree_of_key: {print_pretty(left_subtree_of_key)}, ")
-                logger.debug(f"[DIM {self.DIM}] Right_set: {print_pretty(right_set)}, ")
-                logger.debug(f"[DIM {self.DIM}] Next_entry: {next_entry.item.key if next_entry else None}")
+        # Unzip the node set
+        if isinstance(node.set, KListBase):
+            left_set, left_subtree_of_key, right_set, next_entry = node.set.split_inplace(key)
         else:
-            left_set, left_subtree_of_key, right_set, next_entry = self.node.set.unzip(key)
-            if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Unzipped GKPlusTreeBase at key {key}: ")
-                logger.debug(f"[DIM {self.DIM}] Left_set: {print_pretty(left_set)}, ")
-                logger.debug(f"[DIM {self.DIM}] Left_subtree_of_key: {print_pretty(left_subtree_of_key)}, ")
-                logger.debug(f"[DIM {self.DIM}] Right_set: {print_pretty(right_set)}, ")
-                logger.debug(f"[DIM {self.DIM}] Next_entry: {next_entry.item.key if next_entry else None}")
+            left_set, left_subtree_of_key, right_set, next_entry = node.set.unzip(key)
 
-        self.node.set = left_set
-        left_next = self.node.next
-        
-        right_subtree = self.node.right_subtree
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Split results - Left: {print_pretty(left_set)}, "
+                        f"Key subtree: {print_pretty(left_subtree_of_key)}, "
+                        f"Right: {print_pretty(right_set)}, "
+                        f"Next: {next_entry.item.key if next_entry else None}")
 
+        # Update the current node's set
+        node.set = left_set
+        left_next = node.next
+
+        # Handle leaf nodes
         if is_leaf:
-            if left_set.is_empty():
-                # If the left set is empty, we can return the right subtree directly
-                right_return = self.lift(right_set, None, 1)
-                right_return.node.next = left_next
-                self.node = None
-                return self, left_subtree_of_key, right_return, next_entry
-            
+            return self._handle_leaf_unzip(left_set, left_subtree_of_key, right_set, 
+                                         next_entry, left_next)
+
+        # Handle non-leaf nodes
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Unzipping at non-leaf node with rank {rank}")
+
+        return self._handle_nonleaf_unzip(key, left_set, left_subtree_of_key, right_set, 
+                                        next_entry, right_subtree, rank)
+
+    def _handle_leaf_unzip(self, left_set, left_subtree_of_key, right_set, next_entry, left_next):
+        """Handle unzipping at leaf level."""
+        if left_set.is_empty():
+            # Return right subtree directly
             right_return = self.lift(right_set, None, 1)
-            logger.debug(f"[DIM {self.DIM}] Right return node after lift: {right_return.node}")
-            logger.debug(f"[DIM {self.DIM}] Right return after lift: {print_pretty(right_return)}")
             if not right_return.is_empty():
                 right_return.node.next = left_next
-            self.node.set = left_set
-            self.node.next = None
+            self.node = None
             return self, left_subtree_of_key, right_return, next_entry
         
-        logger.debug(f"[DIM {self.DIM}] Unzipping at non-leaf node with rank {rank}")
-
+        right_return = self.lift(right_set, None, 1)
+        if not right_return.is_empty():
+            right_return.node.next = left_next
         
-        # Case: Found the split key in the node set with a left subtree
+        self.node.set = left_set
+        self.node.next = None
+        
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Leaf unzip complete - Right: {print_pretty(right_return)}")
+        
+        return self, left_subtree_of_key, right_return, next_entry
+
+    def _handle_nonleaf_unzip(self, key, left_set, left_subtree_of_key, right_set, next_entry, right_subtree, rank):
+        """Handle unzipping at non-leaf level."""
+        # Case 1: Found the split key with its left subtree
         if left_subtree_of_key:
-            logger.debug(f"[DIM {self.DIM}] Found left subtree of key {key}: {print_pretty(left_subtree_of_key)}")
-            if left_set.item_count() > 1:
-                logger.debug(f"[DIM {self.DIM}] Left set has items, use left subtree of key as left node's right subtree")
-                self.node.right_subtree = left_subtree_of_key
-            else:
-                logger.debug(f"[DIM {self.DIM}] Left set is empty, using left subtree of key")
-                self.node = left_subtree_of_key.node
+            return self._handle_key_subtree_case(key, left_set, left_subtree_of_key, right_set, 
+                                               next_entry, right_subtree, rank)
+        
+        # Cases 2: Unified handling for left set with multiple items or single/empty
+        left_count = left_set.item_count()
+        return self._handle_no_key_subtree_case(key, left_set, left_count, right_set, 
+                                              next_entry, right_subtree, rank)
 
-            if next_entry:
-                left, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
-                next_entry.left_subtree = r_leftmost_subtree if not r_leftmost_subtree.is_empty() else None
-                if IS_DEBUG:
-                    logger.debug(f"[DIM {self.DIM}] Unzipped GKPlusTreeBase at key {key}: ")
-                    logger.debug(f"[DIM {self.DIM}] Left_set: {print_pretty(left_set)}, ")
-                    logger.debug(f"[DIM {self.DIM}] Left_subtree_of_key: {print_pretty(left_subtree_of_key)}, ")
-                    logger.debug(f"[DIM {self.DIM}] Right_set: {print_pretty(right_set)}, ")
-                    logger.debug(f"[DIM {self.DIM}] Next_entry: {next_entry.item.key if next_entry else None}")
-                right_return = self.lift(right_set, right_subtree, rank)
-                # Use new_next from subtree unzip if it exists, otherwise keep original next_entry
-                next_entry = new_next if new_next is not None else next_entry
-            else:
-                if right_subtree:
-                    left, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
-                    next_entry = new_next
-                else:
-                    left, key_subtree, r_leftmost_subtree, new_next = None, None, None, None
-                right_return = self.lift(right_set, r_leftmost_subtree, rank)
-
-            # Unlink leaf nodes
-            l_max_leaf = left_subtree_of_key.get_max_leaf()
-            logger.debug(f"[DIM {self.DIM}] Unlinking leaf nodes: {print_pretty(l_max_leaf.set)}")
-            l_max_leaf.next = None 
-            return self, key_subtree, right_return, next_entry
-
-
+    def _handle_key_subtree_case(self, key, left_set, left_subtree_of_key, right_set, next_entry, right_subtree, rank):
+        """Handle the case where the split key has a left subtree."""
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Found left subtree of key: {print_pretty(left_subtree_of_key)}")
+        
+        # Update current node based on left set size
         if left_set.item_count() > 1:
-            if next_entry:
-                if next_entry.left_subtree:
-                    l_right_subtree, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
-                    self.node.right_subtree = l_right_subtree
-                    next_entry.left_subtree = r_leftmost_subtree if not r_leftmost_subtree.is_empty() else None
-                    right_return = self.lift(right_set, right_subtree, rank)
-                    # Only update next_entry if we got a valid new_next from the subtree unzip
-                    if new_next is not None:
-                        next_entry = new_next
-                else:
-                    # No left subtree to unzip, just lift the right set
-                    key_subtree = None
-                    self.node.right_subtree = None
-                    right_return = self.lift(right_set, right_subtree, rank)
-                
-                # Break leaf node links for proper separation
-                if rank == 1 and self.node.right_subtree is None:
-                    # We're at leaf level and have separated the trees, break the next link
-                    self.node.next = None
-            else:
-                if IS_DEBUG:
-                    logger.debug(f"[DIM {self.DIM}] Right subtree before unzip: {print_pretty(right_subtree)}")
-                if right_subtree:
-                    l_right_subtree, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
-                    next_entry = new_next
-                else:
-                    l_right_subtree, key_subtree, r_leftmost_subtree, new_next = None, None, None, None
-                
-                self.node.right_subtree = l_right_subtree
-                right_return = r_leftmost_subtree
-
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Left set has items, using as right subtree")
+            self.node.right_subtree = left_subtree_of_key
         else:
-            if next_entry:
-                if next_entry.left_subtree:
-                    left_return, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
-                    self.node = left_return.node if left_return else None
-                    next_entry.left_subtree = r_leftmost_subtree if not r_leftmost_subtree.is_empty() else None
-                    right_return = self.lift(right_set, right_subtree, rank)
-                    # Only update next_entry if we got a valid new_next from the subtree unzip
-                    if new_next is not None:
-                        next_entry = new_next
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Left set minimal, using left subtree as node")
+            self.node = left_subtree_of_key.node
+
+        # Handle next entry and right subtree unzipping
+        key_subtree, right_return, updated_next_entry = self._unzip_right_side(key, next_entry, right_subtree, right_set, rank)
+        
+        # Use updated next_entry if provided, otherwise keep original
+        if updated_next_entry is not None:
+            next_entry = updated_next_entry
+        
+        # Unlink leaf nodes
+        l_max_leaf = left_subtree_of_key.get_max_leaf()
+        if l_max_leaf:
+            l_max_leaf.next = None
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Unlinked leaf nodes")
+        
+        return self, key_subtree, right_return, next_entry
+
+    def _handle_no_key_subtree_case(self, key, left_set, left_count, right_set, next_entry, right_subtree, rank):
+        """Unified handler for cases where left set has multiple items or single/empty items."""
+        key_subtree = None
+        right_return = None
+        
+        if next_entry:
+            if next_entry.left_subtree:
+                # Unzip the next entry's left subtree
+                l_right_subtree, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
+                
+                if left_count > 1:
+                    # Multi-item case: use left subtree as right subtree
+                    self.node.right_subtree = l_right_subtree
                 else:
-                    # No left subtree to unzip, just lift the right set
-                    key_subtree = None
-                    self.node = None
-                    right_return = self.lift(right_set, right_subtree, rank)
+                    # Single/empty case: use left subtree as current node
+                    self.node = l_right_subtree.node if l_right_subtree else None
+                
+                # Update next_entry's left subtree with safe empty check
+                next_entry.left_subtree = r_leftmost_subtree if r_leftmost_subtree and not r_leftmost_subtree.is_empty() else None
+                right_return = self.lift(right_set, right_subtree, rank)
+                
+                # Update next_entry if we got a valid new one
+                if new_next is not None:
+                    next_entry = new_next
             else:
+                # No left subtree to unzip
+                if left_count > 1:
+                    self.node.right_subtree = None
+                else:
+                    self.node = None
+                right_return = self.lift(right_set, right_subtree, rank)
+            
+            # Break leaf links if at leaf level and no right subtree
+            if rank == 1 and self.node and self.node.right_subtree is None:
+                self.node.next = None
+        else:
+            # No next entry - unzip right subtree directly
+            if right_subtree:
                 l_right_subtree, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
+                next_entry = new_next
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Unzipped right subtree: {print_pretty(right_subtree)}")
+            else:
+                l_right_subtree, r_leftmost_subtree = None, None
+            
+            if left_count > 1:
+                # Multi-item case
                 self.node.right_subtree = l_right_subtree
                 right_return = r_leftmost_subtree
-                next_entry = new_next
+            else:
+                # Single/empty case
+                self.node.right_subtree = l_right_subtree
+                right_return = r_leftmost_subtree
 
         return self, key_subtree, right_return, next_entry
+
+    def _unzip_right_side(self, key, next_entry, right_subtree, right_set, rank):
+        """Helper method to handle right-side unzipping logic."""
+        if next_entry:
+            left, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
+            next_entry.left_subtree = r_leftmost_subtree if r_leftmost_subtree and not r_leftmost_subtree.is_empty() else None
+            right_return = self.lift(right_set, right_subtree, rank)
+            updated_next_entry = new_next if new_next is not None else next_entry
+        else:
+            if right_subtree:
+                left, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
+                updated_next_entry = new_next
+            else:
+                key_subtree, r_leftmost_subtree, new_next = None, None, None
+                updated_next_entry = None
+            right_return = self.lift(right_set, r_leftmost_subtree, rank)
+        
+        return key_subtree, right_return, updated_next_entry
 
 
     def lift(self, set: Optional[AbstractSetDataStructure], right: GKPlusTreeBase, rank: int) -> GKPlusTreeBase:
