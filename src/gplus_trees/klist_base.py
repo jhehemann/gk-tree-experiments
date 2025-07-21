@@ -580,8 +580,9 @@ class KListBase(AbstractSetDataStructure):
 
         real_keys = split_node.real_keys
         j = bisect_left(real_keys, key)
+        exact_in_real = j < len(real_keys) and real_keys[j] == key
         left_real_keys = real_keys[:j]
-        right_real_keys = real_keys[j + 1 if exact else j :]
+        right_real_keys = real_keys[j + 1 if exact_in_real else j :]
 
         # ------------- build LEFT --------------------------------------------
         # left = type(self)()
@@ -631,6 +632,7 @@ class KListBase(AbstractSetDataStructure):
             self._rebalance_for_compaction(right)
         
         # ------------- rebuild indexes ---------------------------------------
+        
         self._rebuild_index()
         right._rebuild_index()
 

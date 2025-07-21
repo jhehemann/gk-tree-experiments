@@ -735,6 +735,22 @@ class TestSplitInplace(TestKListBase):
         left.check_invariant()
         right.check_invariant()
 
+    def test_split_at_dummy(self):
+        # Insert some keys
+        keys = [-1, 20, 30]
+        for k in keys:
+            self.klist.insert_entry(Entry(self.make_item(k, f"v{k}"), None))
+        # split before smallest
+        left, subtree, right, next_entry = self.klist.split_inplace(-1)
+        self.assertEqual(self.extract_keys(left), [])
+        self.assertEqual(left.real_item_count(), 0)
+        self.assertIsNone(subtree)
+        self.assertEqual(self.extract_keys(right), [20, 30])
+        self.assertEqual(right.real_item_count(), 2)
+        self.assertEqual(next_entry.item.key, 20)
+        left.check_invariant()
+        right.check_invariant()
+
     def test_split_after_all_keys(self):
         keys = [1, 2, 3]
         for k in keys:
