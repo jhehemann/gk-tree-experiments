@@ -19,9 +19,11 @@ TREE_FLAGS = (
     "leaf_keys_in_order",
 )
 
-def assert_tree_invariants_tc(tc, t: GPlusTreeBase, stats: Stats, err_msg: Optional[str] = "") -> None:
+def assert_tree_invariants_tc(tc, t: GPlusTreeBase, stats: Stats, err_msg: Optional[str] = "", exclude_checks: Optional[list] = []) -> None:
     """TestCase version: use inside unittest.TestCase methods."""
     for flag in TREE_FLAGS:
+        if flag in exclude_checks:
+            continue
         if flag == "set_thresholds_met":
             if type(t) is not GKPlusTreeBase:
                 # this flag is only relevant for GKPlusTreeBase

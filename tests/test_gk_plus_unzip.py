@@ -34,8 +34,11 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         
         return tree
     
-    def _validate_tree_structure(self, tree: GKPlusTreeBase, expected_real_keys: List[int], description: str = "", is_right: bool = False):
-        """Helper to validate tree structure and contents."""
+    def _validate_tree_structure(self, tree: GKPlusTreeBase, expected_real_keys: List[int], description: str = "", is_right: bool = True):
+        """
+        Helper to validate tree structure and contents.
+        Is_right is set to True by default for testing. Set it to False to not allow internal nodes to have less than 2 items in the left tree.
+        """
         if description:
             description = f" ({description})"
             

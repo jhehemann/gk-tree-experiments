@@ -37,6 +37,14 @@ class InternalItem:
     def value(self):
         return None
     
+    def __lt__(self, other: 'InternalItem') -> bool:
+        """Compare two InternalItem instances based on their keys."""
+        return self.key < other.key
+    
+    def __eq__(self, other: 'InternalItem') -> bool:
+        """Check equality of two InternalItem instances based on their keys."""
+        return self.key == other.key
+    
     def get_digest_for_dim(self, dim: int) -> int:
         """
         Get the hash digest for the specified dimension.
