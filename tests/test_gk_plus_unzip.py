@@ -10,6 +10,7 @@ from gplus_trees.klist_base import KListBase
 from tests.gk_plus.base import TreeTestCase
 from tests.utils import assert_tree_invariants_tc
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
+from statistics import median_low
 
 from tests.logconfig import logger
 
@@ -19,18 +20,12 @@ class TestGKPlusTreeUnzip(TreeTestCase):
     def setUp(self):
         """Set up test fixtures with different tree configurations."""
         super().setUp()
-        self.tree_k2 = create_gkplus_tree(K=2, dimension=1)
-        self.tree_k4 = create_gkplus_tree(K=4, dimension=1)
-        self.tree_k8 = create_gkplus_tree(K=8, dimension=1)
-        
-        # Trees with different dimensions
-        self.tree_k4_dim2 = create_gkplus_tree(K=4, dimension=2)
-        self.tree_k4_dim3 = create_gkplus_tree(K=4, dimension=3)
+        self.k = 4  # Default K-list node capacity for tests
     
-    def _create_simple_tree(self, keys: List[int], ranks: List[int], tree=None):
+    def _create_tree(self, keys: List[int], ranks: List[int], tree=None):
         """Helper to create a simple tree with given keys and ranks."""
         if tree is None:
-            tree = create_gkplus_tree(K=4, dimension=1)
+            tree = create_gkplus_tree(K=self.k, dimension=1)
         
         for key, rank in zip(keys, ranks):
             item = self.make_item(key, f"val_{key}")
@@ -39,7 +34,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         
         return tree
     
-    def _validate_tree_structure(self, tree: GKPlusTreeBase, expected_keys: List[int], description: str = "", is_right: bool = False):
+    def _validate_tree_structure(self, tree: GKPlusTreeBase, expected_real_keys: List[int], description: str = "", is_right: bool = False):
         """Helper to validate tree structure and contents."""
         if description:
             description = f" ({description})"
@@ -59,8 +54,8 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         for entry in tree.iter_real_entries():
             actual_keys.append(entry.item.key)
         
-        expected_keys_sorted = sorted(expected_keys)
-        actual_keys_sorted = sorted(actual_keys)
+        expected_keys_sorted = expected_real_keys
+        actual_keys_sorted = actual_keys
         
         self.assertEqual(
             expected_keys_sorted, actual_keys_sorted,
@@ -75,10 +70,16 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         # Validate left tree
         if expected_left_keys:
             self._validate_tree_structure(left_tree, expected_left_keys, "left tree")
+        else:
+            if not left_tree.is_empty():
+                has_real = left_tree.real_item_count() > 0
+                self.assertFalse(has_real, "Left tree should not have real items when no expected left keys")
         
         # Validate right tree  
         if expected_right_keys:
             self._validate_tree_structure(right_tree, expected_right_keys, "right tree", is_right=True)
+        else:
+            self.assertTrue(right_tree.is_empty(), "Right tree should be empty when no expected right keys")
         
         # Validate key subtree presence
         if has_key_subtree:
@@ -96,12 +97,13 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         if expected_next_key is not None:
             # If expected_next_key exists, it should be a valid entry
             self.assertIsNotNone(next_entry, f"Expected next entry for key {unzip_key}")
-            self.assertIsInstance(next_entry, Entry, "expected_next_key should be an instance of Entry")
+            self.assertIsInstance(next_entry, Entry, "next_entry should be an instance of Entry")
             self.assertEqual(next_entry.item.key, expected_next_key, "expected_next_key key mismatch")
+            self.assertIsNotNone(next_entry.item.value, "next_entry item value should not be None for dimension 1")
 
     def test_unzip_empty_tree(self):
         """Test unzipping an empty tree."""
-        tree = create_gkplus_tree(K=4, dimension=1)
+        tree = create_gkplus_tree(K=self.k, dimension=1)
         self.assertTrue(tree.is_empty())
         
         left_tree, key_subtree, right_tree, next_entry = tree.unzip(100)
@@ -113,95 +115,170 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_single_item_tree_key_exists(self):
         """Test unzipping a tree with a single item where the key exists."""
-        tree = self._create_simple_tree([100], [1])
+        rank_lists = [[1]]  # Single item with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+
+        tree = self._create_tree(keys, rank_lists[0])
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(100)
+
+        leading_dummy_keys = []
+        for entry in tree:
+            if entry.item.key >= 0:
+                break
+            leading_dummy_keys.append(entry.item.key)
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(keys[0])
         
+
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=100, expected_next_key=None, expected_left_keys=[], expected_right_keys=[],
+            unzip_key=keys[0], expected_next_key=None, expected_left_keys=[], expected_right_keys=[],
             has_key_subtree=False
         )
 
     def test_unzip_single_item_tree_key_not_exists_smaller(self):
         """Test unzipping a tree with a single item where the key is smaller than existing."""
-        tree = self._create_simple_tree([100], [1])
+        rank_lists = [[1]]  # Single item with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+
+        tree = self._create_tree(keys, rank_lists[0])
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(50)
+        unzip_key = keys[0] - 1
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+        
 
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=50, expected_next_key=100, expected_left_keys=[], expected_right_keys=[100],
+            unzip_key=unzip_key, expected_next_key=keys[0], expected_left_keys=[], expected_right_keys=keys,
             has_key_subtree=False
         )
 
     def test_unzip_single_item_tree_key_not_exists_larger(self):
         """Test unzipping a tree with a single item where the key is larger than existing."""
-        tree = self._create_simple_tree([100], [1])
+        rank_lists = [[1]]  # Single item with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(200)
+        tree = self._create_tree(keys, rank_lists[0])
+        unzip_key = keys[0] + 1
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
         
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=200, expected_next_key=None, expected_left_keys=[100], expected_right_keys=[],
+            unzip_key=unzip_key, expected_next_key=None, expected_left_keys=keys, expected_right_keys=[],
             has_key_subtree=False
         )
 
     def test_unzip_multiple_items_key_exists_middle(self):
         """Test unzipping with multiple items where key exists in the middle."""
-        tree = self._create_simple_tree([100, 200, 300, 400, 500], [1, 1, 1, 1, 1])
-        logger.debug(f"Tree before unzip: {print_pretty(tree)}")
+        rank_lists = [[1, 1, 1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+        tree = self._create_tree(keys, rank_lists[0])
 
+        unzip_key = median_low(keys)
+        unzip_idx = keys.index(unzip_key)
 
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(300)
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+        
+        next_key = keys[unzip_idx + 1]
+        expected_left_keys = keys[:unzip_idx]
+        expected_right_keys = keys[unzip_idx + 1:]
 
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=300, expected_next_key=400, expected_left_keys=[100, 200], expected_right_keys=[400, 500],
+            unzip_key=unzip_key, expected_next_key=next_key, expected_left_keys=expected_left_keys, expected_right_keys=expected_right_keys,
             has_key_subtree=False
         )
 
     def test_unzip_multiple_items_key_exists_first(self):
         """Test unzipping with multiple items where key is the first item."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
+        rank_lists = [[1, 1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+        tree = self._create_tree(keys, rank_lists[0])
+        logger.debug(f"Tree before unzip: {print_pretty(tree)}")
+        unzip_key = keys[0]
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+        logger.debug(f"Left tree after unzip: {print_pretty(left_tree)}")
+        logger.debug(f"Key subtree after unzip: {print_pretty(key_subtree)}")
+        logger.debug(f"Right tree after unzip: {print_pretty(right_tree)}")
+        logger.debug(f"Next entry after unzip: {next_entry.item.key if next_entry else None}")
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(100)
-        
+        expected_right_keys = keys[1:]
+
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=100, expected_next_key=200, expected_left_keys=[], expected_right_keys=[200, 300, 400],
+            unzip_key=unzip_key, expected_next_key=keys[1], expected_left_keys=[], expected_right_keys=expected_right_keys,
             has_key_subtree=False
         )
 
     def test_unzip_multiple_items_key_exists_last(self):
         """Test unzipping with multiple items where key is the last item."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
-        
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(400)
+        rank_lists = [[1, 1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k)
+        tree = self._create_tree(keys, rank_lists[0])
+        unzip_key = keys[-1]
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
         
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=400, expected_next_key=None, expected_left_keys=[100, 200, 300], expected_right_keys=[],
+            unzip_key=unzip_key, expected_next_key=None, expected_left_keys=keys[:-1], expected_right_keys=[],
             has_key_subtree=False
         )
 
-    def test_unzip_multiple_items_key_not_exists_between(self):
+    def test_unzip_multiple_items_key_not_exists_between_rank_1(self):
         """Test unzipping with multiple items where key doesn't exist but falls between items."""
-        tree = self._create_simple_tree([100, 200, 400, 500], [1, 1, 1, 1])
+        rank_lists = [[1, 1, 1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(300)
-        
+        median_idx = keys.index(median_low(keys))
+        unzip_key =  keys[median_idx] - 1  # median key - 1 (not in keys)
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+
+        expected_left_keys = keys[:median_idx]
+        expected_right_keys = keys[median_idx:]
+
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=300, expected_next_key=400, expected_left_keys=[100, 200], expected_right_keys=[400, 500],
+            unzip_key=unzip_key, expected_next_key=keys[median_idx], expected_left_keys=expected_left_keys, expected_right_keys=expected_right_keys,
             has_key_subtree=False
         )
-    
+
     def test_unzip_multiple_items_key_not_exists_between_rank_gt_1(self):
         """Test unzipping with multiple items where key doesn't exist but falls between items."""
-        tree = self._create_simple_tree([100, 200, 400, 500], [2, 2, 2, 2])
+        rank_lists = [
+            [2, 2, 2, 2],
+            [2, 1, 2, 1]
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
+        median_index = keys.index(median_low(keys))
+        unzip_key = keys[median_index] + 1  # median key + 1 (not in keys)
+        logger.debug(f"Unzip key: {unzip_key}")
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(300)
+
+        expected_left_keys = keys[:median_index + 1]
+        expected_right_keys = keys[median_index + 1:]
+
+        self._validate_unzip_result(
+            left_tree, key_subtree, right_tree, next_entry,
+            unzip_key=unzip_key, expected_next_key=keys[median_index + 1], expected_left_keys=expected_left_keys, expected_right_keys=expected_right_keys,
+            has_key_subtree=False
+        )
+        
+
+    def test_unzip_multiple_items_key_smaller_than_all(self):
+        """Test unzipping where key is smaller than all existing items."""
+        rank_lists = [[1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
+        logger.debug(f"Tree before unzip: {print_pretty(tree)}")
+        unzip_key = keys[0] - 1
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
         logger.debug(f"left_tree: {print_pretty(left_tree)}")
         logger.debug(f"key_subtree: {print_pretty(key_subtree)}")
         logger.debug(f"right_tree: {print_pretty(right_tree)}")
@@ -209,61 +286,75 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=300, expected_next_key=400, expected_left_keys=[100, 200], expected_right_keys=[400, 500],
-            has_key_subtree=False
-        )
-
-    def test_unzip_multiple_items_key_smaller_than_all(self):
-        """Test unzipping where key is smaller than all existing items."""
-        tree = self._create_simple_tree([200, 300, 400], [1, 1, 1])
-        
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(100)
-        
-        self._validate_unzip_result(
-            left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=100, expected_next_key=200, expected_left_keys=[], expected_right_keys=[200, 300, 400],
+            unzip_key=unzip_key, expected_next_key=keys[0], expected_left_keys=[], expected_right_keys=keys,
             has_key_subtree=False
         )
 
     def test_unzip_multiple_items_key_larger_than_all(self):
         """Test unzipping where key is larger than all existing items."""
-        tree = self._create_simple_tree([100, 200, 300], [1, 1, 1])
+        rank_lists = [[1, 1, 1]]  # Multiple items with rank 1 in dimension 1
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(500)
+        unzip_key = keys[-1] + 1
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
         
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=500, expected_next_key=None, expected_left_keys=[100, 200, 300], expected_right_keys=[],
+            unzip_key=unzip_key, expected_next_key=None, expected_left_keys=keys, expected_right_keys=[],
             has_key_subtree=False
         )
 
     def test_unzip_complex_tree_structure(self):
         """Test unzipping a tree with internal nodes (rank > 1)."""
-        tree = self._create_simple_tree([100, 150, 200, 250, 300, 350], [2, 1, 2, 1, 2, 1])
+        rank_lists = [[2, 1, 2, 1, 2, 1]]
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
+
+        logger.debug(f"Tree before unzip: {print_pretty(tree)}")
+        unzip_key = median_low(keys)
+        unzip_idx = keys.index(unzip_key)
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+
         
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(200)
+
+        expected_left_keys = keys[:unzip_idx]
+        expected_right_keys = keys[unzip_idx + 1:]
         
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=200, expected_next_key=250, expected_left_keys=[100, 150], expected_right_keys=[250, 300, 350],
+            unzip_key=unzip_key, expected_next_key=keys[unzip_idx + 1], expected_left_keys=expected_left_keys, expected_right_keys=expected_right_keys,
             has_key_subtree=None
         )
 
     def test_unzip_with_different_ranks(self):
         """Test unzipping a tree with mixed ranks."""
-        tree = self._create_simple_tree([100, 200, 300, 400, 500], [3, 2, 1, 2, 3])
-        
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(300)
-        
+        rank_lists = [[3, 4, 1, 2, 3]]
+        keys = self.find_keys_for_rank_lists(rank_lists, self.k, spacing=True)
+        tree = self._create_tree(keys, rank_lists[0])
+        logger.debug(f"Tree before unzip: {print_pretty(tree)}")
+        unzip_key = median_low(keys)
+        unzip_idx = keys.index(unzip_key)
+
+        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
+        logger.debug(f"left_tree: {print_pretty(left_tree)}")
+        logger.debug(f"key_subtree: {print_pretty(key_subtree)}")
+        logger.debug(f"right_tree: {print_pretty(right_tree)}")
+        logger.debug(f"next_entry: {next_entry.item.key if next_entry else None}")
+
+        expected_left_keys = keys[:unzip_idx]
+        expected_right_keys = keys[unzip_idx + 1:]
+
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=300, expected_next_key=400, expected_left_keys=[100, 200], expected_right_keys=[400, 500],
-            has_key_subtree=False
+            unzip_key=unzip_key, expected_next_key=keys[unzip_idx + 1], expected_left_keys=expected_left_keys, expected_right_keys=expected_right_keys,
+            has_key_subtree=None
         )
 
     def test_unzip_preserves_tree_properties(self):
         """Test that unzip preserves essential tree properties."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 2, 1, 2])
+        tree = self._create_tree([100, 200, 300, 400], [1, 2, 1, 2])
         
         # Record properties before unzip
         initial_dim = tree.DIM
@@ -283,7 +374,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_invalidates_cached_sizes(self):
         """Test that unzip operation properly invalidates cached tree sizes."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
+        tree = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
         logger.debug(f"Tree before unzip: {print_pretty(tree)}")
         # Force calculation of sizes
         initial_size = tree.real_item_count()
@@ -304,7 +395,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_with_klist_sets(self):
         """Test unzipping trees where node sets are KLists."""
-        tree = self._create_simple_tree([100, 200, 300], [1, 1, 1])
+        tree = self._create_tree([100, 200, 300], [1, 1, 1])
         
         # Verify we have KList sets
         self.assertIsInstance(tree.node.set, KListBase)
@@ -344,7 +435,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_type_validation(self):
         """Test that unzip validates input types correctly."""
-        tree = self._create_simple_tree([100, 200], [1, 1])
+        tree = self._create_tree([100, 200], [1, 1])
         
         # Test with invalid type
         with self.assertRaises(TypeError) as cm:
@@ -366,7 +457,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
         keys = list(range(100, 200, 5))  # 20 keys: 100, 105, 110, ..., 195
         ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
-        tree = self._create_simple_tree(keys, ranks, tree)
+        tree = self._create_tree(keys, ranks, tree)
         
         # Unzip at a key in the middle
         unzip_key = 150
@@ -385,18 +476,18 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_boundary_values(self):
         """Test unzipping with boundary values (very small and very large keys)."""
-        tree = self._create_simple_tree([100, 200, 300], [1, 1, 1])
+        tree = self._create_tree([100, 200, 300], [1, 1, 1])
         
         # Test with very small key
         left_tree, key_subtree, right_tree, next_entry = tree.unzip(-1000)
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=-1000, expected_next_key=-1, expected_left_keys=[], expected_right_keys=[100, 200, 300],
+            unzip_key=-1000, expected_next_key=100, expected_left_keys=[], expected_right_keys=[100, 200, 300],
             has_key_subtree=False
         )
         
         # Test with very large key
-        tree2 = self._create_simple_tree([100, 200, 300], [1, 1, 1])
+        tree2 = self._create_tree([100, 200, 300], [1, 1, 1])
         left_tree, key_subtree, right_tree, next_entry = tree2.unzip(10000)
         self._validate_unzip_result(
             left_tree, key_subtree, right_tree, next_entry,
@@ -406,7 +497,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_sequential_operations(self):
         """Test multiple sequential unzip operations."""
-        tree = self._create_simple_tree([100, 200, 300, 400, 500], [1, 1, 1, 1, 1])
+        tree = self._create_tree([100, 200, 300, 400, 500], [1, 1, 1, 1, 1])
         
         # First unzip at 300
         left_tree, key_subtree, right_tree, next_entry = tree.unzip(300)
@@ -429,7 +520,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_maintains_leaf_structure(self):
         """Test that unzip maintains proper leaf node structure and linking."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
+        tree = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
         
         left_tree, key_subtree, right_tree, next_entry = tree.unzip(250)
         logger.debug(f"left_tree: {print_pretty(left_tree)}")
@@ -448,7 +539,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_with_dummy_entries(self):
         """Test unzipping trees that contain dummy entries."""
-        tree = self._create_simple_tree([100, 200, 300], [1, 1, 1])
+        tree = self._create_tree([100, 200, 300], [1, 1, 1])
         logger.debug(f"Tree before unzip: {print_pretty(tree)}")
         logger.debug(f"Tree size before unzip: {tree.real_item_count()}")
         
@@ -471,10 +562,10 @@ class TestGKPlusTreeUnzip(TreeTestCase):
 
     def test_unzip_consistency_with_split(self):
         """Test that unzip results are consistent with split_inplace behavior."""
-        tree = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
+        tree = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
         
         # Create a copy for split_inplace comparison
-        tree_copy = self._create_simple_tree([100, 200, 300, 400], [1, 1, 1, 1])
+        tree_copy = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
         
         unzip_key = 250
         

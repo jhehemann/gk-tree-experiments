@@ -981,10 +981,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             left_set, left_subtree_of_key, right_set, next_entry = node.set.unzip(key)
 
         if IS_DEBUG:
-            logger.debug(f"[DIM {self.DIM}] Split results - Left: {print_pretty(left_set)}, "
-                        f"Key subtree: {print_pretty(left_subtree_of_key)}, "
-                        f"Right: {print_pretty(right_set)}, "
-                        f"Next: {next_entry.item.key if next_entry else None}")
+            logger.debug(f"[DIM {self.DIM}] Split results - Left: {print_pretty(left_set)}")
+            logger.debug(f"[DIM {self.DIM}] Split results - Key subtree: {print_pretty(left_subtree_of_key)}")
+            logger.debug(f"[DIM {self.DIM}] Split results - Right: {print_pretty(right_set)}")
+            if next_entry:
+                logger.debug(f"[DIM {self.DIM}] Split results - Next entry: key={next_entry.item.key}, value={next_entry.item.value}")
+                if next_entry.left_subtree:
+                    logger.debug(f"[DIM {self.DIM}] Split results - Next entry left subtree node set: {print_pretty(next_entry.left_subtree.node.set)}")
+            else:
+                logger.debug(f"[DIM {self.DIM}] Split results - Next entry: None")
 
         # Update the current node's set
         node.set = left_set
@@ -997,26 +1002,62 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         # Handle non-leaf nodes
         if IS_DEBUG:
-            logger.debug(f"[DIM {self.DIM}] Unzipping at non-leaf node with rank {rank}")
+            logger.debug(f"[DIM {self.DIM}] Handle unzipping result at non-leaf node with rank {rank}")
 
         return self._handle_nonleaf_unzip(key, left_set, left_subtree_of_key, right_set, 
                                         next_entry, right_subtree, rank)
 
+    def _retrieve_next(self, key: int) -> Optional[Entry]:
+        """Retrieve the next entry in the tree after the given key."""
+        pivot, pivot_next = self.find_pivot()
+        dummy_key = get_dummy(self.DIM).key
+        logger.debug(f"[DIM {self.DIM}] Retrieving next entry after key {key} - Pivot: {pivot.item.key if pivot else None}, Next: {pivot_next.item.key if pivot_next else None}")
+        
+        if pivot and pivot.item.key > dummy_key:
+            logger.debug(f"[DIM {self.DIM}] Pivot found and key > {dummy_key} (dummy key). Make it the next entry.")
+            return pivot
+        else:
+            logger.debug(f"[DIM {self.DIM}] No valid pivot found or key <= {dummy_key}. Returning pivot_next.")
+            return pivot_next
+
     def _handle_leaf_unzip(self, left_set, left_subtree_of_key, right_set, next_entry, left_next):
         """Handle unzipping at leaf level."""
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Handle unzipping result at leaf level")
         if left_set.is_empty():
             # Return right subtree directly
             right_return = self.lift(right_set, None, 1)
+            logger.debug(f"[DIM {self.DIM}] Left is empty, Right: {print_pretty(right_return)}")
             if not right_return.is_empty():
+                logger.debug(f"[DIM {self.DIM}] Right return has items, setting next to left next: {print_pretty(left_next)}")
                 right_return.node.next = left_next
+                logger.debug(f"[DIM {self.DIM}] Finding next entry in right return.")
+                # check adding condition: Only search for next entry if it is not klist?
+                # check adding condition: Only search for next entry if it has value==None?
+                next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
+            else:
+                logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
+                next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
+                logger.debug(f"[DIM {self.DIM}] Found next entry in left next: key={next_entry.item.key if next_entry else None}, value={next_entry.item.value if next_entry else None}")
+                
+            logger.debug(f"[DIM {self.DIM}] Set left node to None (empty)")
             self.node = None
             return self, left_subtree_of_key, right_return, next_entry
         
+        logger.debug(f"[DIM {self.DIM}] Left set has items, processing further")
         right_return = self.lift(right_set, None, 1)
         if not right_return.is_empty():
+            logger.debug(f"[DIM {self.DIM}] Right has items, finding next entry in it: {print_pretty(right_return)}")
             right_return.node.next = left_next
+            next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
+        else:
+            logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
+            next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
+        
         
         self.node.set = left_set
+        logger.debug(f"[DIM {self.DIM}] Set left (self) node with left set: {print_pretty(left_set)}")
+        logger.debug(f"[DIM {self.DIM}] Unlinking leaf nodes: Set self.node.next to None")
         self.node.next = None
         
         if IS_DEBUG:
@@ -1069,11 +1110,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     def _handle_no_key_subtree_case(self, key, left_set, left_count, right_set, next_entry, right_subtree, rank):
         """Unified handler for cases where left set has multiple items or single/empty items."""
+        logger.debug(f"[DIM {self.DIM}] handle no key subtree case")
         key_subtree = None
         right_return = None
         
         if next_entry:
+            logger.debug(f"[DIM {self.DIM}] Next entry found: key={next_entry.item.key}, value={next_entry.item.value}")
             if next_entry.left_subtree:
+                logger.debug(f"[DIM {self.DIM}] Next entry has left subtree, unzipping it: {print_pretty(next_entry.left_subtree)}")
                 # Unzip the next entry's left subtree
                 l_right_subtree, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
                 
@@ -1090,8 +1134,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 
                 # Update next_entry if we got a valid new one
                 if new_next is not None:
+                    logger.debug(f"[DIM {self.DIM}] Split results - Update next entry to: key={new_next.item.key}, value={new_next.item.value}")
                     next_entry = new_next
+                else:
+                    logger.debug(f"[DIM {self.DIM}] No new next entry found, keeping original: key={next_entry.item.key}, value={next_entry.item.value}")
             else:
+                logger.debug(f"[DIM {self.DIM}] Next entry has no left subtree, unzipping right subtree")
                 # No left subtree to unzip
                 if left_count > 1:
                     self.node.right_subtree = None
@@ -1104,6 +1152,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 self.node.next = None
         else:
             # No next entry - unzip right subtree directly
+            logger.debug(f"[DIM {self.DIM}] No next entry, unzipping right subtree: {print_pretty(right_subtree)}")
             if right_subtree:
                 l_right_subtree, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
                 next_entry = new_next
