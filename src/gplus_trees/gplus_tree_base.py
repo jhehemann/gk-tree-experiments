@@ -816,11 +816,11 @@ def gtree_stats_(t: GPlusTreeBase,
     # Check current node violations (always check, regardless of current state)
     if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Node set is KList and item_count > threshold: {node_set.item_count()} > {threshold}, KList: {print_pretty(node_set)}")
+            logger.debug(f"[DIM {t.DIM if hasattr(t, 'DIM') else 'N/A'}] Node set is KList and item_count > threshold: {node_set.item_count()} > {threshold}, KList: {print_pretty(node_set)}, tree: {print_pretty(t)}")
         stats.set_thresholds_met = False
     elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Node set is {type(node_set)} and item_count <= threshold: {node_set.item_count()} <= {threshold}, GPlusTree: {print_pretty(node_set)}")
+            logger.debug(f"[DIM {t.DIM if hasattr(t, 'DIM') else 'N/A'}] Node set is {type(node_set)} and item_count <= threshold: {node_set.item_count()} <= {threshold}, GPlusTree: {print_pretty(node_set)}, tree: {print_pretty(t)})")
         stats.set_thresholds_met = False
 
 

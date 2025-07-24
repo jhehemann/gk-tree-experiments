@@ -4,7 +4,7 @@ import unittest
 from typing import List, Optional
 from gplus_trees.base import LeafItem, Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import get_dummy, GKPlusTreeBase
+from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree, get_dummy, GKPlusTreeBase
 from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.klist_base import KListBase
 from tests.gk_plus.base import TreeTestCase
@@ -60,6 +60,20 @@ class TestGKPlusTreeZip(TreeTestCase):
 
     def _validate_tree_after_zip(self, tree: GKPlusTreeBase, expected_keys: List[int], k: int = 4):
         """Helper to validate tree structure and contents after zip operation."""
+        logger.debug(f"k={k}, Expected keys: {expected_keys}")
+        # control_tree = create_gkplus_tree(K=k, dimension=tree.DIM, l_factor=tree.l_factor)
+        # ranks = calc_ranks(expected_keys, k=k, DIM=tree.DIM)
+        control_tree = bulk_create_gkplus_tree(
+            [Entry(self.make_item(key, f"val_{key}"), None) for key in expected_keys],
+            tree.DIM,
+            tree.l_factor,
+            tree.KListClass
+        )
+        # for key, rank in zip(expected_keys, ranks):
+        #     item = self.make_item(key, f"val_{key}")
+        #     control_tree, _, _ = control_tree.insert(item, rank=rank)
+        logger.debug(f"Control tree: {print_pretty(control_tree)}")
+        control_stats = asdict(gtree_stats_(control_tree, {}))
         # Check tree invariants
         if not tree.is_empty():
             stats = gtree_stats_(tree, {})
@@ -68,13 +82,7 @@ class TestGKPlusTreeZip(TreeTestCase):
             
             # Create a control tree with the expected keys and compare stats
             k = tree.SetClass.KListNodeClass.CAPACITY
-            control_tree = create_gkplus_tree(K=k, dimension=tree.DIM, l_factor=tree.l_factor)
-            ranks = calc_ranks(expected_keys, k=k, DIM=tree.DIM)
-            for key, rank in zip(expected_keys, ranks):
-                item = self.make_item(key, f"val_{key}")
-                control_tree, _, _ = control_tree.insert(item, rank=rank)
-            logger.debug(f"Control tree: {print_pretty(control_tree)}")
-            control_stats = asdict(gtree_stats_(control_tree, {}))
+            
             result_stats = asdict(gtree_stats_(tree, {}))
             if control_stats != result_stats:
                 # Find which keys differ
@@ -200,8 +208,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         # Should contain all keys from both trees
         self._validate_tree_after_zip(result, keys)
 
-    def test_zip_different_ranks_self_rank_smaller(self):
-        """Test zipping when self has smaller rank than other."""
+    def test_zip_different_ranks_left_rank_smaller_right_no_left_subtree(self):
+        """Test zipping when left has smaller rank than right."""
         k = 4
         rank_lists = [[1, 2, 1]]
         keys = self.find_keys_for_rank_lists(rank_lists, k=k)
@@ -214,26 +222,113 @@ class TestGKPlusTreeZip(TreeTestCase):
 
         small_rank_tree = self._create_tree(keys_small, ranks_small)
         logger.debug(f"Small rank tree: {print_pretty(small_rank_tree)}")
-        logger.debug(f"Small rank tree structure: {small_rank_tree.print_structure()}")
 
         # Create tree with rank 2
         large_rank_tree = self._create_tree_via_unzip(keys_large, ranks_large)
         logger.debug(f"Large rank tree: {print_pretty(large_rank_tree)}")
-        logger.debug(f"Large rank tree structure: {large_rank_tree.print_structure()}")
 
         self.assertEqual(small_rank_tree.node.rank, 1)
         self.assertEqual(large_rank_tree.node.rank, 2)
         
         result = small_rank_tree.zip(large_rank_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
-        logger.debug(f"Result tree structure after zip: {result.print_structure()}")
         # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
         
         # The result should contain all keys
         self._validate_tree_after_zip(result, keys)
 
-    def test_zip_different_ranks_self_rank_greater(self):
-        """Test zipping when self has larger rank than other."""
+    def test_zip_different_ranks_left_rank_smaller_right_has_left_subtree(self):
+        """Test zipping when left has smaller rank than right."""
+        k = 4
+        rank_lists = [
+            [1, 1, 1, 1, 2],
+            [1, 1, 1, 1, 2]
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+        keys_small = keys[:1]
+        logger.debug(f"Keys for small tree: {keys_small}")
+        ranks_small = rank_lists[0][:1]
+        keys_large = keys[1:]
+        logger.debug(f"Keys for large tree: {keys_large}")
+        ranks_large = rank_lists[0][1:]
+
+        small_rank_tree = self._create_tree(keys_small, ranks_small)
+        logger.debug(f"Small rank tree: {print_pretty(small_rank_tree)}")
+
+        # Create tree with rank 2
+        large_rank_tree = self._create_tree_via_unzip(keys_large, ranks_large)
+        logger.debug(f"Large rank tree: {print_pretty(large_rank_tree)}")
+
+        self.assertEqual(small_rank_tree.node.rank, 1)
+        self.assertEqual(large_rank_tree.node.rank, 2)
+        
+        result = small_rank_tree.zip(large_rank_tree)
+        logger.debug(f"Result after zip: {print_pretty(result)}")
+        # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
+        
+        # The result should contain all keys
+        self._validate_tree_after_zip(result, keys)
+
+    def test_zip_different_ranks_left_rank_smaller_right_has_left_subtree_expanded(self):
+        """Test zipping when left has smaller rank than right."""
+        k = 4
+        rank_lists = [[1, 1, 1, 1, 1, 1, 2]]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+        keys_small = keys[:1]
+        logger.debug(f"Keys for small tree: {keys_small}")
+        ranks_small = rank_lists[0][:1]
+        keys_large = keys[1:]
+        logger.debug(f"Keys for large tree: {keys_large}")
+        ranks_large = rank_lists[0][1:]
+
+        small_rank_tree = self._create_tree(keys_small, ranks_small)
+        logger.debug(f"Small rank tree: {print_pretty(small_rank_tree)}")
+
+        # Create tree with rank 2
+        large_rank_tree = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
+        logger.debug(f"Large rank tree: {print_pretty(large_rank_tree)}")
+
+        self.assertEqual(small_rank_tree.node.rank, 1)
+        self.assertEqual(large_rank_tree.node.rank, 2)
+        
+        result = small_rank_tree.zip(large_rank_tree)
+        logger.debug(f"Result after zip: {print_pretty(result)}")
+        # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
+        
+        # The result should contain all keys
+        self._validate_tree_after_zip(result, keys, k=k)
+
+    def test_zip_different_ranks_left_rank_smaller_expanded_right_has_left_subtree_expanded(self):
+        """Test zipping when left has smaller rank than right."""
+        k = 4
+        rank_lists = [[1, 1, 1, 1, 1, 1, 1, 1, 2]]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+        keys_small = keys[:4]
+        logger.debug(f"Keys for small tree: {keys_small}")
+        ranks_small = rank_lists[0][:4]
+        keys_large = keys[4:]
+        logger.debug(f"Keys for large tree: {keys_large}")
+        ranks_large = rank_lists[0][4:]
+
+        small_rank_tree = self._create_tree(keys_small, ranks_small)
+        logger.debug(f"Small rank tree: {print_pretty(small_rank_tree)}")
+
+        # Create tree with rank 2
+        large_rank_tree = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
+        logger.debug(f"Large rank tree: {print_pretty(large_rank_tree)}")
+
+        self.assertEqual(small_rank_tree.node.rank, 1)
+        self.assertEqual(large_rank_tree.node.rank, 2)
+        
+        result = small_rank_tree.zip(large_rank_tree)
+        logger.debug(f"Result after zip: {print_pretty(result)}")
+        # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
+        
+        # The result should contain all keys
+        self._validate_tree_after_zip(result, keys, k=k)
+
+    def test_zip_different_ranks_left_rank_greater(self):
+        """Test zipping when left has larger rank than right."""
         k = 4
         rank_lists = [[2, 1, 1]]
         keys = self.find_keys_for_rank_lists(rank_lists, k=k)
@@ -261,8 +356,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         # The result should contain all keys
         self._validate_tree_after_zip(result, keys)
 
-    def test_zip_different_ranks_self_rank_greater_non_matching_collapsed(self):
-        """Test zipping when self has larger rank than other."""
+    def test_zip_different_ranks_left_rank_greater_non_matching_collapsed(self):
+        """Test zipping when left has larger rank than right."""
         k = 4
         rank_lists = [[4, 1, 2]]
         keys = self.find_keys_for_rank_lists(rank_lists, k=k)
@@ -411,9 +506,17 @@ class TestGKPlusTreeZip(TreeTestCase):
         # Force calculation of sizes
         initial_size1 = tree1.real_item_count()
         initial_count1 = tree1.item_count()
-        
+
+        initial_size2 = tree2.real_item_count()
+        initial_count2 = tree2.item_count()
+
         # Perform zip
         result = tree1.zip(tree2)
+
+        expected_size = initial_size1 + initial_size2
+        expanded_leafs = result.get_expanded_leaf_count()
+        
+        expected_count = expected_size + (expanded_leafs + 1)
         
         # Sizes should be invalidated and recalculated
         new_size = result.real_item_count()
@@ -421,6 +524,41 @@ class TestGKPlusTreeZip(TreeTestCase):
         
         self.assertGreater(new_size, initial_size1, "Size should increase after zip")
         self.assertGreater(new_count, initial_count1, "Count should increase after zip")
+
+        self.assertEqual(new_size, expected_size, "Size after zip should match expected size")
+        self.assertEqual(new_count, expected_count, "Count after zip should match expected count")
+
+    def test_zip_item_counts(self):
+        """Test that zip operation preserves subtree structure correctly."""
+        k = 4
+        rank_lists = [[1, 1, 1, 1, 1, 2]]
+
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+        keys_small = keys[:1]
+        ranks_small = rank_lists[0][:1]
+        keys_large = keys[1:]
+        ranks_large = rank_lists[0][1:]
+
+        tree_1 = self._create_tree(keys_small, ranks_small, k=k)
+        tree_2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
+
+        result = tree_1.zip(tree_2)
+        # self.assertIs(result, tree_1)
+
+        tree_1_count = tree_1.item_count()
+        tree_2_count = tree_2.item_count()
+        tree_1_size = tree_1.real_item_count()
+        tree_2_size = tree_2.real_item_count()
+
+        expected_size = keys
+        expanded_leafs = result.get_expanded_leaf_count()
+        expected_count = len(keys_small) + len(keys_large)
+
+        
+        
+
+        # Validate structure and contents
+        self._validate_tree_after_zip(result, keys)
 
     def test_zip_with_overlapping_keys(self):
         """Test zipping trees that have overlapping keys."""
