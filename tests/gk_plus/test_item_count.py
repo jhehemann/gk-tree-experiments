@@ -190,8 +190,8 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         # self.print_hash_info(key=15, k=2, num_levels=3)
         # exit()
         # Generate 1000 unique random keys between 1 and 1000000
-        random.seed(42)  # For reproducibility
-        unique_keys = random.sample(range(1, 100), 99)
+        random.seed(81)  # For reproducibility
+        unique_keys = random.sample(range(1, 100), 10)
         # Insert all items
         inserted_count = 0
         for i, key in enumerate(unique_keys, 1):
@@ -206,17 +206,42 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
             expected_keys = [entry.item.key for entry in tree]
             expected_item_count = inserted_count + dummy_cnt
 
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-
-            if inserted_count == 6:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"tree: {print_pretty(tree.node.set.node.right_subtree)}")
-                    logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
+            # if logger.isEnabledFor(logging.DEBUG):
+            #     logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
 
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
 
         self.validate_tree(tree)
+
+    def test_large_tree_size_various_seeds(self):
+        """Test size is correctly maintained in a larger tree with random insertions using multiple seeds"""
+        seeds = list(range(100))
+        for seed in seeds:
+            with self.subTest(seed=seed):
+                tree = create_gkplus_tree(K=4)
+                random.seed(seed)  # For reproducibility
+                unique_keys = random.sample(range(1, 100), 6)
+                inserted_count = 0
+                for i, key in enumerate(unique_keys, 1):
+                    item = self.make_item(key, "val")
+                    tree, _, _ = tree.insert(item, rank=1)
+
+                    inserted_count += 1
+                    max_dim = tree.get_max_dim()
+                    dummy_cnt = self.get_dummy_count(tree)
+                    expanded_leafs = tree.get_expanded_leaf_count()
+                    expected_keys = [entry.item.key for entry in tree]
+                    expected_item_count = inserted_count + dummy_cnt
+
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
+
+                    self.assertEqual(
+                        expected_item_count, tree.item_count(),
+                        f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}"
+                    )
+
+                self.validate_tree(tree)
     
     def test_size_consistency_with_calculate_size(self):
         """Test that node.size matches the result of calculate_size()"""

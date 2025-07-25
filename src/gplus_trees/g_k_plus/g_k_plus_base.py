@@ -1092,6 +1092,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 # other_min_leaf_tree = r_pivot.left_subtree.get_min_leaf_tree()
                 left = left.zip(r_pivot.left_subtree)
                 logger.debug(f"[DIM {self.DIM}] Left tree after zipping (item_count: {left.item_count()}, real_item_count: {left.real_item_count()}): {print_pretty(left)}")
+                # left.node.set.check_and_convert_set(left.node.set)
+                logger.debug(f"[DIM {self.DIM}] Left Items: {[e.item.key for e in left]}")
+                logger.debug(f"[DIM {self.DIM}] Left next: {print_pretty(left.node.next)}")
                 r_pivot.left_subtree.node = left.node
                 r_pivot.left_subtree._invalidate_tree_size()
                 other._invalidate_tree_size()
@@ -1121,8 +1124,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             logger.debug(f"[DIM {self.DIM}] new_other (item_count: {other.item_count()}, real_item_count: {other.real_item_count()}): {print_pretty(other)}")
             logger.debug(f"[DIM {self.DIM}] Other Items: {[e.item.key for e in other]}")
-            # r_leftmost_subtree.node = left.node
-            # self.node = other.node
+            for i, leaf in enumerate(other.iter_leaf_nodes()):
+                logger.debug(f"[DIM {self.DIM}] Other Leaf {i}: {print_pretty(leaf.set)}")
+                logger.debug(f"[DIM {self.DIM}] Leaf next: {print_pretty(leaf.next)}")
+
+            logger.debug(f"[DIM {self.DIM}] Self node next: {print_pretty(self.node.next)}")
             logger.debug(f"[DIM {self.DIM}] new_self (item_count: {self.item_count()}, real_item_count: {self.real_item_count()}): {print_pretty(self)}")
             logger.debug(f"[DIM {self.DIM}] Self Items: {[e.item.key for e in self]}")
             other._invalidate_tree_size()
@@ -1187,27 +1193,49 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         new_left = self.node.right_subtree.zip(r_leftmost_subtree)
                         r_pivot.left_subtree = new_left
                 else:
+                    logger.debug(f"[DIM {self.DIM}] Linking leafs. ")
+                    logger.debug(f"[DIM {self.DIM}] Left leaf {print_pretty(self)}")
+                    logger.debug(f"[DIM {self.DIM}] Right leaf {print_pretty(other.node.right_subtree)}")
                     self.node.next = other.node.next
+
                 for entry in other.node.set:
                     if entry.item.key > dummy_lower_dim.key:
                         self.node.set, _, _ = self.node.set.insert_entry(entry)
+                
                 self.node.right_subtree = other.node.right_subtree
+                logger.debug(f"[DIM {self.DIM}] Merged KLists sitting at root of tree: {print_pretty(self)}")
+                logger.debug(f"[DIM {self.DIM}] root node next: {print_pretty(self.node.next)}")
+
                 left._invalidate_tree_size()
                 self._invalidate_tree_size()
                 self.node.set = self.check_and_convert_set(self.node.set)
+                logger.debug(f"[DIM {self.DIM}] Zipped KLists: {print_pretty(self)}")
                 return self
             elif isinstance(self.node.set, GKPlusTreeBase) and isinstance(other.node.set, KListBase):
                 other.node.set = bulk_create_gkplus_tree(other.node.set, self.node.set.DIM, self.l_factor, type(other.node.set))
                 logger.debug(f"[DIM {self.DIM}] Converted other to GKPlusTreeBase: {print_pretty(other)}")
+                _, _, other.node.set, _ = other.node.set.unzip(-1)
+                logger.debug(f"[DIM {self.DIM}] unzipped other at {-1}: {print_pretty(other)}")
                 zipped = self.node.set.zip(other.node.set)
+                zipped = self.check_and_convert_set(zipped)
+                if left_rank == 1:
+                    self.node.next = other.node.next
                 self.node.set = zipped
+                logger.debug(f"[DIM {self.DIM}] Zipped GKPlusTreeBase with KListBase: {print_pretty(self)}")
                 left._invalidate_tree_size()
                 self._invalidate_tree_size()
                 return self
             elif isinstance(self.node.set, KListBase) and isinstance(other.node.set, GKPlusTreeBase):
                 left.node.set = bulk_create_gkplus_tree(self.node.set, other.node.set.DIM, other.l_factor, type(self.node.set))
+                logger.debug(f"[DIM {self.DIM}] Converted left to GKPlusTreeBase: {print_pretty(left)}")
+                # _, _, left.node.set, _ = left.node.set.unzip(-1)
+                # logger.debug(f"[DIM {self.DIM}] unzipped left at {-1}: {print_pretty(left)}")
+                # Now both sets are GKPlusTreeBase, merge them
                 zipped = left.node.set.zip(other.node.set)
+                zipped = self.check_and_convert_set(zipped)
+
                 self.node.set = zipped
+                logger.debug(f"[DIM {self.DIM}] Zipped KListBase with GKPlusTreeBase: {print_pretty(self)}")
                 if left_rank == 1:
                     self.node.next = other.node.next
                 left._invalidate_tree_size()
@@ -1218,7 +1246,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if IS_DEBUG:
                     logger.debug(f"[DIM {self.DIM}] Merging GKPlusTrees: {print_pretty(self.node.set)} and {print_pretty(other.node.set)}")
                 zipped = self.node.set.zip(other.node.set)
+                zipped = self.check_and_convert_set(zipped)
                 self.node.set = zipped
+                logger.debug(f"[DIM {self.DIM}] Zipped GKPlusTrees: {print_pretty(self)}")
                 if left_rank == 1:
                     self.node.next = other.node.next
                 left._invalidate_tree_size()
