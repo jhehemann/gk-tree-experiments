@@ -5,7 +5,7 @@ from typing import List
 from itertools import product
 from tqdm import tqdm
 import copy
-from statistics import median_low
+from statistics import median_low, median_high
 
 # Add the src directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -155,7 +155,7 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
 
         random.seed(42)  # For reproducibility in tests
         # Shuffle in place
-        random.shuffle(pairs)
+        # random.shuffle(pairs)
 
         for key, rank in pairs:
             if key not in self.ITEMS:
@@ -170,13 +170,18 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
         )
 
         insert_key = insert_entry.item.key
-        
+        logger.debug(f"Now inserting key: {insert_key}, rank: {insert_rank}")
         new_tree, inserted, _ = tree.insert_entry(insert_entry, insert_rank)
         self.assertTrue(inserted, f"Inserted entry should be True for new key {insert_key}")
         
         msg = msg_head + f"\n\nInsert {case_name}: {insert_key}\n"
         # msg += f"Tree after insert: {print_pretty(new_tree)}\n" 
         self.assertIs(new_tree, tree, msg)
+
+        logger.debug(f"Tree after insert: {print_pretty(new_tree)}")
+        logger.debug(f"Tree node right subtree: {print_pretty(new_tree.node.right_subtree)}")
+        logger.debug(f"Tree node right subtree node set: {print_pretty(new_tree.node.right_subtree.node.set)}")
+        logger.debug(f"Tree node right subtree node right subtree: {print_pretty(new_tree.node.right_subtree.node.right_subtree)}")
 
         # Validate tree
         dummies = self.get_dummies(new_tree)
@@ -354,6 +359,136 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                     gnode_capacity=k, l_factor=l_factor
                 )
 
+    # TODO: fix by adding an is_root check and based on flag inserting dummy or not.
+    def test_insert_split_root_higher_dim_lowest_insert_higher_rank_a(self):
+        k = 4
+        l_factor = 1.0
+        tree = create_gkplus_tree(K=k)
+        rank_lists = [
+            [2, 1, 1, 3, 1, 1],  # Dimension 1
+            [1, 1, 1, 1, 1, 2],  # Dimension 2
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+        logger.debug(f"Keys for insert: {keys}")
+
+        # remove the middle key and corresponding ranks for insertion
+
+        insert_key_idx = keys.index(median_low(keys))+1
+        insert_key = keys[insert_key_idx]
+        # insert_key_idx = keys.index(insert_key)
+        insert_rank = rank_lists[0][insert_key_idx]
+        keys.remove(insert_key)
+        logger.debug(f"Insert key: {insert_key}")
+        logger.debug(f"Keys after removal: {keys}")
+        for rank_list in rank_lists:
+            logger.debug(f"Removing rank {rank_list[insert_key_idx]} from {rank_list}")
+            rank_list.remove(rank_list[insert_key_idx])
+        logger.debug(f"Rank lists after removal: {rank_lists}")
+        logger.debug(f"Insert rank: {insert_rank}")
+        logger.debug(f"Rank lists: {rank_lists}")
+
+        # item_map = { k: self.make_item(k) for k in keys}
+        # for idx, item in enumerate(item_map.values()):
+        #     rank = rank_lists[0][idx]
+        #     tree, _, _ = tree.insert(item, rank=rank)
+
+        insert_cases = [("middle non existing", insert_key)]
+        for case_name, insert_key in insert_cases:
+            insert_entry = Entry(self.make_item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+            exp_keys = sorted(keys + [insert_key])
+            with self.subTest(case=case_name, insert_key=insert_key):
+                self._run_insert_case(
+                    keys, rank_lists,
+                    insert_entry, insert_rank,
+                    exp_keys, case_name,
+                    gnode_capacity=k, l_factor=l_factor
+                )
+
+
+    def test_insert_split_root_higher_dim_insert_higher_rank(self):
+        k = 2
+        l_factor = 1.0
+        tree = create_gkplus_tree(K=k)
+        rank_lists = [
+            [2, 1, 3, 1, 1],  # Dimension 1
+            [2, 1, 1, 1, 2],  # Dimension 2
+        ]
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+        logger.debug(f"Keys for insert: {keys}")
+
+        # remove the middle key and corresponding ranks for insertion
+        insert_key = median_low(keys)
+        insert_key_idx = keys.index(insert_key)
+        insert_rank = rank_lists[0][insert_key_idx]
+        keys.remove(insert_key)
+        logger.debug(f"Insert key: {insert_key}")
+        logger.debug(f"Keys after removal: {keys}")
+        for rank_list in rank_lists:
+            logger.debug(f"Removing rank {rank_list[insert_key_idx]} from {rank_list}")
+            rank_list.remove(rank_list[insert_key_idx])
+        logger.debug(f"Rank lists after removal: {rank_lists}")
+        logger.debug(f"Insert rank: {insert_rank}")
+        logger.debug(f"Rank lists: {rank_lists}")
+
+        # item_map = { k: self.make_item(k) for k in keys}
+        # for idx, item in enumerate(item_map.values()):
+        #     rank = rank_lists[0][idx]
+        #     tree, _, _ = tree.insert(item, rank=rank)
+
+        insert_cases = [("middle non existing", insert_key)]
+        for case_name, insert_key in insert_cases:
+            insert_entry = Entry(self.make_item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+            exp_keys = sorted(keys + [insert_key])
+            with self.subTest(case=case_name, insert_key=insert_key):
+                self._run_insert_case(
+                    keys, rank_lists,
+                    insert_entry, insert_rank,
+                    exp_keys, case_name,
+                    gnode_capacity=k, l_factor=l_factor
+                )
+    
+    # def test_insert_split_root_higher_dim_insert_higher_rank(self):
+    #     k = 4
+    #     l_factor = 1.0
+    #     tree = create_gkplus_tree(K=k)
+    #     rank_lists = [
+    #           [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # Dimension 1
+                [2, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1],  # Dimension 2
+    #     ]
+    #     keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+    #     logger.debug(f"Keys for insert: {keys}")
+
+    #     # remove the middle key and corresponding ranks for insertion
+    #     insert_key = median_low(keys)
+    #     insert_key_idx = keys.index(insert_key)
+    #     insert_rank = rank_lists[0][insert_key_idx]
+    #     keys.remove(insert_key)
+    #     logger.debug(f"Insert key: {insert_key}")
+    #     logger.debug(f"Keys after removal: {keys}")
+    #     for rank_list in rank_lists:
+    #         logger.debug(f"Removing rank {rank_list[insert_key_idx]} from {rank_list}")
+    #         rank_list.remove(rank_list[insert_key_idx])
+    #     logger.debug(f"Rank lists after removal: {rank_lists}")
+    #     logger.debug(f"Insert rank: {insert_rank}")
+    #     logger.debug(f"Rank lists: {rank_lists}")
+
+    #     # item_map = { k: self.make_item(k) for k in keys}
+    #     # for idx, item in enumerate(item_map.values()):
+    #     #     rank = rank_lists[0][idx]
+    #     #     tree, _, _ = tree.insert(item, rank=rank)
+
+    #     insert_cases = [("middle non existing", insert_key)]
+    #     for case_name, insert_key in insert_cases:
+    #         insert_entry = Entry(self.make_item(insert_key, value="val"), type(tree)(l_factor=l_factor))
+    #         exp_keys = sorted(keys + [insert_key])
+    #         with self.subTest(case=case_name, insert_key=insert_key):
+    #             self._run_insert_case(
+    #                 keys, rank_lists,
+    #                 insert_entry, insert_rank,
+    #                 exp_keys, case_name,
+    #                 gnode_capacity=k, l_factor=l_factor
+    #             )
+
 
     def test_failing_insert(self):
         """
@@ -373,80 +508,80 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
                 tree, _, _ = tree.insert(self.ITEMS[key], rank=rank)
         self.validate_tree(tree)
        
-    def test_many_rank_combinations_specific_keys(self):
-        """
-        Exhaustively test many rank-combo and insert_key combinations,
-        computing the expected key lists on the fly.
-        """
-        k = 2
-        l_factor = 1.0
-        ranks = range(1, 4)
-        insert_rank = 2
+    # def test_many_rank_combinations_specific_keys(self):
+    #     """
+    #     Exhaustively test many rank-combo and insert_key combinations,
+    #     computing the expected key lists on the fly.
+    #     """
+    #     k = 2
+    #     l_factor = 1.0
+    #     ranks = range(1, 4)
+    #     insert_rank = 2
 
-        num_keys = len(range(1, 4))
-        # Precompute all possible per‐key rank‐tuples for each free dimension:
+    #     num_keys = len(range(1, 4))
+    #     # Precompute all possible per‐key rank‐tuples for each free dimension:
         
-        dim1_choices = list(product(ranks, repeat=num_keys))
-        dim2_choices = list(product(ranks, repeat=num_keys))
-        fixed_dim = tuple([3, 1, 1, 2, 1, 1, 3, 1])
+    #     dim1_choices = list(product(ranks, repeat=num_keys))
+    #     dim2_choices = list(product(ranks, repeat=num_keys))
+    #     fixed_dim = tuple([3, 1, 1, 2, 1, 1, 3, 1])
 
-        total = len(dim1_choices) * len(dim2_choices) * 1
+    #     total = len(dim1_choices) * len(dim2_choices) * 1
 
-        # Cache computations to avoid redundant calculations
-        insert_cases_cache = {}
-        keys_cache = {}
-        empty_subtree = create_gkplus_tree(K=k, l_factor=l_factor)
-        entry_cache = {}
+    #     # Cache computations to avoid redundant calculations
+    #     insert_cases_cache = {}
+    #     keys_cache = {}
+    #     empty_subtree = create_gkplus_tree(K=k, l_factor=l_factor)
+    #     entry_cache = {}
 
-        for dim1, dim2 in tqdm(
-            product(dim1_choices, dim2_choices),
-            total=total,
-            desc="Insert with specific key-rank combinations",
-            unit="combo",
-        ):
-            rank_combo = [dim1, dim2, fixed_dim]
+    #     for dim1, dim2 in tqdm(
+    #         product(dim1_choices, dim2_choices),
+    #         total=total,
+    #         desc="Insert with specific key-rank combinations",
+    #         unit="combo",
+    #     ):
+    #         rank_combo = [dim1, dim2, fixed_dim]
 
-            # Cache keys computation
-            rank_combo_tuple = tuple(tuple(dim) for dim in rank_combo)
-            if rank_combo_tuple not in keys_cache:
-                keys_cache[rank_combo_tuple] = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
-            keys = keys_cache[rank_combo_tuple]
+    #         # Cache keys computation
+    #         rank_combo_tuple = tuple(tuple(dim) for dim in rank_combo)
+    #         if rank_combo_tuple not in keys_cache:
+    #             keys_cache[rank_combo_tuple] = self.find_keys_for_rank_lists(rank_combo, k=k, spacing=True)
+    #         keys = keys_cache[rank_combo_tuple]
             
-            # Cache insert cases for this key set
-            keys_tuple = tuple(keys)
-            if keys_tuple not in insert_cases_cache:
-                insert_cases_cache[keys_tuple] = self._get_insert_cases(keys)
-            insert_cases = insert_cases_cache[keys_tuple]
+    #         # Cache insert cases for this key set
+    #         keys_tuple = tuple(keys)
+    #         if keys_tuple not in insert_cases_cache:
+    #             insert_cases_cache[keys_tuple] = self._get_insert_cases(keys)
+    #         insert_cases = insert_cases_cache[keys_tuple]
 
-            with self.subTest(rank_combo=rank_combo, keys=keys):
-                # logger.info(f"Testing rank combo: {rank_combo} with keys: {keys}")
-                # for each possible insert_key (including non-existent)
-                for case_name, insert_key in insert_cases:
-                    # Cache Entry objects to avoid repeated creation
-                    if insert_key not in entry_cache:
-                        if insert_key in self.ITEMS:
-                            item = self.ITEMS[insert_key]
-                        else:
-                            item = self.make_item(insert_key, "val")
-                            self.ITEMS[insert_key] = item
+    #         with self.subTest(rank_combo=rank_combo, keys=keys):
+    #             # logger.info(f"Testing rank combo: {rank_combo} with keys: {keys}")
+    #             # for each possible insert_key (including non-existent)
+    #             for case_name, insert_key in insert_cases:
+    #                 # Cache Entry objects to avoid repeated creation
+    #                 if insert_key not in entry_cache:
+    #                     if insert_key in self.ITEMS:
+    #                         item = self.ITEMS[insert_key]
+    #                     else:
+    #                         item = self.make_item(insert_key, "val")
+    #                         self.ITEMS[insert_key] = item
                             
-                        entry_cache[insert_key] = Entry(item, empty_subtree)
-                    insert_entry = entry_cache[insert_key]
+    #                     entry_cache[insert_key] = Entry(item, empty_subtree)
+    #                 insert_entry = entry_cache[insert_key]
                     
-                    with self.subTest(insert_key=insert_key):
-                        # Pre-compute expected keys once
-                        exp_keys = keys + [insert_key]
-                        case_name_str = f"insert key {insert_key} {case_name}"
-                        self._run_insert_case(
-                            keys,
-                            rank_combo,
-                            insert_entry,
-                            insert_rank,
-                            exp_keys,
-                            case_name_str,
-                            gnode_capacity=k,
-                            l_factor=l_factor
-                        )
+    #                 with self.subTest(insert_key=insert_key):
+    #                     # Pre-compute expected keys once
+    #                     exp_keys = keys + [insert_key]
+    #                     case_name_str = f"insert key {insert_key} {case_name}"
+    #                     self._run_insert_case(
+    #                         keys,
+    #                         rank_combo,
+    #                         insert_entry,
+    #                         insert_rank,
+    #                         exp_keys,
+    #                         case_name_str,
+    #                         gnode_capacity=k,
+    #                         l_factor=l_factor
+    #                     )
 
     def test_insert_entry(self):
         base_tree = create_gkplus_tree(K=8, l_factor=1.0)

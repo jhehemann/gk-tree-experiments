@@ -10,6 +10,7 @@ from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
 from gplus_trees.logging_config import get_test_logger
 import logging
+from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 
 logger = get_test_logger(__name__)
 
@@ -192,11 +193,13 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         # Generate 1000 unique random keys between 1 and 1000000
         random.seed(42)  # For reproducibility
         unique_keys = random.sample(range(1, 100), 99)
+
+
         # Insert all items
         inserted_count = 0
-        for i, key in enumerate(unique_keys, 1):
-        # for i in range(1, 1000):
-            item = self.make_item(key, "val")
+        
+        items = [self.make_item(key, "val") for key in unique_keys]
+        for i, item in enumerate(items, 1):
             tree, _, _ = tree.insert(item, rank=1)
 
             inserted_count += 1
@@ -215,6 +218,8 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
                     logger.debug(f"Tree structure at insertion {inserted_count}: {tree.node.set.node.right_subtree.print_structure()}")
 
             self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+
+        
 
         self.validate_tree(tree)
     

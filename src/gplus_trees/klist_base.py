@@ -264,6 +264,19 @@ class KListBase(AbstractSetDataStructure):
             node = node.next
         # print(f"Klist Height: {height}")
         return height
+    
+    def insert_min(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
+        it = iter(self)
+        pivots = [next(it, None) for _ in range(2)]
+        prev_pivot, prev_pivot_next = pivots
+
+        self, inserted, _ = self.insert_entry(entry, rank)
+        
+        
+        
+        logger.debug(f"[KListBase] insert_min: prev_pivot={prev_pivot}, prev_pivot_next={prev_pivot_next}")
+        return self, inserted, prev_pivot, prev_pivot_next
+        
 
     def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
         """

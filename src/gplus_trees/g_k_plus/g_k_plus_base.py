@@ -344,6 +344,25 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """
         max_leaf = self.get_max_leaf()
         return max_leaf.set.get_max()
+    
+    def get_min_leaf_tree(self) -> GKPlusNodeBase:
+        """
+        Get the minimum leaf node tree in the tree in the current dimension.
+        Returns:
+            GKPlusNodeBase: The minimum node in the tree.
+        """
+        if self.is_empty():
+            return None
+        
+        cur = self
+        while cur.node.rank > 1:
+            for entry in cur.node.set:
+                if entry.left_subtree is not None:
+                    cur = entry.left_subtree
+                    break
+            else:
+                cur = cur.node.right_subtree
+        return cur
 
     def get_max_leaf(self) -> GKPlusNodeBase:
         """
@@ -373,22 +392,228 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             "tree. No updates allowed during insert implementation phase."
             )
 
-    def _make_leaf_klist(self, x_entry: Entry) -> AbstractSetDataStructure:
+    def insert_min(self, x_entry: Entry, rank: int, add_dummy: bool = True) -> Tuple[GKPlusTreeBase, bool]:
+        """
+        Insert a minimum entry into the tree. This is a placeholder for future implementation.
+        
+        Args:
+            x_entry (Entry): The entry to be inserted.
+
+        Returns:
+            Tuple[GKPlusTreeBase, bool]: The updated tree and whether insertion was successful.
+        """
+        if self.is_empty():
+            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
+
+            if rank == 1:
+                # If the rank is 1, we can directly insert the entry into a new leaf node
+                new_leaf_set = self._make_leaf_klist(x_entry, add_dummy=add_dummy)
+                logger.debug(f"[DIM {self.DIM}] New leaf set: {print_pretty(new_leaf_set)}")
+                new_leaf_node = self.NodeClass(1, new_leaf_set, None)
+                self.node = new_leaf_node
+                inserted = True
+                next_entry = None
+                return self, inserted, next_entry, None
+            
+            left_leaf_tree, right_leaf_tree = self._make_leaf_trees(x_entry, add_dummy=add_dummy)
+            logger.debug(f"[DIM {self.DIM}] New left leaf tree: {print_pretty(left_leaf_tree)}")
+            logger.debug(f"[DIM {self.DIM}] New right leaf tree: {print_pretty(right_leaf_tree)}")
+
+            # Higher-level node
+            if add_dummy:
+                root_set, _, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
+            root_set, _, _ = root_set.insert_entry(Entry(_get_replica(x_entry.item), left_leaf_tree))
+            self.node = self.NodeClass(rank, root_set, right_leaf_tree)
+
+            inserted = True
+            next_entry = None
+            # self, _, next_entry, _ = self._insert_empty(x_entry, rank, add_dummy=False)
+            # min_leaf_tree = self.get_min_leaf_tree()
+            return self, inserted, next_entry, None
+        
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] {x_entry.item.key} into non-empty tree with rank {rank} and add_dummy={add_dummy}; tree: {print_pretty(self)}")
+        x_item = x_entry.item
+        x_key = x_item.key
+        
+        # Find the node with rank where the entry should be initially inserted
+        cur, parent, parent_next = self._find_insert_node(x_entry, rank, for_insert_min=True)
+        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Found insert node: {print_pretty(cur.node.set if cur and not cur.is_empty() else None)} with parent: {print_pretty(parent.node.set if parent and not parent.is_empty() else None)} and parent_next: {parent_next.item.key if parent_next else None}. node.right_subtree: {print_pretty(cur.node.right_subtree if cur.node else None)}")
+
+        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Setting parent_third to None before {x_key} insertion.")
+        parent_third = None
+
+        capacity = self.SetClass.KListNodeClass.CAPACITY
+
+        # Insert until we reach the leaf level
+        while True:
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Current tree: {print_pretty(cur)}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent: {print_pretty(parent)}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent_next: {parent_next.item.key if parent_next else None}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent_next.left_subtree: {print_pretty(parent_next.left_subtree) if parent_next else None}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent_third: {parent_third.item.key if parent_third else None}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent_third.left_subtree: {print_pretty(parent_third.left_subtree) if parent_third else None}")
+            
+            cur._invalidate_tree_size()
+            insert_entry = x_entry if rank == 1 else Entry(_get_replica(x_item), None)
+            if cur.is_empty():
+                # Fast path for empty node
+                # find right leaf node to link to
+                
+                if parent_next is not None and not parent_next.left_subtree is cur:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Parent_next is {parent_next.item.key}; Linking leaf nodes.")
+                    r_min_leaf_tree = parent_next.left_subtree.get_min_leaf_tree()
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent_next's min_leaf tree will be r_min_leaf_tree: {print_pretty(r_min_leaf_tree)}")
+                elif parent_third is not None:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Parent_third is {parent_third.item.key}; Linking leaf nodes.")
+                    r_min_leaf_tree = parent_third.left_subtree.get_min_leaf_tree()
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] parent third's min_leaf tree will be r_min_leaf_tree: {print_pretty(r_min_leaf_tree)}")
+                else:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] No parent_next.")
+                    if parent and parent.node.right_subtree:
+                        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Parent node set is {print_pretty(parent.node.set)}.")
+                        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Parent node right subtree will be r_min_leaf_tree: {print_pretty(parent.node.right_subtree)}")
+                        r_min_leaf_tree = parent.node.right_subtree.get_min_leaf_tree()
+                    else:
+                        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] No parent node right subtree, setting r_min_leaf_tree to None.")
+                        r_min_leaf_tree = None
+
+                
+                # insert the entry into the empty left subtree tree
+                # TODO: Check if we must use the current nodes rank here
+                new_leaf_set = self._make_leaf_klist(x_entry, add_dummy=False)
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] New leaf set: {print_pretty(new_leaf_set)}")
+                new_leaf_node = self.NodeClass(1, new_leaf_set, None)
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] r_min_leaf_tree: {print_pretty(r_min_leaf_tree)}")
+                # zeigt schon irgendwas auf cur?
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Cur: {print_pretty(cur)}")
+                cur.node = new_leaf_node
+                inserted = True
+                next_entry = None
+                third_entry = None
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Inserted: {inserted}, next_entry: {next_entry}, third_entry: {third_entry}")
+                # cur, inserted, next_entry = cur.node.set.insert_entry(x_entry, 1, add_dummy=False)
+                # cur.node = new_leaf_node
+
+                l_max_leaf = cur.get_max_leaf()
+                l_max_leaf.right_subtree = None
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] l_max_leaf: {print_pretty(l_max_leaf.set)}")
+                
+                l_max_leaf.next = r_min_leaf_tree
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Linked leaf nodes: {print_pretty(l_max_leaf.set)} -> {print_pretty(r_min_leaf_tree)}")
+                # logger.debug(f"[DIM {self.DIM}] [INSERT MIN] r_min_leaf_node_structure: {r_min_leaf_tree.print_structure() if r_min_leaf_tree else None}")
+
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Cur after inserting min: {print_pretty(cur)}")
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Parent after inserting min: {print_pretty(parent)}")
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Inserted {x_entry.item.key} with rank {rank} into empty node; self: {print_pretty(self)}")
+
+                
+                
+
+                if add_dummy:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Adding dummy to self before returning. Self: {print_pretty(self)}")
+                    # Add current dimension dummy
+                    dummy = get_dummy(self.DIM)
+                    # digest = dummy.get_digest_for_dim(self.DIM)
+                    # new_rank = calc_rank_from_digest_k(digest, capacity)
+                    new_rank = self.node.rank
+                    self, _, next_entry, third_entry = self.insert_min(Entry(dummy, None), new_rank, add_dummy=False)
+
+                return self, inserted, next_entry, None
+            
+            node = cur.node
+            # node_rank = node.rank  # Cache attribute access
+
+            if isinstance(node.set, KListBase):
+                node.set, _, next_entry, third_entry = node.set.insert_min(insert_entry)
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Inserted {x_entry.item.key} with rank {rank} into KList set: {print_pretty(node.set)}. NextEntry: {next_entry.item.key if next_entry else None}, ThirdEntry: {third_entry.item.key if third_entry else None}")
+            else:
+                digest = x_item.get_digest_for_dim(self.DIM + 1)
+                new_rank = calc_rank_from_digest_k(digest, capacity)
+                node.set, _, next_entry, third_entry = node.set.insert_min(insert_entry, new_rank, add_dummy=True)
+
+            if node.rank == 1:
+                
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Inserted {x_entry.item.key} with rank {rank} into leaf node set: {print_pretty(cur)}")
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Returning self: {print_pretty(self)}")
+                node.right_subtree = None
+                
+                if add_dummy:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Adding dummy to self before returning. Self: {print_pretty(self)}")
+                    # Add current dimension dummy
+                    dummy = get_dummy(self.DIM)
+                    # digest = dummy.get_digest_for_dim(self.DIM)
+                    # new_rank = calc_rank_from_digest_k(digest, capacity)
+                    new_rank = self.node.rank
+                    self, _, next_entry, third_entry = self.insert_min(Entry(dummy, None), new_rank, add_dummy=False)
+
+                logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Final return of self after inserting min {x_entry.item.key}: {print_pretty(self)}")
+                
+                return self, True, next_entry, third_entry
+
+            if next_entry:
+                if next_entry.left_subtree is None:
+                    # TODO: If setting the left subtree here, the next iteration will result in an infinite loop when trying to find the leftmost leaf of the r_leftmost subtree as it # will always be the empty subtree.
+                    next_entry.left_subtree = type(self)(l_factor=self.l_factor)
+                    
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Created new left subtree for next entry {next_entry.item.key}.")
+                    
+                    # We need to create a single leaf node in the next iteration and insert here
+                    # rank = 1
+                
+                r_leftmost_subtree = next_entry.left_subtree
+            else:
+                r_leftmost_subtree = node.right_subtree
+            
+            parent = cur
+            parent_next = next_entry
+            parent_third = third_entry
+            cur = r_leftmost_subtree
+            logger.info(f"[DIM {self.DIM}] [INSERT MIN] Descending to next level with leftmost subtree: {print_pretty(r_leftmost_subtree)} and next entry: {next_entry.item.key if next_entry else None}")
+
+
+            # # Case 1: Found node with matching rank - ready to insert
+            # if node_rank == rank:
+            #     pass
+                
+            # # Case 2: Current rank too small - handle rank mismatch
+            # elif node_rank < rank:
+            #     cur = self._handle_rank_mismatch(cur, parent, p_next_entry, rank, add_dummy=False)
+            #     cur = self.insert_min(cur, x_entry)
+            
+            # if cur.node.rank == 1:
+            #     break
+
+            # # Case 3: Descend to next level
+            # parent = cur
+            # pivot, pivot_next = node.set.find_pivot()
+            # logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Descending to next level with pivot {pivot.item.key if pivot else None} and pivot_next {pivot_next.item.key if pivot_next else None}")
+
+            # if next_entry:
+            #     cur = next_entry.left_subtree
+            # else:
+            #     cur = node.right_subtree
+            # p_next_entry = next_entry
+
+
+
+    def _make_leaf_klist(self, x_entry: Entry, add_dummy: bool = True) -> AbstractSetDataStructure:
         """Builds a KList for a single leaf node containing the dummy and x_item."""
         SetClass = self.SetClass
 
         # start with a fresh empty set of entries
         leaf_set = SetClass()
 
-        # insert the dummy entry, pointing at an empty subtree
-        leaf_set, _, _ = leaf_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
+        if add_dummy:
+            # insert the dummy entry, pointing at an empty subtree
+            leaf_set, _, _ = leaf_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
 
         # now insert the real item, also pointing at an empty subtree
         leaf_set, _, _ = leaf_set.insert_entry(x_entry)
 
         return leaf_set
 
-    def _make_leaf_trees(self, x_entry: Entry) -> Tuple[GKPlusTreeBase, GKPlusTreeBase]:
+    def _make_leaf_trees(self, x_entry: Entry, add_dummy: bool = True) -> Tuple[GKPlusTreeBase, GKPlusTreeBase]:
         """
         Builds two linked leaf-level GKPlusTreeBase nodes for x_item insertion
         and returns the corresponding G+-trees.
@@ -403,6 +628,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_node = NodeK(1, right_set, None)
         right_leaf = TreeK(right_node, self.l_factor)
 
+        if not add_dummy:
+            # If no dummy is needed, return the right leaf only
+            return None, right_leaf
+
         # Build left leaf with dummy entry
         left_set = SetK()
         left_set, _, _ = left_set.insert_entry(Entry(get_dummy(type(self).DIM), None))
@@ -413,30 +642,95 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         left_leaf.node.next = right_leaf
         return left_leaf, right_leaf
 
-    def _insert_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
+    def _insert_empty(self, x_entry: Entry, rank: int, add_dummy: bool = True) -> GKPlusTreeBase:
         """Build the initial tree structure depending on rank."""
         if IS_DEBUG:
             logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
         # Single-level leaf
         inserted = True
         if rank == 1:
-            leaf_set = self._make_leaf_klist(x_entry)
+            leaf_set = self._make_leaf_klist(x_entry, add_dummy)
             self.node = self.NodeClass(rank, leaf_set, None)
             return self, inserted, None
 
         # Higher-level root with two linked leaf children
-        l_leaf_t, r_leaf_t = self._make_leaf_trees(x_entry)
-        root_set, _, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
-        root_set, _, _ = root_set.insert_entry(Entry(_get_replica(x_entry.item), l_leaf_t))
+        l_leaf_t, r_leaf_t = self._make_leaf_trees(x_entry, add_dummy)
+        if add_dummy:
+            root_set, _, _ = self.SetClass().insert_entry(Entry(get_dummy(dim=self.DIM), None))
+            root_set, _, _ = root_set.insert_entry(Entry(_get_replica(x_entry.item), l_leaf_t))
+        else:
+            root_set, _, _ = self.SetClass().insert_entry(Entry(_get_replica(x_entry.item), None))
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted, None
+    
 
-    def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
-        """Optimized version for inserting into a non-empty tree."""
-        if IS_DEBUG:
-            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
-        x_item = x_entry.item
-        x_key = x_item.key
+    # def _descend_create_leftmost_subtree(self, cur: GKPlusTreeBase, x_entry, rank: int) -> GKPlusTreeBase:
+    #     """
+    #     Descend to the next level for insertion of a minimum entry.
+    #     This method is used to navigate through the tree structure to find the
+    #     appropriate node for insertion of a minimum entry.
+
+    #     Args:
+    #         cur (GKPlusTreeBase): The current node in the tree.
+
+    #     Returns:
+    #         GKPlusTreeBase: The next node to descend into.
+    #     """
+    #     node = cur.node
+    #     pivot, pivot_next = node.set.find_pivot()
+
+    #     if pivot is None:
+    #         raise ValueError("No pivot entry found in the current node.")
+        
+    #     if pivot.left_subtree is None:
+    #         pivot.left_subtree = type(self)(l_factor=self.l_factor)
+    #         pivot.left_subtree = self._insert_empty(x_entry, rank, add_dummy=False)
+            
+    #     return pivot.left_subtree
+    
+    
+    def _descend_create_empty_set_leftmost_subtree(self, cur: GKPlusTreeBase) -> GKPlusTreeBase:
+        """
+        Descend to the next level for insertion of a minimum entry.
+        This method is used to navigate through the tree structure to find the
+        appropriate node for insertion of a minimum entry.
+
+        Args:
+            cur (GKPlusTreeBase): The current node in the tree.
+
+        Returns:
+            GKPlusTreeBase: The next node to descend into.
+        """
+        node = cur.node
+
+        # TODO: Check if finding the minimum is better here
+        pivot, pivot_next = node.set.find_pivot()
+        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Pivot found: {pivot.item.key if pivot else None}, next entry: {pivot_next.item.key if pivot_next else None}")
+
+        if pivot is None:
+            raise ValueError("No pivot entry found in the current node.")
+        
+        if pivot.left_subtree is None:
+            logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Pivot left subtree is None. Creating empty left subtree for pivot {pivot.item.key}")
+            pivot.left_subtree = type(self)(l_factor=self.l_factor)
+        
+        logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Descending to left subtree of pivot {pivot.item.key} with next entry {pivot_next.item.key if pivot_next else None}; left subtree: {print_pretty(pivot.left_subtree)}")
+        return pivot.left_subtree, pivot_next
+
+    
+    def _find_insert_node(self, x_entry: Entry, rank: int, for_insert_min: bool = False) -> GKPlusTreeBase:
+        """        Find the node where the entry should be inserted based on its rank.
+        This method is used to navigate through the tree structure to find the
+        appropriate node for insertion.
+
+        Args:
+            x_entry (Entry): The entry to be inserted.
+            rank (int): The rank of the entry's item key.
+
+        Returns:
+            GKPlusTreeBase: The node where the entry should be inserted.
+        """
+        x_key = x_entry.item.key
         
         cur = self
         parent = None
@@ -450,21 +744,38 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Case 1: Found node with matching rank - ready to insert
             if node_rank == rank:
-                return self._insert_new_item(cur, x_entry)
+                if for_insert_min:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Found matching node for {x_key} at rank {rank}")
+                return cur, parent, p_next_entry
 
             # Case 2: Current rank too small - handle rank mismatch
             if node_rank < rank:
-                cur = self._handle_rank_mismatch(cur, parent, p_next_entry, rank)
+                if for_insert_min:
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Current rank {node_rank} < {rank}, handling rank mismatch current node {print_pretty(cur.node.set)}")
+                cur = self._handle_rank_mismatch(cur, parent, p_next_entry, rank, add_dummy=not for_insert_min)
                 continue
 
-            # Case 3: Descend to next level (current rank > rank)
+            # Case 3: Descend to next level
             parent = cur
-            next_entry = node.set.retrieve(x_key)[1]
-            if next_entry:
-                cur = next_entry.left_subtree
+
+            if for_insert_min:
+                cur, next_entry = self._descend_create_empty_set_leftmost_subtree(cur)
+                if cur.is_empty():
+                    logger.debug(f"[DIM {self.DIM}] [INSERT MIN] Descending to next level with empty leftmost subtree for {x_key}")
+                    return cur, parent, next_entry
             else:
-                cur = node.right_subtree
+                next_entry = node.set.retrieve(x_key)[1]
+                cur = next_entry.left_subtree if next_entry else node.right_subtree
+
             p_next_entry = next_entry
+    
+    def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
+        """Optimized version for inserting into a non-empty tree."""
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}")
+            logger.debug(f"[DIM {self.DIM}] Current tree: {print_pretty(self)}")
+        insert_node, _, _ = self._find_insert_node(x_entry, rank)
+        return self._insert_new_item(insert_node, x_entry)
 
     def _handle_rank_mismatch(
         self,
@@ -473,6 +784,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         p_next: Entry,
         rank: int,
         left_parent: Optional[GKPlusTreeBase] = None,
+        add_dummy: bool = True
     ) -> GKPlusTreeBase:
         """
         If the current node's rank < rank, we need to create or unfold a
@@ -492,8 +804,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # create a new root node
             old_node = self.node
-            dummy = get_dummy(dim=TreeClass.DIM)
-            root_set, _, _ = self.SetClass().insert_entry(Entry(dummy, None))
+            if add_dummy:
+                dummy = get_dummy(dim=TreeClass.DIM)
+                root_set, _, _ = self.SetClass().insert_entry(Entry(dummy, None))
+            else:
+                root_set = self.SetClass()
             self.node = self.NodeClass(
                 rank,
                 root_set,
@@ -501,11 +816,14 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             )
             return self
         
-        # Unfold intermediate node between parent and current
-        # Locate the current node’s pivot and place its replica first in the intermediate node.
-        pivot = cur.node.set.find_pivot()[0]
-        pivot_replica = _get_replica(pivot.item)
-        new_set, _, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
+        if add_dummy:
+            # Unfold intermediate node between parent and current
+            # Locate the current node’s pivot and place its replica first in the intermediate node.
+            pivot = cur.node.set.find_pivot()[0]
+            pivot_replica = _get_replica(pivot.item)
+            new_set, _, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
+        else:
+            new_set = self.SetClass()
         new_tree = TreeClass(l_factor=self.l_factor)
         new_tree.node = self.NodeClass(rank, new_set, cur)
 
@@ -554,8 +872,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         left_parent = None
         left_x_entry = None
 
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] [INSERT] Inserting {x_key} into (sub)tree: {print_pretty(cur)}")
+
         while True:
             # Cache node reference and minimize repeated attribute access
+            logger.debug(f"[DIM {self.DIM}] [INSERT] Current node: {print_pretty(cur.node.set if cur else None)}")
             cur._invalidate_tree_size()
             node = cur.node
             
@@ -564,6 +886,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
             # Fast path: First iteration without splitting
             if right_parent is None:
+                # logger.debug(f"[DIM {self.DIM}] [INSERT] First iteration for {x_key} in tree node: {print_pretty(cur.node.set)}")
                 is_gkplus_type = isinstance(node.set, GKPlusTreeBase)
                 insert_entry = x_entry if is_leaf else Entry(replica, None)
                 if not is_gkplus_type:
@@ -601,25 +924,38 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 cur = subtree
                 continue
 
+            logger.debug(f"[DIM {self.DIM}] [INSERT] Subsequent iteration for {x_key} in tree node: {print_pretty(cur)}")
+
             # Perform split operation and immediately cache converted results
-            left_split, _, right_split, next_entry = node.set.split_inplace(x_key)
+            
+            if isinstance(node.set, KListBase):
+                left_split, _, right_split, next_entry = node.set.split_inplace(x_key)
+            else:
+                left_split, _, right_split, next_entry = node.set.unzip(x_key)
             left_split = check_and_convert_set(left_split)
+
+            logger.debug(f"[DIM {self.DIM}] [INSERT] Left split: {print_pretty(left_split)}")
+            logger.debug(f"[DIM {self.DIM}] [INSERT] Right split: {print_pretty(right_split)}")
             
             # Cache item counts early to avoid repeated method calls in conditionals
             right_item_count = right_split.item_count() # invalidate size after insertion
             left_item_count = left_split.item_count()
             
-            # Handle right side creation - inline optimization for performance
+            # Handle right side creation
             new_tree = None
             if right_item_count > 0 or is_leaf:
                 insert_entry = x_entry if is_leaf else Entry(replica, None)
                 if isinstance(right_split, GKPlusTreeBase):
+                    logger.debug(f"[DIM {self.DIM}] [INSERT] Calculating rank for x_item in right split of Dimension {self.DIM + 1}")
                     digest = x_item.get_digest_for_dim(self.DIM + 1)
                     new_rank = calc_rank_from_digest_k(digest, capacity)
-                    right_split, _, _ = right_split.insert_entry(insert_entry, rank=new_rank)
+                    logger.debug(f"[DIM {self.DIM}] [INSERT] Inserting {insert_entry.item.key} into right split with rank {new_rank}")
+                    right_split, _, _, _ = right_split.insert_min(insert_entry, rank=new_rank)
                     right_split._invalidate_tree_size()
                 else:
-                    right_split, _, _ = right_split.insert_entry(insert_entry)
+                    right_split, _, _, _ = right_split.insert_min(insert_entry)
+
+                logger.debug(f"[DIM {self.DIM}] [INSERT] Right split after insert_min: {print_pretty(right_split)}")
 
                 # Create new tree node
                 right_split = check_and_convert_set(right_split)
