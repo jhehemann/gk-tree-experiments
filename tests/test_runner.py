@@ -33,8 +33,8 @@ TEST_FILES = [
     'test_rank_hash_consistency.py',
     'test_utility_functions.py',
 
-    # 'test_gk_plus_zip.py',
-    # 'test_gk_plus_unzip.py',
+    'test_gk_plus_zip.py',
+    'test_gk_plus_unzip.py',
 
     # 'test_stats_gpltree.py',
     # 'test_gk_plus_tree.py',

@@ -187,6 +187,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         """Test size is correctly maintained in a larger tree with random insertions"""
         # TODO: Test with k=2 when all other tests are passing (Currently k=2 is not working due to recursion depth issues)
         tree = self.tree_k4
+        
         # self.print_hash_info(key=15, k=2, num_levels=3)
         # exit()
         # Generate 1000 unique random keys between 1 and 1000000
@@ -218,6 +219,7 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         seeds = list(range(100))
         for seed in seeds:
             with self.subTest(seed=seed):
+                logger.debug(f"Testing large tree size with seed {seed}")
                 tree = create_gkplus_tree(K=4)
                 random.seed(seed)  # For reproducibility
                 unique_keys = random.sample(range(1, 100), 6)
