@@ -1090,9 +1090,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 r_pivot.left_subtree = new_left
         else:
             # Leaf node case
-            logger.debug(f"[DIM {self.DIM}] Linking leafs. ")
-            logger.debug(f"[DIM {self.DIM}] Left leaf {print_pretty(self)}")
-            logger.debug(f"[DIM {self.DIM}] Right leaf {print_pretty(other.node.right_subtree)}")
+            logger.debug(f"[DIM {self.DIM}] Linking leaf to be zipped into with other's next. ")
+            logger.debug(f"[DIM {self.DIM}] Leaf to be zipped into: {print_pretty(self)}")
+            logger.debug(f"[DIM {self.DIM}] Linked leaf: {print_pretty(other.node.next)}")
             self.node.next = other.node.next
 
         return None  # Signal to continue processing
@@ -1164,15 +1164,20 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 r_pivot.left_subtree._invalidate_tree_size()
                 other._invalidate_tree_size()
             else:
-                logger.debug(f"[DIM {self.DIM}] No left subtree found for r_pivot {r_pivot.item.key if r_pivot else None}, using left tree as its left subtree")
+                logger.debug(f"[DIM {self.DIM}] No left subtree found for r_pivot {r_pivot.item.key if r_pivot else None}, using self as its left subtree")
+                
+                logger.debug(f"[DIM {self.DIM}] Left tree is a leaf {print_pretty(left)}, finding other min leaf tree to link it")
+                other_min_leaf_tree = other.get_min_leaf_tree()
+                logger.debug(f"[DIM {self.DIM}] Found other min leaf tree set: {print_pretty(other_min_leaf_tree.node.set)}")
                 if left.node.rank == 1:
-                    logger.debug(f"[DIM {self.DIM}] Left tree is a leaf {print_pretty(left)}, finding other min leaf tree to link it")
-                    other_min_leaf_tree = other.get_min_leaf_tree()
-                    logger.debug(f"[DIM {self.DIM}] Found other min leaf tree set: {print_pretty(other_min_leaf_tree.node.set)}")
                     left.node.next = other_min_leaf_tree
 
+                else:
+                    max_left_leaf = left.get_max_leaf()
+                    max_left_leaf.next = other_min_leaf_tree
+
                 r_pivot.left_subtree = left
-                logger.debug(f"[DIM {self.DIM}] Set r_pivot {r_pivot.item.key}'s left_subtree to left tree: {print_pretty(left)}")
+                logger.debug(f"[DIM {self.DIM}] Set r_pivot {r_pivot.item.key}'s left_subtree to self: {print_pretty(left)}")
                 other._invalidate_tree_size()
 
             # Insert replica of left pivot into other's set
@@ -1198,7 +1203,6 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             
             return other
         
-        # Case 2: Self rank > other rank - recursively zip into right subtree
         # Case 2: Self rank > other rank - recursively zip into right subtree
         elif self.node.rank > other.node.rank:
             new_right = self.node.right_subtree.zip(other, is_root=False)

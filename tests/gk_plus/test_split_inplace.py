@@ -142,7 +142,8 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
         msg_head = (
             f"\n\nKey-Rank combo:\n"
             f"K: {keys}\n"
-            f"R: {rank_combo}"
+            f"R: {rank_combo}\n"
+            f"Split key: {split_key}\n"
             # f"\n\nTREE BEFORE SPLIT: {print_pretty(tree)}\n"
         )
 
@@ -806,6 +807,22 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
                     gnode_capacity=8, l_factor=1.0
                 )
 
+    def test_split_abcdefghijklmnop(self):
+        keys  =  [414, 123, 965, 912, 584]
+        # keys  =  [12, 13, 15, 16, 14]
+        ranks =  [1, 1, 1, 1, 3]
+        split_cases = [("split at key 11", 11)]
+        for case_name, split_key in split_cases:
+            exp_left = [k for k in keys if k < split_key]
+            exp_right = [k for k in keys if k > split_key]
+            with self.subTest(case=case_name, split_key=split_key):
+                self._run_split_case_multi_dim(
+                    keys, ranks,
+                    split_key, exp_left,
+                    exp_right, case_name,
+                    gnode_capacity=4, l_factor=1.0
+                )
+
     # # Uncomment to run exhaustive tests of all rank combinations and split keys.
     # def test_all_rank_combinations_specific_keys(self):
     #     """
@@ -894,8 +911,11 @@ class TestGKPlusSplitInplace(GKPlusTreeTestCase):
     # def test_rank_combinations_random_keys_and_split_points(self):
     #     """Test splitting with randomly generated items and keys for multiple split points."""
     #     k = 4
-    #     num_items = 50
+    #     num_items = 5
     #     repetitions = 100  # Number of subtests with different random seeds/split keys
+
+    #     seed = 42
+    #     random.seed(seed)
 
     #     for i in tqdm(range(repetitions), desc="Split with random items", unit="trial"):
     #         with self.subTest(run=i):
