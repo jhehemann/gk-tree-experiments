@@ -77,7 +77,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         """Benchmark sequential insertion of adversarial keys."""
         tree = self.tree_class(l_factor=l_factor)
         for item, rank in zip(self.items, self.ranks):
-            tree, _ = tree.insert(item, rank)
+            tree, _, _ = tree.insert(item, rank)
 
 
 class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):

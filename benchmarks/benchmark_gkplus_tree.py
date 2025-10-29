@@ -58,7 +58,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         tree = self.tree_class(l_factor=l_factor)
         
         for entry, rank in zip(self.entries, self.ranks):
-            tree, _ = tree.insert_entry(entry, rank)
+            tree, _, _ = tree.insert_entry(entry, rank)
 
 
 class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
@@ -165,5 +165,5 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         """Measure peak memory during tree construction."""
         tree = self.tree_class(l_factor=l_factor)
         for entry, rank in zip(self.entries, self.ranks):
-            tree, _ = tree.insert_entry(entry, rank)
+            tree, _, _ = tree.insert_entry(entry, rank)
         return tree
