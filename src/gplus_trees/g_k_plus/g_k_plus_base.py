@@ -619,7 +619,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if not inserted:
                         return self.update(cur, x_entry)
                     if IS_DEBUG:
-                        logger.debug(f"[DIM {self.DIM}] Inserted {x_item.key} into node set at rank {node.rank}: {print_pretty(node.set)}")
+                        logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into node set at rank {node.rank}: {print_pretty(node.set)}")
                     node.set = check_and_convert_set(node.set) # only KLists can be extended
                 else:
                     digest = x_item.get_digest_for_dim(self.DIM + 1)
@@ -629,7 +629,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if not inserted:
                         return self.update(cur, x_entry)
                     if IS_DEBUG:
-                        logger.debug(f"[DIM {self.DIM}] Inserted {x_item.key} into node set at rank {node.rank}: {print_pretty(node.set)}")
+                        logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into node set at rank {node.rank}: {print_pretty(node.set)}")
 
                 subtree = next_entry.left_subtree if next_entry else node.right_subtree
                 insert_entry.left_subtree = subtree if not is_leaf else insert_entry.left_subtree
@@ -682,13 +682,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if isinstance(right_split, GKPlusTreeBase):
                     digest = x_item.get_digest_for_dim(self.DIM + 1)
                     new_rank = calc_rank_from_digest_k(digest, capacity)
-                    tree_insert = bulk_create_gkplus_tree([x_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass)
+                    tree_insert = bulk_create_gkplus_tree([insert_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass)
 
                     
                     right_split = tree_insert.zip(right_split)
                     # right_split, _, _ = right_split.insert_entry(insert_entry, rank=new_rank)
                     if IS_DEBUG:
-                        logger.debug(f"[DIM {self.DIM}] Inserted {x_item.key} into right split with rank {new_rank} item count {right_split.item_count()} and real_item_count {right_split.real_item_count()}: {print_pretty(right_split)}")
+                        logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into right split with rank {new_rank} item count {right_split.item_count()} and real_item_count {right_split.real_item_count()}: {print_pretty(right_split)}")
                     right_split._invalidate_tree_size()
                 else:
                     right_split, _, _ = right_split.insert_entry(insert_entry)
