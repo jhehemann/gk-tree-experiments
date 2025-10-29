@@ -6,4 +6,5 @@ A history-independent tree data structure for $O(\log n)$ tree operations with h
 Example command for running statistics:
 ```bash
 python stats/stats_gk_plus_tree.py --sizes 10000 --ks 4 --repetitions 1 --l_factor 1.0 --seed 42
+python stats/stats_gplus_tree.py --sizes 10000 --ks 4 --repetitions 1 --seed 42
 ```
