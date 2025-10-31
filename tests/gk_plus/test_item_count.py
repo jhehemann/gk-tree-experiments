@@ -288,67 +288,67 @@ class TestGKPlusTreeItemCountTracking(GKPlusTreeTestCase):
         # Verify subtree sizes are consistent
         self.assertTrue(self.verify_subtree_sizes(tree))
 
-    def test_split_tree(self):
-        """Test that size is correctly maintained after splitting a tree"""
-        k = 4
-        tree = create_gkplus_tree(K=k)
-        rank_lists = [
-            [2, 3, 2, 1, 3],  # Dimension 1
-            [1, 2, 3, 4, 2],  # Dimension 2
-        ]
-        keys = self.find_keys_for_rank_lists(rank_lists, k=k)
-        item_map = { k: self.make_item(k) for k in keys}
-        for idx, item in enumerate(item_map.values()):
-            rank = rank_lists[0][idx]
-            tree, _, _ = tree.insert(item, rank=rank)
+    # def test_split_tree(self):
+    #     """Test that size is correctly maintained after splitting a tree"""
+    #     k = 4
+    #     tree = create_gkplus_tree(K=k)
+    #     rank_lists = [
+    #         [2, 3, 2, 1, 3],  # Dimension 1
+    #         [1, 2, 3, 4, 2],  # Dimension 2
+    #     ]
+    #     keys = self.find_keys_for_rank_lists(rank_lists, k=k)
+    #     item_map = { k: self.make_item(k) for k in keys}
+    #     for idx, item in enumerate(item_map.values()):
+    #         rank = rank_lists[0][idx]
+    #         tree, _, _ = tree.insert(item, rank=rank)
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
-        with self.subTest("First split at 337"):
-            left1, _, right1, next_entry = tree.split_inplace(337)
-            self.assertIsNone(left1.item_cnt, 
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(left1.item_count(), 3,
-                                "Item count should be 3 after inserting three items (1 dummy + 3 items)")
-            self.assertEqual(left1.item_cnt, 3,
-                            "item_cnt should be 3 after item_count() is called")
+    #     if logger.isEnabledFor(logging.DEBUG):
+    #         logger.debug(f"Initial tree before splits: {print_pretty(tree)}")
+    #     with self.subTest("First split at 337"):
+    #         left1, _, right1, next_entry = tree.split_inplace(337)
+    #         self.assertIsNone(left1.item_cnt, 
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(left1.item_count(), 3,
+    #                             "Item count should be 3 after inserting three items (1 dummy + 3 items)")
+    #         self.assertEqual(left1.item_cnt, 3,
+    #                         "item_cnt should be 3 after item_count() is called")
             
-            self.assertIsNone(right1.item_cnt, 
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(right1.item_count(), 4,
-                                "Item count should be 4 after inserting three items (1 dummy + 3 items)")
-            self.assertEqual(right1.item_cnt, 4,
-                            "item_cnt should be 4 after item_count() is called") 
-        with self.subTest("Second split at 148 on left part"):
-            # Second split on the left part
-            left2, middle2, right2, next_entry = left1.split_inplace(148)
-            self.assertIsNone(left2.item_cnt,
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(left2.item_count(), 2,
-                                "Item count should be 2 after inserting two items (1 dummy + 1 item)")
-            self.assertEqual(left2.item_cnt, 2,
-                            "item_cnt should be 2 after item_count() is called")
-            self.assertIsNone(right2.item_cnt,
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(right2.item_count(), 2,
-                                "Item count should be 2 after inserting two items (1 dummy + 1 item)")
-            self.assertEqual(right2.item_cnt, 2,
-                            "item_cnt should be 2 after item_count() is called")
+    #         self.assertIsNone(right1.item_cnt, 
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(right1.item_count(), 4,
+    #                             "Item count should be 4 after inserting three items (1 dummy + 3 items)")
+    #         self.assertEqual(right1.item_cnt, 4,
+    #                         "item_cnt should be 4 after item_count() is called") 
+    #     with self.subTest("Second split at 148 on left part"):
+    #         # Second split on the left part
+    #         left2, middle2, right2, next_entry = left1.split_inplace(148)
+    #         self.assertIsNone(left2.item_cnt,
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(left2.item_count(), 2,
+    #                             "Item count should be 2 after inserting two items (1 dummy + 1 item)")
+    #         self.assertEqual(left2.item_cnt, 2,
+    #                         "item_cnt should be 2 after item_count() is called")
+    #         self.assertIsNone(right2.item_cnt,
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(right2.item_count(), 2,
+    #                             "Item count should be 2 after inserting two items (1 dummy + 1 item)")
+    #         self.assertEqual(right2.item_cnt, 2,
+    #                         "item_cnt should be 2 after item_count() is called")
 
-        with self.subTest("Third split at 450 on right part"):
-            left3, _, right3, next_entry = right1.split_inplace(450)
-            self.assertIsNone(left3.item_cnt,
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(left3.item_count(), 3,
-                                "Item count should be 3 after inserting three items (1 dummy + 2 items)")
-            self.assertEqual(left3.item_cnt, 3,
-                            "item_cnt should be 3 after item_count() is called")
-            self.assertIsNone(right3.item_cnt,
-                          "item_cnt should be None before triggering item_count()")
-            self.assertEqual(right3.item_count(), 2,
-                                "Item count should be 2 after inserting two items (1 dummy + 1 item)")
-            self.assertEqual(right3.item_cnt, 2,
-                            "item_cnt should be 2 after item_count() is called")
+    #     with self.subTest("Third split at 450 on right part"):
+    #         left3, _, right3, next_entry = right1.split_inplace(450)
+    #         self.assertIsNone(left3.item_cnt,
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(left3.item_count(), 3,
+    #                             "Item count should be 3 after inserting three items (1 dummy + 2 items)")
+    #         self.assertEqual(left3.item_cnt, 3,
+    #                         "item_cnt should be 3 after item_count() is called")
+    #         self.assertIsNone(right3.item_cnt,
+    #                       "item_cnt should be None before triggering item_count()")
+    #         self.assertEqual(right3.item_count(), 2,
+    #                             "Item count should be 2 after inserting two items (1 dummy + 1 item)")
+    #         self.assertEqual(right3.item_cnt, 2,
+    #                         "item_cnt should be 2 after item_count() is called")
             
 
     

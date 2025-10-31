@@ -25,7 +25,6 @@ TEST_FILES = [
     'gk_plus/test_insert.py',
     'gk_plus/test_item_count.py',
     'gk_plus/test_set_conversion.py',
-    'gk_plus/test_split_inplace.py',
 
     'test_gp_mkl_tree.py',
     'test_insert_result.py',
@@ -38,6 +37,8 @@ TEST_FILES = [
 
     # 'test_stats_gpltree.py',
     # 'test_gk_plus_tree.py',
+
+    # 'gk_plus/test_split_inplace.py',
 ]
 
 

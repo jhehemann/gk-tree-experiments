@@ -170,7 +170,7 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
                 # If no next entry found in current node, check linked leaf nodes
                 if next_entry is None and node.next is not None:
-                    # Find the next entry (no dummy) in the linked leaf list
+                    # Find the next entry > key in the next leaf node
                     next_node = node.next.node
                     for entry in next_node.set:
                         if entry.item.key > key:
@@ -180,6 +180,10 @@ class GPlusTreeBase(AbstractSetDataStructure):
                 return found_entry, next_entry
 
             cur = next_entry.left_subtree if next_entry else node.right_subtree
+            # if next_entry and next_entry.left_subtree is not None:
+            #     cur = next_entry.left_subtree
+            # else:
+            #     cur = cur.node.right_subtree
     
     def delete(self, item):
         raise NotImplementedError("delete not implemented yet")

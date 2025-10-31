@@ -303,7 +303,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if self.is_empty():
             return None, None
 
-        dummy_pivot = get_dummy(self.DIM - 1).key
+        dummy = get_dummy(self.DIM - 1).key
 
         pivot = None
         current = None
@@ -312,7 +312,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if pivot is not None:
                 break
             else:
-                if entry.item.key == dummy_pivot or entry.item.key > dummy_pivot:
+                if entry.item.key == dummy or entry.item.key > dummy:
                     pivot = entry
 
         if pivot is None:
@@ -524,6 +524,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         
         # Unfold intermediate node between parent and current
         # Locate the current node’s pivot and place its replica first in the intermediate node.
+        # logger.info(f"[DIM {self.DIM}] Find Pivot for rank mismatch handling.")
         pivot = cur.node.set.find_pivot()[0]
         pivot_replica = _get_replica(pivot.item)
         new_set, _, _ = self.SetClass().insert_entry(Entry(pivot_replica, None))
@@ -640,6 +641,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     self._invalidate_tree_size()
                     # Check for next entry in the next leaf if it exists and no next entry was found
                     if next_entry is None and node.next is not None:
+                        # logger.info(f"[DIM {self.DIM}] Find Pivot for next entry in the next leaf during _insert_new_item.")
                         next_entry = node.next.find_pivot()[0]
                     return self, True, next_entry
                 
@@ -738,11 +740,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 next_cur = cur.node.right_subtree
             else:
                 # Collapse single-item nodes for non-leaves
-                if next_entry:
-                    new_subtree = next_entry.left_subtree
-                else:
-                    new_subtree = cur.node.right_subtree
-
+                new_subtree = (
+                    next_entry.left_subtree if next_entry is not None else cur.node.right_subtree
+                )
 
                 # Update parent reference efficiently
                 if left_x_entry is not None:
@@ -777,255 +777,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # Continue to next iteration with updated current node
             cur = next_cur
 
-    def split_inplace(self, key: int
-                      ) -> Tuple['GKPlusTreeBase',
-                                 Optional['GKPlusTreeBase'],
-                                 'GKPlusTreeBase']:
-        """
-        Split the tree into two parts around the given key.
 
-        Args:
-            key: The key value to split at
-
-        Returns:
-            A tuple of (left_return, key_subtree, right_return) where:
-            - left_return: A tree containing all entries with keys < key
-            - key_subtree: If key exists, its associated left subtree; else None
-            - right_return: A tree with entries with keys ≥ key (except key itself)
-        """
-
-        if not isinstance(key, int):
-            raise TypeError(f"key must be int, got {type(key).__name__!r}")
-
-        # Cache frequently used attributes and classes for better performance
-        TreeClass = type(self)
-        NodeClass = TreeClass.NodeClass
-        cached_l_factor = self.l_factor
-        dummy = get_dummy(dim=TreeClass.DIM)
-        check_and_convert_set = self.check_and_convert_set
-        KListNodeCapacity = self.KListClass.KListNodeClass.CAPACITY
-        tree_dim_plus_one = self.DIM + 1
-        
-        # Cache dummy properties for repeated use
-        dummy_key = dummy.key
-
-        # Case 1: Empty tree - return None left, right and key's subtree
-        if self.is_empty():
-            return self, None, TreeClass(l_factor=cached_l_factor), None
-
-        # Initialize left and right return trees
-        left_return = self
-        right_return = TreeClass(l_factor=cached_l_factor)
-
-        # Parent tracking variables
-        right_parent = None    # Parent node for right-side updates
-        right_entry = None     # Entry in right parent points to current subtree
-        left_parent = None     # Parent node for left-side updates
-        seen_key_subtree = None  # Cache last seen left_parents left subtree
-        cur = left_return
-        key_node_found = False
-
-        # logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] tree before split: {print_pretty(self)}")
-
-        while True:
-            # Cache node reference and minimize repeated attribute access
-            node = cur.node
-            cur._invalidate_tree_size()
-            node_rank = node.rank
-            is_leaf = node_rank == 1
-
-            # Split node at key - cache results immediately
-            left_split, key_subtree, right_split, next_entry = node.set.split_inplace(key)
-            left_split = check_and_convert_set(left_split)
-
-            # Cache item counts and next entry
-            l_count = left_split.item_count()
-            r_count = right_split.item_count()
-
-            # --- Handle right side of the split ---
-            # Determine if we need a new tree for the right split
-            if r_count > 0:  # incl. dummy items
-                # Cache type check to avoid repeated isinstance calls
-                is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
-                
-                if is_gkplus_type:
-                    # Calculate the new rank for the item in the next dimension - use cached values
-                    digest = dummy.get_digest_for_dim(tree_dim_plus_one)
-                    new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
-                    right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
-                    right_split._invalidate_tree_size()
-                    # TODO: Check why we need to invalidate size and why it is not done in insert_entry. Check it also for insert_entry()
-                else:
-                    right_split, _, _ = right_split.insert_entry(Entry(dummy, None))
-                right_split = check_and_convert_set(right_split)
-
-                # Cache node references for performance
-                right_node = NodeClass(node_rank, right_split, node.right_subtree)
-
-                if right_parent is None:
-                    # Create a root node for right return tree
-                    right_return.node = right_node
-                    new_tree = right_return
-                else:
-                    new_tree = TreeClass(l_factor=cached_l_factor)
-                    new_tree.node = right_node
-
-                    # Update parent reference
-                    if right_entry is not None:
-                        right_entry.left_subtree = new_tree
-                    else:
-                        right_parent.node.right_subtree = new_tree
-
-                if is_leaf:
-                    # Prepare for updating 'next' pointers
-                    new_tree.node.next = node.next
-
-                # Prepare references for next iteration
-                next_right_entry = next_entry
-                next_cur = (
-                    next_entry.left_subtree
-                    if next_entry else new_tree.node.right_subtree
-                )
-                next_right_parent = new_tree
-            else:
-                if is_leaf and right_parent:
-                    # Cache type check result - reuse from above if possible
-                    is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
-
-                    # Create a leaf with a single dummy item
-                    if is_gkplus_type:
-                        # Calculate new rank for item in the next dimension - use cached values
-                        digest = dummy.get_digest_for_dim(tree_dim_plus_one)
-                        new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
-                        right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
-                        right_split._invalidate_tree_size()
-                    else:
-                        right_split, _, _ = right_split.insert_entry(Entry(dummy, None))
-
-                    right_split = check_and_convert_set(right_split)
-                    right_node = NodeClass(1, right_split, None)
-                    new_tree = TreeClass(l_factor=cached_l_factor)
-                    new_tree.node = right_node
-
-                    # Update parent reference
-                    if right_entry is not None:
-                        right_entry.left_subtree = new_tree
-                    else:
-                        right_parent.node.right_subtree = new_tree
-
-                    # Link leaf nodes
-                    new_tree.node.next = node.next
-                    next_right_parent = new_tree
-                else:
-                    next_right_parent = right_parent
-                    next_cur = (
-                        next_entry.left_subtree
-                        if next_entry else node.right_subtree
-                    )
-            
-                next_right_entry = right_entry
-            
-            # Update right parent variables for next iteration
-            right_parent = next_right_parent
-            right_entry = next_right_entry
-
-            # --- Handle left side of the split ---
-            # Determine if we need to create/update using left split
-            if l_count > 1:  # incl. dummy items
-                # Update current node to use left split
-                node.set = left_split
-                cur._invalidate_tree_size()
-
-                if left_parent is None:
-                    # Reuse left split as the root node for the left return tree
-                    left_return.node = cur.node
-
-                if is_leaf:
-                    # Prepare for updating 'next' pointers
-                    # do not rearrange subtrees at leaf level
-                    # TODO: check if the right subtree can be set to None here, so we don't need to 
-                    # do this later
-                    l_last_leaf = node
-                elif key_subtree:
-                    # Highest node containing split key found
-                    # All entries in its left subtree are less than key and
-                    # are part of the left return tree
-                    seen_key_subtree = key_subtree
-                    node.right_subtree = key_subtree
-                elif next_entry:
-                    node.right_subtree = next_entry.left_subtree
-
-                # Check if we need to update the left parent reference - optimized
-                next_left_parent = left_parent if key_node_found else cur
-            else:
-                if is_leaf:
-                    if left_parent or seen_key_subtree:
-                        # Prepare unlinking leaf nodes and determine left return if needed
-                        if l_count == 0:
-                            # find the preceeding leaf node
-                            if left_parent:
-                                l_last_leaf = left_parent.get_max_leaf()
-                            else:
-                                # no left parent, so seen_key_subtree is the left return tree
-                                left_return.node = seen_key_subtree.node
-                                if left_return.item_count() == 1:
-                                    # Only the dummy item in left return
-                                    left_return.node = None
-                                    l_last_leaf = None
-                                else:
-                                    # At least one non-dummy item in left return
-                                    l_last_leaf = seen_key_subtree.get_max_leaf()
-                                left_return._invalidate_tree_size()
-                        else:
-                            node.set = left_split
-                            l_last_leaf = node
-                    else:
-                        # No non-dummy entry in left tree
-                        self.node = None
-                        l_last_leaf = None
-                        
-                    next_left_parent = left_parent
-                else:
-                    # Determine new subtree efficiently
-                    if key_subtree is not None:
-                        # Highest node containing split key found
-                        # All entries in its left subtree are less than key and
-                        # are part of the left return tree
-                        new_subtree = key_subtree
-                        seen_key_subtree = key_subtree
-                    else:
-                        # There must be a next entry, since nodes have at least two entries. 
-                        # l_count <= 1 and we have not found the split key (not key_subtree)
-                        new_subtree = next_entry.left_subtree
-
-                    if left_parent and not key_node_found:
-                        left_parent.node.right_subtree = new_subtree
-                        
-                    next_left_parent = left_parent
-
-            left_parent = next_left_parent
-
-            # Main return logic
-            if is_leaf:
-                if next_entry is None and not right_return.is_empty():
-                    pivot, pivot_next = right_return.find_pivot()
-                    if pivot and pivot.item.key > dummy_key:
-                        next_entry = pivot
-                    else:
-                        next_entry = pivot_next
-
-                if l_last_leaf: # unlink leaf nodes
-                    l_last_leaf.next = None
-                return_subtree = key_subtree
-                return self, return_subtree, right_return, next_entry
-
-            if key_subtree:
-                # Do not update left parent reference from this point on
-                key_node_found = True
-
-            # Continue to next iteration with updated current node
-            cur = next_cur
-        
     def _create_dummy_singleton_tree(self, rank: int, dim: int, l_factor: float, KListClass) -> 'GKPlusTreeBase':
         """
         Create a dummy singleton tree with a single entry containing the dummy item.
@@ -1065,9 +817,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         Helper method to handle the common logic for zipping sets when trees have the same rank.
         Consolidates repeated code for finding pivots, handling subtrees, and linking nodes.
         """
-        r_pivot, r_pivot_next = other.node.set.find_pivot()
+        r_pivot = other.node.set.find_pivot()[0]
         if IS_DEBUG:
-            logger.debug(f"[DIM {self.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}, r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}")
+            logger.debug(f"[DIM {self.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}.")
 
         if not r_pivot:
             # This can only happen in leaf nodes where dummy entries may be the only entries
@@ -1175,13 +927,15 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             if is_root:
                 is_root = False  # Mark that we're no longer at root level
 
-            r_pivot, r_pivot_next = other.node.set.find_pivot()
+            # logger.info(f"[DIM {self.DIM}] Find Pivot for right tree into which other is being zipped.")
+            r_pivot= other.node.set.find_pivot()[0]
             if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}, r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}")
+                logger.debug(f"[DIM {self.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}")
 
-            l_pivot, l_pivot_next = left.node.set.find_pivot()
+            # logger.info(f"[DIM {self.DIM}] Find Pivot for left tree to be zipped into other.")
+            l_pivot = left.node.set.find_pivot()[0]
             if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Found l_pivot: {l_pivot.item.key if l_pivot else None}, l_pivot_next: {l_pivot_next.item.key if l_pivot_next else None}")
+                logger.debug(f"[DIM {self.DIM}] Found l_pivot: {l_pivot.item.key if l_pivot else None}")
 
             # Handle r_pivot's left subtree
             if r_pivot and r_pivot.left_subtree:
@@ -1318,17 +1072,18 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     self.node.next = other.node.next
             
             self.node.right_subtree = other.node.right_subtree
-            logger.debug(f"[DIM {self.DIM}] Merged Sets sitting at root of tree: {print_pretty(self)}")
-            logger.debug(f"[DIM {self.DIM}] root node next: {print_pretty(self.node.next)}")
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Merged Sets sitting at root of tree: {print_pretty(self)}")
+                logger.debug(f"[DIM {self.DIM}] root node next: {print_pretty(self.node.next)}")
 
             left._invalidate_tree_size()
             self._invalidate_tree_size()
-            
-            if self_is_klist and other_is_klist:
-                
-                logger.debug(f"[DIM {self.DIM}] Zipped KLists: {print_pretty(self)}")
-            else:
-                logger.debug(f"[DIM {self.DIM}] Zipped GKPlusTreeBase sets: {print_pretty(self)}")
+
+            if IS_DEBUG:
+                if self_is_klist and other_is_klist:
+                    logger.debug(f"[DIM {self.DIM}] Zipped KLists: {print_pretty(self)}")
+                else:
+                    logger.debug(f"[DIM {self.DIM}] Zipped GKPlusTreeBase sets: {print_pretty(self)}")
             
             return self
 
@@ -1352,6 +1107,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if self.is_empty():
             TreeClass = type(self)
             return self, None, TreeClass(l_factor=self.l_factor), None
+        
+        if key < get_dummy(self.DIM).key:
+            raise ValueError(f"Cannot unzip at key {key} less than dimension dummy key {get_dummy(self.DIM).key}")
 
         node = self.node
         rank = node.rank
@@ -1400,6 +1158,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         """Retrieve the next entry in the tree after the given key."""
         pivot, pivot_next = self.find_pivot()
         dummy_key = get_dummy(self.DIM).key
+        # logger.info(f"[DIM {self.DIM}] Find Pivot for key {key} to retrieve next entry. Pivot: {pivot.item.key if pivot else None}, Next: {pivot_next.item.key if pivot_next else None}")
         logger.debug(f"[DIM {self.DIM}] Retrieving next entry after key {key} - Pivot: {pivot.item.key if pivot else None}, Next: {pivot_next.item.key if pivot_next else None}")
         
         if pivot and pivot.item.key > dummy_key:
@@ -1416,37 +1175,53 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         if left_set.is_empty():
             # Return right subtree directly
             right_return = self.lift(right_set, None, 1)
-            logger.debug(f"[DIM {self.DIM}] Left is empty, Right: {print_pretty(right_return)}")
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Left is empty, Right: {print_pretty(right_return)}")
             if not right_return.is_empty():
-                logger.debug(f"[DIM {self.DIM}] Right return has items, setting next to left next: {print_pretty(left_next)}")
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Right return has items, setting next to left next: {print_pretty(left_next)}")
                 right_return.node.next = left_next
-                logger.debug(f"[DIM {self.DIM}] Finding next entry in right return.")
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Finding next entry in right return.")
                 # check adding condition: Only search for next entry if it is not klist?
                 # check adding condition: Only search for next entry if it has value==None?
-                next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
-            else:
-                logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
-                next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
-                logger.debug(f"[DIM {self.DIM}] Found next entry in left next: key={next_entry.item.key if next_entry else None}, value={next_entry.item.value if next_entry else None}")
                 
-            logger.debug(f"[DIM {self.DIM}] Set left node to None (empty)")
+                if next_entry is None:
+                    next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
+            else:
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
+                
+                if next_entry is None:
+                    next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
+                
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Found next entry in left next: key={next_entry.item.key if next_entry else None}, value={next_entry.item.value if next_entry else None}")
+                
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Set left node to None (empty)")
             self.node = None
             return self, left_subtree_of_key, right_return, next_entry
         
-        logger.debug(f"[DIM {self.DIM}] Left set has items, processing further")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Left set has items, processing further")
         right_return = self.lift(right_set, None, 1)
         if not right_return.is_empty():
-            logger.debug(f"[DIM {self.DIM}] Right has items, finding next entry in it: {print_pretty(right_return)}")
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Right has items, finding next entry in it: {print_pretty(right_return)}")
             right_return.node.next = left_next
-            next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
+            if next_entry is None:
+                next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
         else:
-            logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
-            next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
-        
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
+            if next_entry is None:
+                next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
         
         self.node.set = left_set
-        logger.debug(f"[DIM {self.DIM}] Set left (self) node with left set: {print_pretty(left_set)}")
-        logger.debug(f"[DIM {self.DIM}] Unlinking leaf nodes: Set self.node.next to None")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Set left (self) node with left set: {print_pretty(left_set)}")
+            logger.debug(f"[DIM {self.DIM}] Unlinking leaf nodes: Set self.node.next to None")
         self.node.next = None
         
         if IS_DEBUG:
@@ -1504,9 +1279,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         right_return = None
         
         if next_entry:
-            logger.debug(f"[DIM {self.DIM}] Next entry found: key={next_entry.item.key}, value={next_entry.item.value}")
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] Next entry found: key={next_entry.item.key}, value={next_entry.item.value}")
             if next_entry.left_subtree:
-                logger.debug(f"[DIM {self.DIM}] Next entry has left subtree, unzipping it: {print_pretty(next_entry.left_subtree)}")
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Next entry has left subtree, unzipping it: {print_pretty(next_entry.left_subtree)}")
                 # Unzip the next entry's left subtree
                 l_right_subtree, key_subtree, r_leftmost_subtree, new_next = next_entry.left_subtree.unzip(key)
                 
@@ -1541,7 +1318,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 self.node.next = None
         else:
             # No next entry - unzip right subtree directly
-            logger.debug(f"[DIM {self.DIM}] No next entry, unzipping right subtree: {print_pretty(right_subtree)}")
+            if IS_DEBUG:
+                logger.debug(f"[DIM {self.DIM}] No next entry, unzipping right subtree: {print_pretty(right_subtree)}")
             if right_subtree:
                 l_right_subtree, key_subtree, r_leftmost_subtree, new_next = right_subtree.unzip(key)
                 next_entry = new_next
@@ -1606,11 +1384,10 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             return right
         
         new_node = self.NodeClass(rank, set, right)
-        logger.debug(f"[DIM {self.DIM}] Created new node: {print_pretty(new_node.set)} with rank {rank} and right subtree: {print_pretty(right)}")
+        if IS_DEBUG:
+            logger.debug(f"[DIM {self.DIM}] Created new node: {print_pretty(new_node.set)} with rank {rank} and right subtree: {print_pretty(right)}")
         
         return TreeClass(new_node, self.l_factor)
-
-
 
     def iter_real_entries(self):
         """
@@ -2114,3 +1891,256 @@ def bulk_create_gkplus_tree(
     # logger.debug(f"Bulk created GKPlusTree: {print_pretty(root_tree)}")
 
     return root_tree
+
+
+
+
+
+    # def split_inplace(self, key: int
+    #                   ) -> Tuple['GKPlusTreeBase',
+    #                              Optional['GKPlusTreeBase'],
+    #                              'GKPlusTreeBase']:
+    #     """
+    #     Split the tree into two parts around the given key.
+
+    #     Args:
+    #         key: The key value to split at
+
+    #     Returns:
+    #         A tuple of (left_return, key_subtree, right_return) where:
+    #         - left_return: A tree containing all entries with keys < key
+    #         - key_subtree: If key exists, its associated left subtree; else None
+    #         - right_return: A tree with entries with keys ≥ key (except key itself)
+    #     """
+
+    #     if not isinstance(key, int):
+    #         raise TypeError(f"key must be int, got {type(key).__name__!r}")
+
+    #     # Cache frequently used attributes and classes for better performance
+    #     TreeClass = type(self)
+    #     NodeClass = TreeClass.NodeClass
+    #     cached_l_factor = self.l_factor
+    #     dummy = get_dummy(dim=TreeClass.DIM)
+    #     check_and_convert_set = self.check_and_convert_set
+    #     KListNodeCapacity = self.KListClass.KListNodeClass.CAPACITY
+    #     tree_dim_plus_one = self.DIM + 1
+        
+    #     # Cache dummy properties for repeated use
+    #     dummy_key = dummy.key
+
+    #     # Case 1: Empty tree - return None left, right and key's subtree
+    #     if self.is_empty():
+    #         return self, None, TreeClass(l_factor=cached_l_factor), None
+
+    #     # Initialize left and right return trees
+    #     left_return = self
+    #     right_return = TreeClass(l_factor=cached_l_factor)
+
+    #     # Parent tracking variables
+    #     right_parent = None    # Parent node for right-side updates
+    #     right_entry = None     # Entry in right parent points to current subtree
+    #     left_parent = None     # Parent node for left-side updates
+    #     seen_key_subtree = None  # Cache last seen left_parents left subtree
+    #     cur = left_return
+    #     key_node_found = False
+
+    #     # logger.debug(f"[DIM {self.DIM}] [SPLIT {key}] tree before split: {print_pretty(self)}")
+
+    #     while True:
+    #         # Cache node reference and minimize repeated attribute access
+    #         node = cur.node
+    #         cur._invalidate_tree_size()
+    #         node_rank = node.rank
+    #         is_leaf = node_rank == 1
+
+    #         # Split node at key - cache results immediately
+    #         left_split, key_subtree, right_split, next_entry = node.set.split_inplace(key)
+    #         left_split = check_and_convert_set(left_split)
+
+    #         # Cache item counts and next entry
+    #         l_count = left_split.item_count()
+    #         r_count = right_split.item_count()
+
+    #         # --- Handle right side of the split ---
+    #         # Determine if we need a new tree for the right split
+    #         if r_count > 0:  # incl. dummy items
+    #             # Cache type check to avoid repeated isinstance calls
+    #             is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
+                
+    #             if is_gkplus_type:
+    #                 # Calculate the new rank for the item in the next dimension - use cached values
+    #                 digest = dummy.get_digest_for_dim(tree_dim_plus_one)
+    #                 new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
+    #                 right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
+    #                 right_split._invalidate_tree_size()
+    #                 # TODO: Check why we need to invalidate size and why it is not done in insert_entry. Check it also for insert_entry()
+    #             else:
+    #                 right_split, _, _ = right_split.insert_entry(Entry(dummy, None))
+    #             right_split = check_and_convert_set(right_split)
+
+    #             # Cache node references for performance
+    #             right_node = NodeClass(node_rank, right_split, node.right_subtree)
+
+    #             if right_parent is None:
+    #                 # Create a root node for right return tree
+    #                 right_return.node = right_node
+    #                 new_tree = right_return
+    #             else:
+    #                 new_tree = TreeClass(l_factor=cached_l_factor)
+    #                 new_tree.node = right_node
+
+    #                 # Update parent reference
+    #                 if right_entry is not None:
+    #                     right_entry.left_subtree = new_tree
+    #                 else:
+    #                     right_parent.node.right_subtree = new_tree
+
+    #             if is_leaf:
+    #                 # Prepare for updating 'next' pointers
+    #                 new_tree.node.next = node.next
+
+    #             # Prepare references for next iteration
+    #             next_right_entry = next_entry
+    #             next_cur = (
+    #                 next_entry.left_subtree
+    #                 if next_entry else new_tree.node.right_subtree
+    #             )
+    #             next_right_parent = new_tree
+    #         else:
+    #             if is_leaf and right_parent:
+    #                 # Cache type check result - reuse from above if possible
+    #                 is_gkplus_type = isinstance(right_split, GKPlusTreeBase)
+
+    #                 # Create a leaf with a single dummy item
+    #                 if is_gkplus_type:
+    #                     # Calculate new rank for item in the next dimension - use cached values
+    #                     digest = dummy.get_digest_for_dim(tree_dim_plus_one)
+    #                     new_rank = calc_rank_from_digest_k(digest, KListNodeCapacity)
+    #                     right_split, _, _ = right_split.insert_entry(Entry(dummy, None), rank=new_rank)
+    #                     right_split._invalidate_tree_size()
+    #                 else:
+    #                     right_split, _, _ = right_split.insert_entry(Entry(dummy, None))
+
+    #                 right_split = check_and_convert_set(right_split)
+    #                 right_node = NodeClass(1, right_split, None)
+    #                 new_tree = TreeClass(l_factor=cached_l_factor)
+    #                 new_tree.node = right_node
+
+    #                 # Update parent reference
+    #                 if right_entry is not None:
+    #                     right_entry.left_subtree = new_tree
+    #                 else:
+    #                     right_parent.node.right_subtree = new_tree
+
+    #                 # Link leaf nodes
+    #                 new_tree.node.next = node.next
+    #                 next_right_parent = new_tree
+    #             else:
+    #                 next_right_parent = right_parent
+    #                 next_cur = (
+    #                     next_entry.left_subtree
+    #                     if next_entry else node.right_subtree
+    #                 )
+            
+    #             next_right_entry = right_entry
+            
+    #         # Update right parent variables for next iteration
+    #         right_parent = next_right_parent
+    #         right_entry = next_right_entry
+
+    #         # --- Handle left side of the split ---
+    #         # Determine if we need to create/update using left split
+    #         if l_count > 1:  # incl. dummy items
+    #             # Update current node to use left split
+    #             node.set = left_split
+    #             cur._invalidate_tree_size()
+
+    #             if left_parent is None:
+    #                 # Reuse left split as the root node for the left return tree
+    #                 left_return.node = cur.node
+
+    #             if is_leaf:
+    #                 # Prepare for updating 'next' pointers
+    #                 # do not rearrange subtrees at leaf level
+    #                 # TODO: check if the right subtree can be set to None here, so we don't need to 
+    #                 # do this later
+    #                 l_last_leaf = node
+    #             elif key_subtree:
+    #                 # Highest node containing split key found
+    #                 # All entries in its left subtree are less than key and
+    #                 # are part of the left return tree
+    #                 seen_key_subtree = key_subtree
+    #                 node.right_subtree = key_subtree
+    #             elif next_entry:
+    #                 node.right_subtree = next_entry.left_subtree
+
+    #             # Check if we need to update the left parent reference - optimized
+    #             next_left_parent = left_parent if key_node_found else cur
+    #         else:
+    #             if is_leaf:
+    #                 if left_parent or seen_key_subtree:
+    #                     # Prepare unlinking leaf nodes and determine left return if needed
+    #                     if l_count == 0:
+    #                         # find the preceeding leaf node
+    #                         if left_parent:
+    #                             l_last_leaf = left_parent.get_max_leaf()
+    #                         else:
+    #                             # no left parent, so seen_key_subtree is the left return tree
+    #                             left_return.node = seen_key_subtree.node
+    #                             if left_return.item_count() == 1:
+    #                                 # Only the dummy item in left return
+    #                                 left_return.node = None
+    #                                 l_last_leaf = None
+    #                             else:
+    #                                 # At least one non-dummy item in left return
+    #                                 l_last_leaf = seen_key_subtree.get_max_leaf()
+    #                             left_return._invalidate_tree_size()
+    #                     else:
+    #                         node.set = left_split
+    #                         l_last_leaf = node
+    #                 else:
+    #                     # No non-dummy entry in left tree
+    #                     self.node = None
+    #                     l_last_leaf = None
+                        
+    #                 next_left_parent = left_parent
+    #             else:
+    #                 # Determine new subtree efficiently
+    #                 if key_subtree is not None:
+    #                     # Highest node containing split key found
+    #                     # All entries in its left subtree are less than key and
+    #                     # are part of the left return tree
+    #                     new_subtree = key_subtree
+    #                     seen_key_subtree = key_subtree
+    #                 else:
+    #                     # There must be a next entry, since nodes have at least two entries. 
+    #                     # l_count <= 1 and we have not found the split key (not key_subtree)
+    #                     new_subtree = next_entry.left_subtree
+
+    #                 if left_parent and not key_node_found:
+    #                     left_parent.node.right_subtree = new_subtree
+                        
+    #                 next_left_parent = left_parent
+
+    #         left_parent = next_left_parent
+
+    #         # Main return logic
+    #         if is_leaf:
+    #             if next_entry is None and not right_return.is_empty():
+    #                 pivot, pivot_next = right_return.find_pivot()
+    #                 if pivot and pivot.item.key > dummy_key:
+    #                     next_entry = pivot
+    #                 else:
+    #                     next_entry = pivot_next
+
+    #             if l_last_leaf: # unlink leaf nodes
+    #                 l_last_leaf.next = None
+    #             return_subtree = key_subtree
+    #             return self, return_subtree, right_return, next_entry
+
+    #         if key_subtree:
+    #             # Do not update left parent reference from this point on
+    #             key_node_found = True
+
+    #         # Continue to next iteration with updated current node
+    #         cur = next_cur
