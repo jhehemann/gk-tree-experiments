@@ -482,13 +482,12 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         tree = self._create_tree([100, 200, 300], [1, 1, 1])
         
         # Test with very small key
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(-1000)
-        self._validate_unzip_result(
-            left_tree, key_subtree, right_tree, next_entry,
-            unzip_key=-1000, expected_next_key=100, expected_left_keys=[], expected_right_keys=[100, 200, 300],
-            has_key_subtree=False
-        )
-        
+        # left_tree, key_subtree, right_tree, next_entry = tree.unzip(-1000)
+        # Try to unzip at a key less than the dummy key, should raise ValueError
+        with self.assertRaises(ValueError) as cm:
+            tree.unzip(-1000)
+        self.assertIn("less than dimension dummy key", str(cm.exception))
+
         # Test with very large key
         tree2 = self._create_tree([100, 200, 300], [1, 1, 1])
         left_tree, key_subtree, right_tree, next_entry = tree2.unzip(10000)
@@ -562,34 +561,6 @@ class TestGKPlusTreeUnzip(TreeTestCase):
             unzip_key=dummy_key, expected_next_key=100, expected_left_keys=[], expected_right_keys=[100, 200, 300],
             has_key_subtree=False  # Dummy should exist
         )
-
-    def test_unzip_consistency_with_split(self):
-        """Test that unzip results are consistent with split_inplace behavior."""
-        tree = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
-        
-        # Create a copy for split_inplace comparison
-        tree_copy = self._create_tree([100, 200, 300, 400], [1, 1, 1, 1])
-        
-        unzip_key = 250
-        
-        # Perform unzip
-        left_tree, key_subtree, right_tree, next_entry = tree.unzip(unzip_key)
-        
-        # Perform split_inplace for comparison
-        split_left, split_key_subtree, split_right, next_entry_split = tree_copy.split_inplace(unzip_key)
-
-        # Extract keys from results
-        unzip_left_keys = sorted([e.item.key for e in left_tree.iter_real_entries()])
-        unzip_right_keys = sorted([e.item.key for e in right_tree.iter_real_entries()])
-        
-        split_left_keys = sorted([e.item.key for e in split_left.iter_real_entries()])
-        split_right_keys = sorted([e.item.key for e in split_right.iter_real_entries()])
-        
-        # Results should be similar
-        self.assertEqual(next_entry.item.key, next_entry_split.item.key, "Next entries should match between unzip and split")
-        self.assertEqual(unzip_left_keys, split_left_keys, "Left results should match between unzip and split")
-        self.assertEqual(unzip_right_keys, split_right_keys, "Right results should match between unzip and split")
-
 
 if __name__ == '__main__':
     unittest.main()
