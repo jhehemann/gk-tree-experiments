@@ -175,7 +175,6 @@ def repeated_experiment(
             dim_limit=adversarial_dim
         )
         items = [LeafItem(ItemData(key, "val")) for key in keys]
-        random.shuffle(items)
         ranks = [1] * len(keys)
 
     # Generate results from repeated experiments.
@@ -184,6 +183,7 @@ def repeated_experiment(
         if adversarial_dim:
             t0 = time.perf_counter()
             tree = create_gkplus_tree(K=K, l_factor=l_factor)
+            random.shuffle(items)
             for item, rank in zip(items, ranks):
                 tree.insert(item, rank)
             times_build.append(time.perf_counter() - t0)
