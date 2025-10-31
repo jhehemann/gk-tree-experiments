@@ -738,7 +738,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 next_cur = cur.node.right_subtree
             else:
                 # Collapse single-item nodes for non-leaves
-                new_subtree = next_entry.left_subtree if next_entry else None
+                if next_entry:
+                    new_subtree = next_entry.left_subtree
+                else:
+                    new_subtree = cur.node.right_subtree
+
 
                 # Update parent reference efficiently
                 if left_x_entry is not None:
@@ -1708,7 +1712,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 new_klist = _tree_to_klist(tree)
                 if IS_DEBUG:
                     logger.debug(f"[DIM {self.DIM}] GKPlusTree with tree item count {tree_item_count}, real item count {real_item_count} and expected klist item count {expected_klist_size} is below threshold {threshold}: {print_pretty(tree)}")
-                logger.debug(f"[DIM {self.DIM}] Converted GKPlusTree to KList: {print_pretty(new_klist)}")
+                    logger.debug(f"[DIM {self.DIM}] Converted GKPlusTree to KList: {print_pretty(new_klist)}")
                 return new_klist
             return tree
         
