@@ -1181,18 +1181,18 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if IS_DEBUG:
                     logger.debug(f"[DIM {self.DIM}] Right return has items, setting next to left next: {print_pretty(left_next)}")
                 right_return.node.next = left_next
-                if IS_DEBUG:
-                    logger.debug(f"[DIM {self.DIM}] Finding next entry in right return.")
+                
                 # check adding condition: Only search for next entry if it is not klist?
                 # check adding condition: Only search for next entry if it has value==None?
                 
                 if next_entry is None:
+                    if IS_DEBUG:
+                        logger.debug(f"[DIM {self.DIM}] next_entry is None, finding next entry in right return.")
                     next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
             else:
-                if IS_DEBUG:
-                    logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
-                
                 if next_entry is None:
+                    if IS_DEBUG:
+                        logger.debug(f"[DIM {self.DIM}] Right is empty (and next_entry is None), finding next entry in left next: {print_pretty(left_next)}")
                     next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
                 
                 if IS_DEBUG:
@@ -1207,15 +1207,16 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             logger.debug(f"[DIM {self.DIM}] Left set has items, processing further")
         right_return = self.lift(right_set, None, 1)
         if not right_return.is_empty():
-            if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Right has items, finding next entry in it: {print_pretty(right_return)}")
+            
             right_return.node.next = left_next
             if next_entry is None:
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Right has items (and next_entry is None), finding next entry in right: {print_pretty(right_return)}")
                 next_entry = right_return._retrieve_next(get_dummy(self.DIM).key)
         else:
-            if IS_DEBUG:
-                logger.debug(f"[DIM {self.DIM}] Right is empty, finding next entry in left next: {print_pretty(left_next)}")
             if next_entry is None:
+                if IS_DEBUG:
+                    logger.debug(f"[DIM {self.DIM}] Right is empty (and next_entry is None), finding next entry in left next: {print_pretty(left_next)}")
                 next_entry = left_next._retrieve_next(get_dummy(self.DIM).key) if left_next else None
         
         self.node.set = left_set
