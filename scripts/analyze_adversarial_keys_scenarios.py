@@ -71,7 +71,7 @@ def generate_and_populate_tree(keys, k):
         rank = ranks[idx]
         print(f"Inserting item: {item.key}, with rank: {rank}")
         tree.insert(item, rank)
-        print(f"Inserted item: {item.key} with rank: {rank}")
+        # print(f"Inserted item: {item.key} with rank: {rank}")
     return tree
 
 
@@ -82,10 +82,20 @@ def create_adversarial_rank_lists(dimensions=10, size=10):
     rank_lists = []
     for i in range(dimensions):
         rank_list = [1] * size
+        rank_lists.append(rank_list)
+    return rank_lists, None
+
+def create_adversarial_rank_lists_i_eq_2(dimensions=10, size=10):
+    """
+    Create rank lists where in each list with index i, the element at i is 2, others are 1.
+    """
+    rank_lists = []
+    for i in range(dimensions):
+        rank_list = [1] * size
         if i < size:
             rank_list[i] = 2
         rank_lists.append(rank_list)
-    return rank_lists
+    return rank_lists, None
 
 
 def create_middle_pattern_rank_lists(dimensions=10, size=10):
@@ -111,7 +121,7 @@ def create_middle_pattern_rank_lists(dimensions=10, size=10):
         for pos in positions:
             rank_list[pos] = 2
         rank_lists.append(rank_list)
-    return rank_lists
+    return rank_lists, None
 
 
 def create_middle_pattern_rank_lists_single_2(dimensions=10, size=10):
@@ -127,7 +137,37 @@ def create_middle_pattern_rank_lists_single_2(dimensions=10, size=10):
         if i == 0:
             rank_list[middle] = 2
         rank_lists.append(rank_list)
-    return rank_lists
+    return rank_lists, None
+
+def create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=10, size=10):
+    """
+    Create rank lists with a pattern:
+    - First list: middle position is 2, rest are 1.
+    - All other lists: all ranks are 1.
+    """
+    rank_lists = []
+    middle = size // 2
+    for i in range(dimensions):
+        rank_list = [1] * size
+        if i == 0:
+            rank_list[middle] = 2
+        rank_lists.append(rank_list)
+    return rank_lists, middle
+
+def create_middle_pattern_rank_lists_single_2_insert_first(dimensions=10, size=10):
+    """
+    Create rank lists with a pattern:
+    - First list: middle position is 2, rest are 1.
+    - All other lists: all ranks are 1.
+    """
+    rank_lists = []
+    first = 0
+    for i in range(dimensions):
+        rank_list = [1] * size
+        if i == 0:
+            rank_list[first] = 2
+        rank_lists.append(rank_list)
+    return rank_lists, first
 
 
 def create_shifted_rank_lists(dimensions=10, size=10, k=4):
@@ -149,10 +189,10 @@ def create_shifted_rank_lists(dimensions=10, size=10, k=4):
         rank_lists.append(rank_list)
         left += spacing
         right -= spacing
-    return rank_lists
+    return rank_lists, None
 
 
-def create_two_middle_twos_rank_lists(dimensions=10, size=10):
+def create_two_middle_twos_rank_lists(dimensions=10, size=100):
     """
     Generate rank lists where:
     - First list: two middle positions are 1, positions left and right of those are 2, rest are 1.
@@ -169,13 +209,16 @@ def create_two_middle_twos_rank_lists(dimensions=10, size=10):
             if middle2 + 1 < size:
                 rank_list[middle2 + 1] = 2
         rank_lists.append(rank_list)
-    return rank_lists
+    return rank_lists, None
 
 
 if __name__ == "__main__":
     # Adversarial rank lists
     k = 4  # K-list node capacity
-    rank_lists = create_middle_pattern_rank_lists_single_2(dimensions=10, size=10)
+    dimensions = 5
+    size = 5
+
+    rank_lists, insert_key_idx = create_middle_pattern_rank_lists_single_2_insert_first(dimensions=dimensions, size=size)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         colored_rl = [
@@ -186,20 +229,33 @@ if __name__ == "__main__":
 
     def profile_find_keys():
         keys = find_keys_for_rank_lists(rank_lists, k)
-        print("Keys matching rank lists:", keys)
-        return keys
+        insert_key = None
+        if insert_key_idx is not None:
+            insert_key = keys.pop(insert_key_idx)
+        return keys, insert_key
 
     def profile_generate_tree(keys):
         tree = generate_and_populate_tree(keys, k)
         return tree
     
-
+    def profile_insert_specific():
+        if insert_key is None:
+            raise ValueError("Insert specific should not be called when insert_key is None.")
+        base_test = BaseTestCase()
+        item = base_test.make_item(insert_key)
+        rank = rank_lists[0][insert_key_idx]
+        tree.insert(item, rank)
+        return tree
+    
     # Profile find_keys_for_rank_lists
     print("\nProfiling find_keys_for_rank_lists...")
     profiler1 = cProfile.Profile()
     profiler1.enable()
-    keys = profile_find_keys()
+    keys, insert_key = profile_find_keys()
     profiler1.disable()
+    print("Keys matching rank lists:", keys)
+    if insert_key is not None:
+        print("Insert key:", insert_key)
 
     # Profile generate_and_populate_tree 
     print("\nProfiling generate_and_populate_tree...")
@@ -208,10 +264,17 @@ if __name__ == "__main__":
     tree = profile_generate_tree(keys)
     profiler2.disable()
     print("\nTree generated and populated with keys.")
-    
-    # exit()
 
-    print_tree_nodes(tree)
+    if insert_key is not None:
+        # Profile insert_specific
+        print(f"\nProfiling insert_specific: {insert_key}...")
+        profiler3 = cProfile.Profile()
+        profiler3.enable()
+        tree = profile_insert_specific()
+        profiler3.disable()
+        print("\nSpecific key inserted into the tree.")
+    
+    # print_tree_nodes(tree)
 
     print("\nProfiling output for find_keys_for_rank_lists:")
     stats1 = pstats.Stats(profiler1)
@@ -219,4 +282,10 @@ if __name__ == "__main__":
 
     print("\nProfiling output for generate_and_populate_tree and print_tree_nodes:")
     stats2 = pstats.Stats(profiler2)
-    stats2.sort_stats('cumtime').print_stats(20)
+    stats2.sort_stats('cumtime').print_stats(50)
+
+    if insert_key is not None:
+        print("\nProfiling output for insert_specific:")
+        stats3 = pstats.Stats(profiler3)
+        stats3.sort_stats('cumtime').print_stats(50)
+
