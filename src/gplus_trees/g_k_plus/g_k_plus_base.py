@@ -298,7 +298,8 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         Returns:
             Tuple[Optional[Entry], Optional[Entry]]: A tuple of (pivot_entry, successor_entry)
-            where successor_entry is None if pivot is the last entry in the tree.
+            where successor_entry is the first entry with key > pivot.key, or None if pivot 
+            is the last entry in the tree.
         """
 
         if self.is_empty():
@@ -310,8 +311,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
         successor = None
         for entry in self:
             if pivot is not None:
-                successor = entry
-                break
+                if entry.item.key > pivot.item.key:
+                    successor = entry
+                    break
             else:
                 if entry.item.key == dummy or entry.item.key > dummy:
                     pivot = entry
@@ -1110,11 +1112,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if IS_DEBUG:
                     logger.debug(f"[DIM {left.DIM}] Set r_pivot {r_pivot.item.key}'s left_subtree to left: {print_pretty(left)}")
                     logger.debug(f"[DIM {left.DIM}] Other after reassignment: {print_pretty(other)}")
-                r_pivot, r_pivot_next = other_min_leaf_tree.find_pivot()  # Update r_pivot after reassignment
-                if (r_pivot_next == r_pivot or r_pivot_next is None) and other_min_leaf_tree.node.next is not None:
+                r_pivot, r_pivot_next = other_min_leaf_tree.node.set.find_pivot()  # Update r_pivot after reassignment
+                if r_pivot_next is None and other_min_leaf_tree.node.next is not None:
                     if IS_DEBUG:
                         logger.debug(f"[DIM {left.DIM}] Updating r_pivot_next from other_min_leaf_tree's successor: {print_pretty(other_min_leaf_tree.node.next)}")
-                    r_pivot_next = other_min_leaf_tree.node.next.find_pivot()[0]
+                    r_pivot_next = other_min_leaf_tree.node.next.node.set.find_pivot()[0]
 
                 if IS_DEBUG:
                     logger.debug(f"[DIM {left.DIM}] Updated r_pivot after reassignment: {r_pivot.item.key if r_pivot else None}, Next: {r_pivot_next.item.key if r_pivot_next else None}")
@@ -1142,11 +1144,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             # new_right = type(left)(l_factor=left.l_factor)
 
             left.node.right_subtree, r_pivot, r_pivot_next = left.node.right_subtree.zip(left.node.right_subtree, other, is_root=False)
-            # left.node.right_subtree.node = new_right_subtree_node
-            # new_right = left.node.right_subtree
+
             if IS_DEBUG:
                 logger.debug(f"[DIM {left.DIM}] Zipped right subtree (item_count: {left.node.right_subtree.item_count()}, real_item_count: {left.node.right_subtree.real_item_count()}): {print_pretty(left.node.right_subtree)}")
                 logger.debug(f"[DIM {left.DIM}] Items right subtree: {[e.item.key for e in left.node.right_subtree]}")
+                logger.debug(f"[DIM {left.DIM}] r_pivot: {r_pivot.item.key if r_pivot else None}, r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}")
+                logger.debug(f"[DIM {left.DIM}] r_pivot left subtree: {print_pretty(r_pivot.left_subtree) if r_pivot and r_pivot.left_subtree else None}")
+                logger.debug(f"[DIM {left.DIM}] r_pivot next left subtree: {print_pretty(r_pivot_next.left_subtree) if r_pivot_next and r_pivot_next.left_subtree else None}")
 
             left._invalidate_tree_size()
             if IS_DEBUG:
@@ -1203,7 +1207,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 if r_pivot_next is None and other.node.next is not None:
                     if IS_DEBUG:
                         logger.debug(f"[DIM {left.DIM}] Updating r_pivot_next from other's successor: {print_pretty(other.node.next)}")
-                    r_pivot_next = other.node.next.find_pivot()[0]
+                    r_pivot_next = other.node.next.node.set.find_pivot()[0]
                 # left.node.set = left.check_and_convert_set(left.node.set)
                 return left, r_pivot, r_pivot_next
             
@@ -1239,7 +1243,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if r_pivot_next is None and other_min_leaf_tree.node.next is not None:
                         if IS_DEBUG:
                             logger.debug(f"[DIM {left.DIM}] Updating r_pivot_next from other_min_leaf_tree's successor: {print_pretty(other_min_leaf_tree.node.next)}")
-                        r_pivot_next = other_min_leaf_tree.node.next.find_pivot()[0]
+                        r_pivot_next = other_min_leaf_tree.node.next.node.set.find_pivot()[0]
                 else:
                     if IS_DEBUG:
                         logger.debug(f"[DIM {left.DIM}] Found left subtree for r_pivot {r_pivot.item.key}: {print_pretty(r_pivot.left_subtree)}")

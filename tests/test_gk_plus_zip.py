@@ -925,6 +925,67 @@ class TestGKPlusTreeZip(TreeTestCase):
             f"Tree real_item_count mismatch"
         )
 
+    def test_zip_next_entry_multiple_expansions_root(self):
+        """
+        Single test method for zipping specific trees.
+        """
+        k = 2
+        
+        rank_lists = [
+            [1, 2, 2, 2, 2],  # Dimension 1
+            [1, 2, 1, 1, 1],  # Dimension 2
+            [1, 2, 2, 1, 1],  # Dimension 3
+            [3, 3, 1, 2, 1],  # Dimension 4
+        ]
+
+        keys = self.find_keys_for_rank_lists(rank_lists, k=k, spacing=True)
+        keys1 = keys[:1]
+        ranks1 = rank_lists[0][:1]
+        keys2 = keys[1:]
+        ranks2 = rank_lists[1:]
+
+        # Build the first tree normally
+        tree1 = create_gkplus_tree(K=k, dimension=1)
+        for key, rank in zip(keys1, ranks1):
+            tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
+        
+        # Build the second tree via unzip to remove dummy items in current dimension
+        tree2 = self._create_tree_via_unzip(keys2, ranks2, k=k)
+        
+        # Log tree structures before zip
+        logger.debug(f"Tree 1 before zip:\n{print_pretty(tree1)}")
+        logger.debug(f"Tree 2 before zip:\n{print_pretty(tree2)}")
+        
+        # Validate tree1 before zipping (tree2 is built via unzip -> violates invariants either way)
+        self.validate_tree(tree1)
+
+        # Perform the zip operation
+        result, _, _ = tree1.zip(tree1, tree2)
+        
+        # Log result structure
+        logger.debug(f"Result after zip:\n{print_pretty(result)}")
+        
+        # Validate the result
+        expected_keys = sorted(keys1 + keys2)
+        
+        # Validate the merged tree contains all keys from both trees
+        self._validate_tree_after_zip(result, expected_keys, k=k)
+        
+        # Verify that all keys are accessible
+        actual_keys = sorted([entry.item.key for entry in result.iter_real_entries()])
+        self.assertEqual(
+            expected_keys,
+            actual_keys,
+            f"Expected keys: {expected_keys}\nActual keys: {actual_keys}"
+        )
+        
+        # Verify tree size
+        self.assertEqual(
+            result.real_item_count(),
+            len(expected_keys),
+            f"Tree real_item_count mismatch"
+        )
+
     def test_zip_random_trees_varying_sizes_case_a(self):
         """
         Test zipping with randomly generated trees of varying sizes over multiple repetitions.
