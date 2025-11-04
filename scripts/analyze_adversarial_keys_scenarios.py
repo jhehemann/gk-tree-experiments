@@ -69,7 +69,7 @@ def generate_and_populate_tree(keys, k):
     for idx, key in enumerate(keys):
         item = base_test.make_item(key)
         rank = ranks[idx]
-        print(f"Inserting item: {item.key}, with rank: {rank}")
+        # print(f"Inserting item: {item.key}, with rank: {rank}")
         tree.insert(item, rank)
         # print(f"Inserted item: {item.key} with rank: {rank}")
     return tree
@@ -215,17 +215,17 @@ def create_two_middle_twos_rank_lists(dimensions=10, size=100):
 if __name__ == "__main__":
     # Adversarial rank lists
     k = 4  # K-list node capacity
-    dimensions = 5
-    size = 5
+    dimensions = 10
+    size = 1000
 
     rank_lists, insert_key_idx = create_middle_pattern_rank_lists_single_2_insert_first(dimensions=dimensions, size=size)
-    print("Adversarial rank lists:")
-    for rl in rank_lists:
-        colored_rl = [
-            f"\033[31m{num}\033[0m" if num != 1 else str(num)
-            for num in rl
-        ]
-        print(' '.join(colored_rl))
+    # print("Adversarial rank lists:")
+    # for rl in rank_lists:
+    #     colored_rl = [
+    #         f"\033[31m{num}\033[0m" if num != 1 else str(num)
+    #         for num in rl
+    #     ]
+    #     print(' '.join(colored_rl))
 
     def profile_find_keys():
         keys = find_keys_for_rank_lists(rank_lists, k)
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     profiler1.enable()
     keys, insert_key = profile_find_keys()
     profiler1.disable()
-    print("Keys matching rank lists:", keys)
+    # print("Keys matching rank lists:", keys)
     if insert_key is not None:
         print("Insert key:", insert_key)
 

@@ -33,7 +33,11 @@ TEST_FILES = [
     'test_utility_functions.py',
 
     'test_gk_plus_zip.py',
-    'test_gk_plus_unzip.py',
+    'test_gk_plus_unzip.py',   
+
+    # 'gk_plus.test_insert.TestInternalMethodsWithEntryInsert.test_many_rank_combinations_specific_keys',
+    
+    # 'gk_plus.test_insert.TestInternalMethodsWithEntryInsert.test_insert_case_d',
 
     # 'test_stats_gpltree.py',
     # 'test_gk_plus_tree.py',

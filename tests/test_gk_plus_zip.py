@@ -140,7 +140,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertTrue(tree1.is_empty())
         self.assertTrue(tree2.is_empty())
         
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         self.assertIs(result, tree1, "zip should return self")
         self.assertTrue(result.is_empty(), "Result should be empty")
@@ -154,7 +154,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         non_empty_tree = self._create_tree(keys, rank_lists[0], k=k)
         empty_tree = create_gkplus_tree(K=4, dimension=1)
         
-        result = non_empty_tree.zip(non_empty_tree, empty_tree)
+        result, _, _ = non_empty_tree.zip(non_empty_tree, empty_tree)
         self.assertIs(result, non_empty_tree)
         self._validate_tree_after_zip(result, keys)
 
@@ -169,7 +169,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         logger.debug(f"Non-empty tree before zip: {print_pretty(non_empty_tree)}")
         
         # Test empty.zip(non_empty)
-        result1 = empty_tree.zip(empty_tree, non_empty_tree)
+        result1, _, _ = empty_tree.zip(empty_tree, non_empty_tree)
         self.assertIs(result1, empty_tree)
         self._validate_tree_after_zip(result1, keys)
        
@@ -192,7 +192,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertIsInstance(tree1.node.set, KListBase)
         self.assertIsInstance(tree2.node.set, KListBase)
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, tree1)
         
@@ -222,7 +222,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertIsInstance(tree1.node.set, KListBase)
         self.assertIsInstance(tree2.node.set, KListBase)
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, tree1)
         
@@ -251,7 +251,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(small_rank_tree.node.rank, 1)
         self.assertEqual(large_rank_tree.node.rank, 2)
         
-        result = small_rank_tree.zip(small_rank_tree, large_rank_tree)
+        result, _, _ = small_rank_tree.zip(small_rank_tree, large_rank_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
         
@@ -283,7 +283,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(small_rank_tree.node.rank, 1)
         self.assertEqual(large_rank_tree.node.rank, 2)
 
-        result = small_rank_tree.zip(small_rank_tree, large_rank_tree)
+        result, _, _ = small_rank_tree.zip(small_rank_tree, large_rank_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
         
@@ -312,7 +312,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(small_rank_tree.node.rank, 1)
         self.assertEqual(large_rank_tree.node.rank, 2)
 
-        result = small_rank_tree.zip(small_rank_tree, large_rank_tree)
+        result, _, _ = small_rank_tree.zip(small_rank_tree, large_rank_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
         
@@ -341,7 +341,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(small_rank_tree.node.rank, 1)
         self.assertEqual(large_rank_tree.node.rank, 2)
         
-        result = small_rank_tree.zip(small_rank_tree, large_rank_tree)
+        result, _, _ = small_rank_tree.zip(small_rank_tree, large_rank_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         # self.assertIs(result, small_rank_tree) # This is not guaranteed by current implementation
         
@@ -370,7 +370,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(rank_2_tree.node.rank, 2)
         self.assertEqual(rank_1_tree.node.rank, 1)
 
-        result = rank_2_tree.zip(rank_2_tree, rank_1_tree)
+        result, _, _ = rank_2_tree.zip(rank_2_tree, rank_1_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, rank_2_tree)
 
@@ -398,7 +398,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertEqual(rank_4_tree.node.rank, 4)
         self.assertEqual(rank_2_tree.node.rank, 2)
 
-        result = rank_4_tree.zip(rank_4_tree, rank_2_tree)
+        result, _, _ = rank_4_tree.zip(rank_4_tree, rank_2_tree)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, rank_4_tree)
 
@@ -428,7 +428,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         
 
         # Now zip them
-        result = tree_klist.zip(tree_klist, tree_gkplus)
+        result, _, _ = tree_klist.zip(tree_klist, tree_gkplus)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, tree_klist)
 
@@ -457,7 +457,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         tree_2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
         self.assertIsInstance(tree_2.node.set, GKPlusTreeBase)
 
-        result = tree_1.zip(tree_1, tree_2)
+        result, _, _ = tree_1.zip(tree_1, tree_2)
         logger.debug(f"Result after zip: {print_pretty(result)}")
         self.assertIs(result, tree_1)
 
@@ -482,7 +482,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.assertGreater(tree_1.node.rank, 1)
         self.assertGreater(tree_2.node.rank, 1)
 
-        result = tree_1.zip(tree_1, tree_2)
+        result, _, _ = tree_1.zip(tree_1, tree_2)
         self.assertIs(result, tree_1)
 
         # Validate structure and contents
@@ -514,7 +514,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         tree_1 = self._create_tree(keys_small, ranks_small, k=k)
         tree_2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
 
-        result = tree_1.zip(tree_1, tree_2)
+        result, _, _ = tree_1.zip(tree_1, tree_2)
         self.assertIs(result, tree_1)
 
         self._validate_tree_after_zip(result, keys)
@@ -532,7 +532,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         initial_count2 = tree2.item_count()
 
         # Perform zip
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
 
         expected_size = initial_size1 + initial_size2
         expanded_leafs = result.get_expanded_leaf_count()
@@ -563,7 +563,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         tree_1 = self._create_tree(keys_small, ranks_small, k=k)
         tree_2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
 
-        result = tree_1.zip(tree_1, tree_2)
+        result, _, _ = tree_1.zip(tree_1, tree_2)
         # self.assertIs(result, tree_1)
 
         tree_1_count = tree_1.item_count()
@@ -611,7 +611,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         ranks2 = calc_ranks(keys2, k=8, DIM=1)
         tree2 = self._create_tree_via_unzip(keys2, ranks2, tree2)
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         # self.assertIs(result, tree1)
         
         # Validate all keys are present
@@ -627,7 +627,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         initial_dim = tree1.DIM
         initial_l_factor = tree1.l_factor
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
 
         # Properties should be maintained
         self.assertEqual(result.DIM, initial_dim, "DIM should be preserved")
@@ -645,7 +645,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         # Make a copy of initial keys for validation
         initial_keys = [entry.item.key for entry in tree.iter_real_entries()]
 
-        result = tree.zip(tree, tree)
+        result, _, _ = tree.zip(tree, tree)
         self.assertIs(result, tree)
         
         # After zipping with itself, should contain at least the original keys
@@ -682,7 +682,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.validate_tree(tree1)
 
         # Perform the zip operation
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         # Log result structure
         logger.debug(f"Result after zip:\n{print_pretty(result)}")
@@ -736,7 +736,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.validate_tree(tree1)
 
         # Perform the zip operation
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         # Log result structure
         logger.debug(f"Result after zip:\n{print_pretty(result)}")
@@ -790,7 +790,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.validate_tree(tree1)
 
         # Perform the zip operation
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         # Log result structure
         logger.debug(f"Result after zip:\n{print_pretty(result)}")
@@ -844,7 +844,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.validate_tree(tree1)
 
         # Perform the zip operation
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         # Log result structure
         logger.debug(f"Result after zip:\n{print_pretty(result)}")
@@ -899,7 +899,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         self.validate_tree(tree1)
 
         # Perform the zip operation
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         
         # Log result structure
         logger.debug(f"Result after zip:\n{print_pretty(result)}")
@@ -1013,7 +1013,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         logger.debug(f"Tree 1 before zip:\n{print_pretty(tree1)}")
         logger.debug(f"Tree 2 before zip:\n{print_pretty(tree2)}")
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         self._validate_tree_after_zip(result, expected_keys, k=k)
         
         actual_count = result.real_item_count()
@@ -1113,7 +1113,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         logger.debug(f"Tree 1 before zip:\n{print_pretty(tree1)}")
         logger.debug(f"Tree 2 before zip:\n{print_pretty(tree2)}")
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         self._validate_tree_after_zip(result, expected_keys, k=k)
         
         actual_count = result.real_item_count()
@@ -1210,7 +1210,7 @@ class TestGKPlusTreeZip(TreeTestCase):
         logger.debug(f"Tree 1 before zip:\n{print_pretty(tree1)}")
         logger.debug(f"Tree 2 before zip:\n{print_pretty(tree2)}")
 
-        result = tree1.zip(tree1, tree2)
+        result, _, _ = tree1.zip(tree1, tree2)
         self._validate_tree_after_zip(result, expected_keys, k=k)
         
         actual_count = result.real_item_count()
