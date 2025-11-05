@@ -167,7 +167,25 @@ def create_middle_pattern_rank_lists_single_2_insert_first(dimensions=10, size=1
         if i == 0:
             rank_list[first] = 2
         rank_lists.append(rank_list)
-    return rank_lists, first
+    return rank_lists, [first]
+
+
+def create_first_and_middle_pattern_rank_lists(dimensions=10, size=10):
+    """
+    Create rank lists with a pattern:
+    - First list: middle position is 2, rest are 1.
+    - All other lists: all ranks are 1.
+    """
+    rank_lists = []
+    first = 0
+    second = 5
+    for i in range(dimensions):
+        rank_list = [1] * size
+        if i == 0:
+            rank_list[first] = 2
+            rank_list[second] = 2
+        rank_lists.append(rank_list)
+    return rank_lists, [first, second]
 
 
 def create_shifted_rank_lists(dimensions=10, size=10, k=4):
@@ -218,27 +236,36 @@ if __name__ == "__main__":
     dimensions = 10
     size = 1000
 
-    rank_lists, insert_key_idx = create_middle_pattern_rank_lists_single_2_insert_first(dimensions=dimensions, size=size)
-    # print("Adversarial rank lists:")
-    # for rl in rank_lists:
-    #     colored_rl = [
-    #         f"\033[31m{num}\033[0m" if num != 1 else str(num)
-    #         for num in rl
-    #     ]
-    #     print(' '.join(colored_rl))
+    rank_lists, insert_key_idx_list = create_first_and_middle_pattern_rank_lists(dimensions=dimensions, size=size)
+    print("Adversarial rank lists:")
+    for rl in rank_lists:
+        display_rl = rl
+        if len(rl) > 20:
+            display_rl = rl[:10] + ['...'] + rl[-10:]
+        colored_rl = [
+            f"\033[31m{num}\033[0m" if num != 1 and num != '...' else str(num)
+            for num in display_rl
+        ]
+        print(' '.join(colored_rl))
 
     def profile_find_keys():
         keys = find_keys_for_rank_lists(rank_lists, k)
-        insert_key = None
-        if insert_key_idx is not None:
-            insert_key = keys.pop(insert_key_idx)
-        return keys, insert_key
+        if len(keys) <= 20:
+            print("Keys matching rank lists:", keys)
+        else:
+            print(f"Keys matching rank lists (showing first 10 and last 10 of {len(keys)}):", keys[:10] + ['...'] + keys[-10:])
+        insert_keys = []
+        print("Insert key indices (inserted after all other keys):", insert_key_idx_list)
+        if insert_key_idx_list:
+            for insert_key_idx in reversed(insert_key_idx_list):
+                insert_keys.append(keys.pop(insert_key_idx))
+        return keys, reversed(insert_keys)
 
     def profile_generate_tree(keys):
         tree = generate_and_populate_tree(keys, k)
         return tree
     
-    def profile_insert_specific():
+    def profile_insert_specific(insert_key, insert_key_idx):
         if insert_key is None:
             raise ValueError("Insert specific should not be called when insert_key is None.")
         base_test = BaseTestCase()
@@ -251,11 +278,10 @@ if __name__ == "__main__":
     print("\nProfiling find_keys_for_rank_lists...")
     profiler1 = cProfile.Profile()
     profiler1.enable()
-    keys, insert_key = profile_find_keys()
+    keys, insert_keys = profile_find_keys()
     profiler1.disable()
-    # print("Keys matching rank lists:", keys)
-    if insert_key is not None:
-        print("Insert key:", insert_key)
+    if insert_keys:
+        print("Insert keys:", insert_keys)
 
     # Profile generate_and_populate_tree 
     print("\nProfiling generate_and_populate_tree...")
@@ -265,27 +291,30 @@ if __name__ == "__main__":
     profiler2.disable()
     print("\nTree generated and populated with keys.")
 
-    if insert_key is not None:
-        # Profile insert_specific
-        print(f"\nProfiling insert_specific: {insert_key}...")
-        profiler3 = cProfile.Profile()
-        profiler3.enable()
-        tree = profile_insert_specific()
-        profiler3.disable()
-        print("\nSpecific key inserted into the tree.")
-    
-    # print_tree_nodes(tree)
-
     print("\nProfiling output for find_keys_for_rank_lists:")
     stats1 = pstats.Stats(profiler1)
     stats1.sort_stats('cumtime').print_stats(20)
 
     print("\nProfiling output for generate_and_populate_tree and print_tree_nodes:")
     stats2 = pstats.Stats(profiler2)
-    stats2.sort_stats('cumtime').print_stats(50)
+    stats2.sort_stats('cumtime').print_stats(20)
 
-    if insert_key is not None:
-        print("\nProfiling output for insert_specific:")
-        stats3 = pstats.Stats(profiler3)
-        stats3.sort_stats('cumtime').print_stats(50)
+    if insert_keys:
+        # Profile insert_specific
+        for insert_key, insert_key_idx in zip(insert_keys, insert_key_idx_list):
+            print(f"\nProfiling insert_specific: {insert_key}...")
+            profiler3 = cProfile.Profile()
+            profiler3.enable()
+            tree = profile_insert_specific(insert_key, insert_key_idx)
+            profiler3.disable()
+            print(f"\nSpecific key {insert_key} inserted into the tree.")
+            
+            # Print stats for this specific insertion
+            print(f"\nProfiling output for insert_specific ({insert_key}):")
+            stats3 = pstats.Stats(profiler3)
+            stats3.sort_stats('cumtime').print_stats(20)
+    
+    # print_tree_nodes(tree)
+
+    
 
