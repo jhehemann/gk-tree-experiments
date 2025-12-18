@@ -202,9 +202,9 @@ def repeated_experiment(
         phy_height = tree.physical_height()
         times_phy.append(time.perf_counter() - t0)
 
-        # Time tree size computation
+        # Time real item count computation
         t0 = time.perf_counter()
-        tree_size = tree.item_count()
+        tree_size = tree.real_item_count()
         times_size.append(time.perf_counter() - t0)
 
         results.append((stats, phy_height, tree_size))
@@ -258,7 +258,7 @@ def repeated_experiment(
 
     # Prepare rows for stats and timings
     rows = [
-        ("Tree size",             avg_tree_size,        var_tree_size),
+        ("Real item count",       avg_tree_size,        var_tree_size),
         ("Item count",            avg_item_count,       var_item_count),
         ("Item slot count",       avg_item_slot_count,  var_item_slot_count),
         ("Space amplification",    avg_space_amp,        var_space_amp),
