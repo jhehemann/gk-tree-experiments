@@ -47,9 +47,11 @@ class BenchmarkUtils:
         as this can significantly contaminate benchmark results with I/O overhead.
         """
         root_logger = logging.getLogger()
-        if root_logger.level <= logging.DEBUG:
+        # Use getEffectiveLevel() to handle NOTSET correctly
+        effective_level = root_logger.getEffectiveLevel()
+        if effective_level <= logging.DEBUG:
             warnings.warn(
-                f"Logging level is set to {logging.getLevelName(root_logger.level)}. "
+                f"Logging level is set to {logging.getLevelName(effective_level)}. "
                 "This may contaminate benchmark results with expensive logging output. "
                 "Consider setting logging to INFO or higher for accurate measurements.",
                 RuntimeWarning,
