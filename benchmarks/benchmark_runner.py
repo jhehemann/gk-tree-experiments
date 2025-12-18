@@ -741,7 +741,6 @@ class IsolatedBenchmarkRunner:
                             for branch in branch_lines:
                                 if branch and not branch.startswith('('):  # Skip detached HEAD
                                     branches_with_results.add(branch)
-                                    print(f"🔍 Found branch '{branch}' for commit {commit_hash[:8]}")
                         except subprocess.CalledProcessError:
                             print(f"⚠️  Could not find branch for commit {commit_hash[:8]}")
             except (json.JSONDecodeError, OSError) as e:
@@ -777,7 +776,42 @@ class IsolatedBenchmarkRunner:
                 asv_config = json.load(f)
             
             current_branches = set(asv_config.get("branches", []))
-            all_branches = current_branches.union(branches_with_results)
+            
+            # Check which branches still exist in the ORIGINAL repository (not isolated repo)
+            # The isolated repo's branches should be a subset of what exists in origin
+            existing_branches = set()
+            branches_to_delete_locally = []
+            
+            # First fetch to ensure we have latest remote refs
+            self._run_command(["git", "fetch", "origin", "--prune"], cwd=self.repo_dir)
+            
+            for branch in current_branches.union(branches_with_results):
+                try:
+                    # Check if branch exists remotely in the original repo
+                    self._run_command(["git", "show-ref", "--verify", f"refs/remotes/origin/{branch}"], cwd=self.repo_dir)
+                    existing_branches.add(branch)
+                except subprocess.CalledProcessError:
+                    # Branch doesn't exist in origin
+                    print(f"🗑️  Branch '{branch}' no longer exists in origin")
+                    print(f"Current branches: {current_branches}")
+                    if branch in current_branches:
+                        print(f"🗑️  Branch '{branch}' no longer exists in origin, removing from config")
+                        branches_to_delete_locally.append(branch)
+            
+            # Delete local branches that no longer exist in origin
+            if branches_to_delete_locally:
+                for branch in branches_to_delete_locally:
+                    try:
+                        # Check if local branch exists
+                        self._run_command(["git", "show-ref", "--verify", f"refs/heads/{branch}"], cwd=self.repo_dir)
+                        # Delete the local branch (use -D to force delete even if not fully merged)
+                        self._run_command(["git", "branch", "-d", branch], cwd=self.repo_dir)
+                        print(f"   ✅ Deleted local branch '{branch}' from isolated repo")
+                    except subprocess.CalledProcessError:
+                        # Branch doesn't exist locally, nothing to delete
+                        pass
+            
+            all_branches = existing_branches.intersection(current_branches.union(branches_with_results))
             
             if all_branches != current_branches:
                 asv_config["branches"] = sorted(list(all_branches))
@@ -786,7 +820,12 @@ class IsolatedBenchmarkRunner:
                     json.dump(asv_config, f, indent=2)
                 
                 added_branches = all_branches - current_branches
-                print(f"✅ Updated ASV config to include {len(added_branches)} additional branches: {', '.join(sorted(added_branches))}")
+                removed_branches = current_branches - all_branches
+                
+                if added_branches:
+                    print(f"✅ Updated ASV config to include {len(added_branches)} additional branches: {', '.join(sorted(added_branches))}")
+                if removed_branches:
+                    print(f"🗑️  Removed {len(removed_branches)} non-existent branches from config: {', '.join(sorted(removed_branches))}")
             else:
                 print("✅ ASV config already includes all branches with results")
         
