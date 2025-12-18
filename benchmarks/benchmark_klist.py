@@ -50,7 +50,7 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
         klist = self.KListClass()
 
         for entry in self.entries:
-            klist, _ = klist.insert_entry(entry)
+            klist, _, _ = klist.insert_entry(entry)
 
 
 class KListRetrieveBenchmarks(BaseBenchmark):
@@ -92,7 +92,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
             entries = BenchmarkUtils.create_test_entries(insert_keys)
             klist = self.KListClass()
             for entry in entries:
-                klist, _ = klist.insert_entry(entry)
+                klist, _, _ = klist.insert_entry(entry)
             self._klist_cache[cache_key] = klist
             self._data_cache[cache_key] = insert_keys
 
