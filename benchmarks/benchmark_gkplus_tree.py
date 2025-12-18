@@ -15,18 +15,18 @@ from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
 
 
 class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
-    """Benchmarks for batch GKPlusTreeBase construction via sequential inserts."""
+    """Benchmarks for GKPlusTreeBase construction via sequential inserts."""
     
     # Test different capacities, data sizes, distributions, and l_factors
     params = [
-        [4, 8, 16, 32],  # K values (capacities)
+        [4, 8, 16],  # K values (capacities)
         [1000, 10000],  # data sizes
         ['uniform', 'sequential', 'clustered'],  # data distributions
-        [1.0, 2.0, 4.0, 8.0]  # l_factor values
+        [1.0, 2.0, 4.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'distribution', 'l_factor']
     
-    min_run_count = 5
+    min_run_count = 3
     
     def setup(self, capacity, size, distribution, l_factor):
         """Setup GKPlusTree and test data for tree construction benchmarking."""
@@ -66,14 +66,14 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
     
     # Test different capacities, data sizes, hit ratios, and l_factors (distribution fixed to 'sequential')
     params = [
-        [4, 8, 16, 32],  # K values (capacities)
+        [4, 8, 16],  # K values (capacities)
         [1000, 10000],  # data sizes
         [0.0, 1.0],  # hit ratios
-        [1.0, 2.0, 4.0, 8.0]  # l_factor values
+        [1.0, 2.0, 4.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'hit_ratio', 'l_factor']
     
-    min_run_count = 5
+    min_run_count = 3
     
     # Class-level cache for trees and associated data
     _tree_cache = {}
@@ -140,9 +140,9 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
     """Benchmarks for memory usage of GKPlusTree operations."""
     
     params = [
-        [4, 8, 16, 32],  # K values
+        [4, 8, 16],  # K values
         [1000, 10000],  # sizes
-        [1.0, 2.0, 4.0, 8.0]  # l_factor values
+        [1.0, 2.0, 4.0]  # l_factor values
     ]
     param_names = ['capacity', 'size', 'l_factor']
     

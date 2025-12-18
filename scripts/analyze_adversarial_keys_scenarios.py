@@ -233,7 +233,7 @@ def create_two_middle_twos_rank_lists(dimensions=10, size=100):
 if __name__ == "__main__":
     # Adversarial rank lists
     k = 4  # K-list node capacity
-    dimensions = 5
+    dimensions = 5 # Simulate key ranks up to this many dimensions
     size = 6
 
     rank_lists, insert_key_idx_list = create_first_and_middle_pattern_rank_lists(dimensions=dimensions, size=size)

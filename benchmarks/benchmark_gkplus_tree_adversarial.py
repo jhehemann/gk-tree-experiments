@@ -43,20 +43,20 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
     # benchmark individual dimension limits for each K
-    l_factors = [1.0, 2.0, 4.0, 8.0]  # l_factor values
+    l_factors = [1.0, 2.0, 4.0]  # l_factor values
     capacities_and_dim_limits = [
         (4, [1, 10, 20, 30, 40]),
         (8, [1, 10, 20, 40, 80]),
         (16, [1, 10, 20, 40, 80, 160]),
-        (32, [1, 10, 20, 40, 80, 160, 320])
     ]
+    # (32, [1, 10, 20, 40, 80, 160, 320])  # IGNORE 32 for now due to long runtimes
 
     params = [
         [(cap, lim) for cap, limits in capacities_and_dim_limits for lim in limits],
         l_factors,
     ]
     param_names = ['capacity_dim_limit', 'l_factor']
-    min_run_count = 5
+    min_run_count = 3
 
     def setup(self, capacity_dim_limit, l_factor):
         super().setup(*capacity_dim_limit, l_factor)
@@ -83,14 +83,13 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
 class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
     """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys."""
     params = [
-        [8, 16, 32],    # K values (capacities)
-        [10, 20, 40, 80],  # successive dimensions to enforce rank=1
-        [1.0, 2.0, 4.0, 8.0],  # l_factor values
+        [4, 8, 16],    # K values (capacities)
+        [10, 20, 40],  # successive dimensions to enforce rank=1
+        [1.0, 2.0, 4.0],  # l_factor values
         [1.0] # hit ratio
     ]
     param_names = ['capacity', 'dim_limit', 'hit_ratio', 'l_factor']
-    min_run_count = 5
-
+    min_run_count = 3
     _tree_cache = {}
 
     def setup(self, capacity, dim_limit, hit_ratio, l_factor):
