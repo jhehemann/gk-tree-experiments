@@ -3,7 +3,7 @@
 import os
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass
@@ -14,8 +14,8 @@ class BenchmarkConfig:
     seed: int = 42
     
     # Benchmark parameters
-    sizes: list[int] = None
-    ks: list[int] = None
+    sizes: List[int] = None
+    ks: List[int] = None
     repetitions: int = 200
     
     # Execution control
