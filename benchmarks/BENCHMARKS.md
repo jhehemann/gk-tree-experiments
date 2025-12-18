@@ -17,9 +17,11 @@ This system implements benchmarking for the G+Trees project. All benchmarks run 
 ./benchmark setup
 
 # 2. Run benchmarks manually
-./benchmark run HEAD                    # Benchmark current commit
-./benchmark run 'HEAD^!'                # Benchmark latest commit (best practice)
-./benchmark run HEAD GKPlusTreeInsert  # Benchmark specific test
+./benchmark run HEAD                                # Benchmark current commit
+./benchmark run 'HEAD^!'                            # Benchmark latest commit (best practice)
+./benchmark run HEAD GKPlusTreeRetrieveBenchmarks   # Benchmark specific test
+./benchmark run --quick 'HEAD^!'                    # Run a quick benchmark on the latest commit (useful for a sanity check)
+
 
 # 3. Monitor progress
 ./benchmark status
