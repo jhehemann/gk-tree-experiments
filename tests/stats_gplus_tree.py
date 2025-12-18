@@ -1,4 +1,13 @@
-"""Statistics for gplus trees."""
+"""Statistics for gplus trees.
+
+DEPRECATED: This file is kept for reference but is superseded by the
+benchmarks/ directory which implements methodologically correct benchmarks
+with proper phase separation, reproducibility, and timing accuracy.
+
+For new benchmarks, use: python -m benchmarks
+For verify-only mode: python -m benchmarks --verify-only
+See benchmarks/README.md for details.
+"""
 # pylint: skip-file
 
 import os
