@@ -16,7 +16,7 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
     """Benchmarks for K-List construction via sequential inserts."""
 
     # For each K in [4, 8, 16, 32, 64, 128], test sizes = [K, 2K, 4K, 8K] via l_factor
-    k_values = [4, 8, 16, 32, 64, 128]
+    k_values = [4, 8, 16, 32, 64]
     l_factors = [1, 2, 4, 8]
 
     params = [
@@ -56,8 +56,8 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
 class KListRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.retrieve() method."""
 
-    # For each K in [4, 8, 16, 32, 64, 128], test sizes = [K, 2K, 4K, 8K] via l_factor
-    k_values = [4, 8, 16, 32, 64, 128]
+    # For each K in [4, 8, 16, 32, 64], test sizes = [K, 2K, 4K, 8K] via l_factor
+    k_values = [4, 8, 16, 32, 64]
     l_factors = [1, 2, 4, 8]
 
     params = [

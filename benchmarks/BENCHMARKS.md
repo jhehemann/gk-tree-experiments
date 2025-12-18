@@ -30,6 +30,8 @@ This system implements benchmarking for the G+Trees project. All benchmarks run 
 # 5. View results
 ./benchmark view
 ```
+> **Note**: Set logging to INFO to avoid skewed benchmarks caused by expensive log output. 
+`src/gplus_trees/logging_config.py`
 
 ## Directory Structure
 
