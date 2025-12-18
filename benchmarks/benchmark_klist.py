@@ -9,7 +9,7 @@ retrieve() operations with various data patterns and sizes.
 import gc
 
 from gplus_trees.factory import make_gplustree_classes
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED
 
 
 class KListBatchInsertBenchmarks(BaseBenchmark):
@@ -41,7 +41,7 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
         seed_offset = hash((capacity, size, distribution)) % 1000
         self.keys = BenchmarkUtils.generate_deterministic_keys(
             size=size,
-            seed=42 + seed_offset,  # Will use DEFAULT_BENCHMARK_SEED + offset
+            seed=DEFAULT_BENCHMARK_SEED + seed_offset,
             distribution=distribution
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
@@ -94,7 +94,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
             # Build and cache KList and insert keys
             self.KListClass = make_gplustree_classes(capacity)[2]
             seed_offset = hash((capacity, size)) % 1000
-            base_seed = 42 + seed_offset
+            base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
                 size=size,
                 seed=base_seed,
@@ -113,7 +113,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
 
         # Generate lookup keys with specified hit ratio
         seed_offset = hash((capacity, size)) % 1000
-        base_seed = 42 + seed_offset
+        base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,

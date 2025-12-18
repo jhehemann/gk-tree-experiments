@@ -11,7 +11,7 @@ import gc
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED
 
 
 class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
@@ -39,7 +39,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
         self.keys = BenchmarkUtils.generate_deterministic_keys(
             size=size,
-            seed=42 + seed_offset,  # Will use DEFAULT_BENCHMARK_SEED + offset
+            seed=DEFAULT_BENCHMARK_SEED + seed_offset,
             distribution=distribution
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
@@ -102,7 +102,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             
             # Generate and insert test data with deterministic seed
             seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
-            base_seed = 42 + seed_offset
+            base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
                 size=size,
                 seed=base_seed,
@@ -122,7 +122,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         
         # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
         seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
-        base_seed = 42 + seed_offset
+        base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,

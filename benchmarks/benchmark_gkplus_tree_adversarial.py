@@ -6,7 +6,7 @@ import gc
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_ranks
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED
 import os
 import pickle
 
@@ -118,7 +118,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
 
         # Generate lookup keys with specified hit ratio
         seed_offset = hash((size, capacity, dim_limit, hit_ratio)) % 1000
-        base_seed = 42 + seed_offset
+        base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
