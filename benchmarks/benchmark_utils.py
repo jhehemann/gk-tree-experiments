@@ -3,23 +3,62 @@ Benchmarking utilities for G+ trees and K-lists.
 
 This module provides common utilities and base classes for ASV benchmarking
 that work optimally with ASV's built-in timing and stabilization mechanisms.
+
+Reproducibility:
+    All random data generation uses deterministic seeds by default.
+    The default seed can be overridden via the BENCHMARK_SEED environment variable.
+    
+Logging:
+    Benchmarks should be run with logging at INFO level or higher to avoid
+    performance contamination from verbose debug output.
 """
 
 import random
 import gc
+import os
+import logging
+import warnings
 from typing import List, Tuple
 import numpy as np
 
 from gplus_trees.base import Entry, LeafItem, ItemData
 
+# Default seed for deterministic benchmarking - can be overridden via environment variable
+DEFAULT_BENCHMARK_SEED = int(os.environ.get('BENCHMARK_SEED', '42'))
+
+# Logger for benchmark utilities
+_logger = logging.getLogger(__name__)
+
 
 
 class BenchmarkUtils:
-    """Utility class for ASV benchmarking operations."""
+    """Utility class for ASV benchmarking operations.
+    
+    This class provides methods for generating deterministic test data and
+    performing common benchmark setup operations while ensuring reproducibility.
+    """
+    
+    @staticmethod
+    def check_logging_level():
+        """
+        Check if logging level is appropriate for benchmarking.
+        
+        Issues a warning if DEBUG or lower (more verbose) logging is enabled,
+        as this can significantly contaminate benchmark results with I/O overhead.
+        """
+        root_logger = logging.getLogger()
+        if root_logger.level <= logging.DEBUG:
+            warnings.warn(
+                f"Logging level is set to {logging.getLevelName(root_logger.level)}. "
+                "This may contaminate benchmark results with expensive logging output. "
+                "Consider setting logging to INFO or higher for accurate measurements.",
+                RuntimeWarning,
+                stacklevel=2
+            )
     
     @staticmethod
     def generate_deterministic_keys(size: int, 
-                                  seed: int = 42,
+                                  seed: int = None,
                                   key_range: Tuple[int, int] = (1, 1000000),
                                   distribution: str = 'uniform') -> List[int]:
         """
@@ -27,13 +66,20 @@ class BenchmarkUtils:
         
         Args:
             size: Number of keys to generate
-            seed: Random seed for reproducibility
+            seed: Random seed for reproducibility. If None, uses DEFAULT_BENCHMARK_SEED.
             key_range: Range of key values (min, max)
             distribution: Distribution type ('uniform', 'clustered', 'sequential')
             
         Returns:
             List of deterministic keys
+            
+        Note:
+            This function always produces the same output for the same inputs,
+            ensuring benchmark reproducibility.
         """
+        if seed is None:
+            seed = DEFAULT_BENCHMARK_SEED
+            
         random.seed(seed)
         np.random.seed(seed)
         
@@ -100,7 +146,7 @@ class BenchmarkUtils:
     @staticmethod
     def create_lookup_keys(insert_keys: List[int], 
                           hit_ratio: float = 0.8,
-                          seed: int = 42,
+                          seed: int = None,
                           num_lookups = 1000) -> List[int]:
         """
         Create keys for lookup operations with specified hit ratio.
@@ -108,11 +154,15 @@ class BenchmarkUtils:
         Args:
             insert_keys: Keys that were inserted (for hits)
             hit_ratio: Ratio of lookups that should be hits (0.0 to 1.0)
-            seed: Random seed for reproducibility
+            seed: Random seed for reproducibility. If None, uses DEFAULT_BENCHMARK_SEED.
+            num_lookups: Number of lookup keys to generate
             
         Returns:
             List of lookup keys
         """
+        if seed is None:
+            seed = DEFAULT_BENCHMARK_SEED
+            
         random.seed(seed)
         
         # Handle edge case of empty insert_keys
@@ -161,7 +211,17 @@ class BenchmarkUtils:
 
 
 class BaseBenchmark:
-    """Base class for ASV benchmarks optimized for ASV's built-in timing."""
+    """Base class for ASV benchmarks optimized for ASV's built-in timing.
+    
+    This class provides a standard setup/teardown pattern that ensures:
+    - Garbage collection is disabled during timed sections
+    - Logging level is appropriate for benchmarking
+    - Consistent parameter handling across benchmarks
+    
+    ASV Timing:
+        ASV handles timing automatically. The warmup_time and sample_time
+        settings control how ASV stabilizes and measures performance.
+    """
     
     # Parameters for benchmarking
     params = []
@@ -172,10 +232,27 @@ class BaseBenchmark:
     sample_time = 0.4
     
     def setup(self, *params):
-        """Setup method called before each benchmark."""
-        pass
+        """Setup method called before each benchmark.
+        
+        This method should prepare test data and disable garbage collection
+        to ensure consistent timing measurements. ASV calls this before
+        the timed section begins.
+        
+        Subclasses should:
+        1. Call super().setup(*params) first
+        2. Prepare test data
+        3. Call gc.collect() to clean up setup overhead
+        4. Call gc.disable() to prevent GC during measurement
+        """
+        # Check logging level and warn if too verbose
+        BenchmarkUtils.check_logging_level()
 
     def teardown(self, *params):
-        """Teardown method called after each benchmark."""
+        """Teardown method called after each benchmark.
+        
+        Re-enables garbage collection after measurement completes.
+        ASV calls this after the timed section ends.
+        """
+        # Always re-enable garbage collection after benchmarking
         if not gc.isenabled():
             gc.enable()

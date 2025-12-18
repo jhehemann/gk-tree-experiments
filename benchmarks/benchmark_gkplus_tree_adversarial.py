@@ -71,7 +71,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         self.l_factor = l_factor
 
         gc.collect()
-        gc.disable()
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
 
     def time_adversarial_insert(self, capacity_dim_limit, l_factor):
         """Benchmark sequential insertion of adversarial keys."""
@@ -81,7 +81,13 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
 
 
 class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
-    """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys."""
+    """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys.
+    
+    Cache Behavior:
+        This benchmark uses class-level caching to avoid rebuilding trees
+        for each parameter set. Trees are cached by (capacity, size, dim_limit, l_factor).
+        The cache persists across benchmark runs within the same process.
+    """
     params = [
         [4, 8, 16],    # K values (capacities)
         [10, 20, 40],  # successive dimensions to enforce rank=1
@@ -110,14 +116,26 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
             self._tree_cache[tree_cache_key] = (tree, insert_keys)
         self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
 
-        # Generate lookup keys with specified hit ratio, using class-level cache
-        base_seed = 42 + hash((size, capacity, dim_limit, hit_ratio)) % 1000
+        # Generate lookup keys with specified hit ratio
+        seed_offset = hash((size, capacity, dim_limit, hit_ratio)) % 1000
+        base_seed = 42 + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
             seed=base_seed + 1000
         )
-        gc.collect(); gc.disable()
+        gc.collect()
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
+    
+    @classmethod
+    def clear_cache(cls):
+        """Clear the tree cache to free memory when needed.
+        
+        Note: This is not called automatically. It can be used for memory
+        management in long benchmark sessions if needed.
+        """
+        cls._tree_cache.clear()
+        gc.collect()
 
     def time_adversarial_retrieve(self, capacity, dim_limit, hit_ratio, l_factor):
         """Benchmark sequential retrieval of adversarial keys."""

@@ -35,10 +35,11 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         # Create GKPlusTree with specified capacity and l_factor
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         
-        # Generate deterministic test data
+        # Generate deterministic test data using combined parameter hash for seed variation
+        seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
         self.keys = BenchmarkUtils.generate_deterministic_keys(
             size=size,
-            seed=42 + hash((capacity, size, distribution, l_factor)) % 1000,
+            seed=42 + seed_offset,  # Will use DEFAULT_BENCHMARK_SEED + offset
             distribution=distribution
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
@@ -50,7 +51,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         self.l_factor = l_factor
 
         gc.collect()
-        gc.disable() # Enabled in teardown
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
     
     
     def time_insert_entry_tree_construction(self, capacity, size, distribution, l_factor):
@@ -62,7 +63,13 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
 
 
 class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
-    """Benchmarks for GKPlusTreeBase.retrieve() method."""
+    """Benchmarks for GKPlusTreeBase.retrieve() method.
+    
+    Cache Behavior:
+        This benchmark uses class-level caching to avoid rebuilding trees
+        for each hit_ratio test. Trees are cached by (capacity, size, l_factor).
+        The cache persists across benchmark runs within the same process.
+    """
     
     # Test different capacities, data sizes, hit ratios, and l_factors (distribution fixed to 'sequential')
     params = [
@@ -93,8 +100,9 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             # Create and populate GKPlusTree (only when not cached)
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
             
-            # Generate and insert test data
-            base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
+            # Generate and insert test data with deterministic seed
+            seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
+            base_seed = 42 + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
                 size=size,
                 seed=base_seed,
@@ -113,20 +121,24 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
         
         # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
-        base_seed = 42 + hash((capacity, size, distribution, l_factor)) % 1000
+        seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
+        base_seed = 42 + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
             seed=base_seed + 1000
         )
         gc.collect()
-        gc.disable() # Enabled in teardown
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
 
     @classmethod
     def clear_cache(cls):
-        """Clear the tree cache to free memory when needed."""
+        """Clear the tree cache to free memory when needed.
+        
+        Note: This is not called automatically. It can be used for memory
+        management in long benchmark sessions if needed.
+        """
         cls._tree_cache.clear()
-        cls._data_cache.clear()
         gc.collect()
 
     def time_retrieve_sequential(self, capacity, size, hit_ratio, l_factor):
@@ -151,7 +163,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         super().setup(capacity, size, l_factor)
         
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
-        self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=42)
+        self.keys = BenchmarkUtils.generate_deterministic_keys(size, seed=None)  # Uses DEFAULT_BENCHMARK_SEED
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
         self.ranks = calc_ranks(self.keys, capacity, DIM=1)
         
@@ -159,7 +171,7 @@ class GKPlusTreeMemoryBenchmarks(BaseBenchmark):
         self.l_factor = l_factor
 
         gc.collect()
-        gc.disable() # Enabled in teardown
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
     
     def peakmem_tree_construction(self, capacity, size, l_factor):
         """Measure peak memory during tree construction."""

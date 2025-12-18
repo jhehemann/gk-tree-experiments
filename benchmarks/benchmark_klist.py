@@ -37,13 +37,17 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
         # Create KList class with specified capacity
         _, _, self.KListClass, _ = make_gplustree_classes(capacity)
 
-        # Generate deterministic test data
+        # Generate deterministic test data using combined parameter hash for seed variation
+        seed_offset = hash((capacity, size, distribution)) % 1000
         self.keys = BenchmarkUtils.generate_deterministic_keys(
             size=size,
-            seed=42 + hash((capacity, size, distribution)) % 1000,
+            seed=42 + seed_offset,  # Will use DEFAULT_BENCHMARK_SEED + offset
             distribution=distribution
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
+        
+        gc.collect()
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
 
     def time_insert_entry_batch_construction(self, capacity, l_factor, distribution):
         """Benchmark full klist construction by inserting all entries."""
@@ -54,7 +58,13 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
 
 
 class KListRetrieveBenchmarks(BaseBenchmark):
-    """Benchmarks for KListBase.retrieve() method."""
+    """Benchmarks for KListBase.retrieve() method.
+    
+    Cache Behavior:
+        This benchmark uses class-level caching to avoid rebuilding KLists
+        for each hit_ratio test. KLists are cached by (capacity, size).
+        The cache persists across benchmark runs within the same process.
+    """
 
     # For each K in [4, 8, 16, 32, 64], test sizes = [K, 2K, 4K, 8K] via l_factor
     k_values = [4, 8, 16, 32, 64]
@@ -83,7 +93,8 @@ class KListRetrieveBenchmarks(BaseBenchmark):
         if cache_key not in self._klist_cache:
             # Build and cache KList and insert keys
             self.KListClass = make_gplustree_classes(capacity)[2]
-            base_seed = 42 + hash((capacity, size)) % 1000
+            seed_offset = hash((capacity, size)) % 1000
+            base_seed = 42 + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
                 size=size,
                 seed=base_seed,
@@ -101,14 +112,26 @@ class KListRetrieveBenchmarks(BaseBenchmark):
         self.insert_keys = self._data_cache[cache_key]
 
         # Generate lookup keys with specified hit ratio
-        base_seed = 42 + hash((capacity, size)) % 1000
+        seed_offset = hash((capacity, size)) % 1000
+        base_seed = 42 + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
             hit_ratio=hit_ratio,
             seed=base_seed + 1000
         )
         gc.collect()
-        gc.disable() # Enabled in teardown
+        gc.disable()  # Re-enabled in teardown by BaseBenchmark
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the KList cache to free memory when needed.
+        
+        Note: This is not called automatically. It can be used for memory
+        management in long benchmark sessions if needed.
+        """
+        cls._klist_cache.clear()
+        cls._data_cache.clear()
+        gc.collect()
 
     def time_retrieve_sequential(self, capacity, l_factor, hit_ratio):
         """Benchmark sequential retrieve operations."""
