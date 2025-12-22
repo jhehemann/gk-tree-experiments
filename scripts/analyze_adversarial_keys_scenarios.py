@@ -75,9 +75,9 @@ def generate_and_populate_tree(keys, k):
     return tree
 
 
-def create_adversarial_rank_lists(dimensions=10, size=10):
+def create_adversarial_1_rank_lists(dimensions=10, size=10):
     """
-    Create rank lists where in each list with index i, the element at i is 2, others are 1.
+    Create rank lists where all elements are 1.
     """
     rank_lists = []
     for i in range(dimensions):
@@ -98,7 +98,7 @@ def create_adversarial_rank_lists_i_eq_2(dimensions=10, size=10):
     return rank_lists, None
 
 
-def create_middle_pattern_rank_lists(dimensions=10, size=10):
+def create_middle_out_pattern_rank_lists(dimensions=10, size=10):
     """
     Create rank lists with a pattern:
     - First list: middle position is 2, rest are 1.
@@ -124,22 +124,29 @@ def create_middle_pattern_rank_lists(dimensions=10, size=10):
     return rank_lists, None
 
 
-def create_middle_pattern_rank_lists_single_2(dimensions=10, size=10):
+def create_middle_in_pattern_rank_lists(dimensions=10, size=10, k=4):
     """
-    Create rank lists with a pattern:
-    - First list: middle position is 2, rest are 1.
-    - All other lists: all ranks are 1.
+    Create rank lists where in the first list, the kth and kth last positions are 2, rest are 1.
+    In each subsequent list, the positions of 2 are shifted towards the middle by k.
+    This continues for 'dimensions' lists.
     """
     rank_lists = []
-    middle = size // 2
+    spacing_factor = 1
+    spacing = spacing_factor  # Spacing factor to shift positions
+    left = spacing
+    right = size - spacing - 1
     for i in range(dimensions):
         rank_list = [1] * size
-        if i == 0:
-            rank_list[middle] = 2
+        if left <= right:
+            rank_list[left] = 2
+            rank_list[right] = 2
         rank_lists.append(rank_list)
+        left += spacing
+        right -= spacing
     return rank_lists, None
 
-def create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=10, size=10):
+
+def create_dim_1_middle_2_rank_lists(dimensions=10, size=10):
     """
     Create rank lists with a pattern:
     - First list: middle position is 2, rest are 1.
@@ -154,10 +161,11 @@ def create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=10, size=
         rank_lists.append(rank_list)
     return rank_lists, [middle]
 
-def create_middle_pattern_rank_lists_single_2_insert_first(dimensions=10, size=10):
+
+def create_dim_1_first_2_rank_lists(dimensions=10, size=10):
     """
     Create rank lists with a pattern:
-    - First list: middle position is 2, rest are 1.
+    - First list: first position is 2, rest are 1.
     - All other lists: all ranks are 1.
     """
     rank_lists = []
@@ -170,10 +178,10 @@ def create_middle_pattern_rank_lists_single_2_insert_first(dimensions=10, size=1
     return rank_lists, [first]
 
 
-def create_first_and_middle_pattern_rank_lists(dimensions=10, size=10):
+def create_dim_1_first_and_middle_2_rank_lists(dimensions=10, size=10):
     """
     Create rank lists with a pattern:
-    - First list: middle position is 2, rest are 1.
+    - First list: first and middle positions are 2, rest are 1.
     - All other lists: all ranks are 1.
     """
     rank_lists = []
@@ -188,55 +196,13 @@ def create_first_and_middle_pattern_rank_lists(dimensions=10, size=10):
     return rank_lists, [first, second]
 
 
-def create_shifted_rank_lists(dimensions=10, size=10, k=4):
-    """
-    Create rank lists where in the first list, the kth and kth last positions are 2, rest are 1.
-    In each subsequent list, the positions of 2 are shifted towards the middle by k.
-    This continues for 'dimensions' lists.
-    """
-    rank_lists = []
-    spacing_factor = 2
-    spacing = spacing_factor * k  # Spacing factor to shift positions
-    left = spacing
-    right = size - spacing - 1
-    for i in range(dimensions):
-        rank_list = [1] * size
-        if left <= right:
-            rank_list[left] = 2
-            rank_list[right] = 2
-        rank_lists.append(rank_list)
-        left += spacing
-        right -= spacing
-    return rank_lists, None
-
-
-def create_two_middle_twos_rank_lists(dimensions=10, size=100):
-    """
-    Generate rank lists where:
-    - First list: two middle positions are 1, positions left and right of those are 2, rest are 1.
-    - All other lists: all ranks are 1.
-    """
-    rank_lists = []
-    middle1 = (size - 1) // 2
-    middle2 = middle1 + 1
-    for i in range(dimensions):
-        rank_list = [1] * size
-        if i == 0 and size >= 4:
-            if middle1 - 1 >= 0:
-                rank_list[middle1 - 1] = 2
-            if middle2 + 1 < size:
-                rank_list[middle2 + 1] = 2
-        rank_lists.append(rank_list)
-    return rank_lists, None
-
-
 if __name__ == "__main__":
     # Adversarial rank lists
     K = 4           # K-list node capacity
-    DIMENSIONS = 30  # Simulate key ranks up to this many dimensions
-    SIZE = 10        # Number of keys to generate
+    DIMENSIONS = 20  # Simulate key ranks up to this many dimensions
+    SIZE = 100        # Number of keys to generate
 
-    rank_lists, insert_key_idx_list = create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=DIMENSIONS, size=SIZE)
+    rank_lists, insert_key_idx_list = create_dim_1_first_2_rank_lists(dimensions=DIMENSIONS, size=SIZE)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         display_rl = rl
