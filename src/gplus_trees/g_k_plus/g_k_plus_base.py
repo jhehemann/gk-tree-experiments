@@ -705,6 +705,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
                 # Create new tree node
                 right_split = check_and_convert_set(right_split)
+                # TODO(#1): Verify if tree invalidation needed here after split conversion
                 new_tree = TreeClass(l_factor=l_factor)
                 if IS_DEBUG:
                     logger.debug(f"[DIM {self.DIM}] Creating new right tree with rank {node.rank} and item count {right_split.item_count()}: {print_pretty(right_split)} and right subtree {print_pretty(node.right_subtree)}")
@@ -890,7 +891,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     logger.debug(f"[DIM {left.DIM}] Created dummy tree: {print_pretty(left)}")
                 left, r_pivot, r_pivot_next = self.zip(left, other)
                 left.node.set = self.check_and_convert_set(left.node.set)
-                left._invalidate_tree_size()
+                left._invalidate_tree_size()  # Correctly invalidates after conversion
 
                 return left, r_pivot, r_pivot_next
             r_pivot, r_pivot_next = other.find_pivot()
@@ -928,7 +929,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                 logger.debug(f"[DIM {left.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}; Next: {r_pivot_next.item.key if r_pivot_next else None}")
             
             other.node.set = other.check_and_convert_set(other.node.set)
-            other._invalidate_tree_size()
+            other._invalidate_tree_size()  # Correctly invalidates after conversion
 
             # Zip r_pivot's left subtree into left
             if r_pivot and r_pivot.left_subtree:
@@ -1031,6 +1032,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     if entry.item.key > dummy_lower_dim.key:
                         left.node.set, _, _ = left.node.set.insert_entry(entry)
                 left.node.set = left.check_and_convert_set(left.node.set)
+                # TODO(#1): Add left._invalidate_tree_size() after set conversion
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
                 
                 if IS_DEBUG:
@@ -1046,6 +1048,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}. Pivot left subtree: {print_pretty(r_pivot.left_subtree) if r_pivot and r_pivot.left_subtree else None}")
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}. Pivot next left subtree: {print_pretty(r_pivot_next.left_subtree) if r_pivot_next and r_pivot_next.left_subtree else None}")
                 left.node.set = self.check_and_convert_set(left.node.set)
+                # TODO(#1): Add left._invalidate_tree_size() after set conversion
             else:
                 raise TypeError(f"Set types should match after conversion, got {type(left.node.set).__name__} and {type(other.node.set).__name__}")
 
@@ -1463,6 +1466,12 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
     def check_and_convert_set(self,
                               set: AbstractSetDataStructure
                               ) -> AbstractSetDataStructure:
+        """Check and convert set between KList and GKPlusTree based on thresholds.
+        
+        TODO(#1): After calling this method and replacing node.set, the caller MUST
+        call _invalidate_tree_size() to ensure cached counts are invalidated.
+        Otherwise, item_count() will return stale values leading to incorrect conversions.
+        """
         if isinstance(set, KListBase):
             return self.check_and_expand_klist(set)
         elif isinstance(set, GKPlusTreeBase):
@@ -1482,6 +1491,9 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         Returns:
             Either the original KList or a new GKPlusTree based on the threshold
+            
+        Note (Issue #1):
+            If conversion occurs, caller must call _invalidate_tree_size() on the parent tree.
         """
         # Check if the item count exceeds l_factor * CAPACITY
         k = klist.KListNodeClass.CAPACITY
@@ -1509,6 +1521,11 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         Returns:
             Either the original tree or a new KList based on the threshold
+            
+        Note (Issue #1):
+            If conversion occurs, caller must call _invalidate_tree_size() on the parent tree.
+            The item_count() used here relies on cached values, which may be stale if not
+            properly invalidated after previous operations.
         """
         # Get the threshold based on the KList capacity
         k = self.KListClass.KListNodeClass.CAPACITY

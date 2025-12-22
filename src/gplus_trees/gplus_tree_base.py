@@ -86,8 +86,14 @@ class GPlusTreeBase(AbstractSetDataStructure):
     A G+-tree is a recursively defined structure that is either empty or contains a single G+-node.
     Attributes:
         node (Optional[GPlusNode]): The G+-node that the tree contains. If None, the tree is empty.
+    
+    TODO (Issue #5): Add first_leaf pointer to enable O(1) access to first leaf node:
+        - Add 'first_leaf' to __slots__ tuple
+        - Initialize in __init__ method
+        - Maintain during insertions and tree modifications
+        - This will significantly speed up sequential access operations
     """
-    __slots__ = ("node",)
+    __slots__ = ("node",)  # TODO(#5): Add "first_leaf" here
     
     # set by factory
     NodeClass: Type[GPlusNodeBase]
@@ -228,6 +234,8 @@ class GPlusTreeBase(AbstractSetDataStructure):
 
         # Link leaves
         left_leaf.node.next = right_leaf
+        # TODO(#5): Set first_leaf pointer here: left_leaf.first_leaf = left_leaf
+        # TODO(#5): Set first_leaf pointer here: right_leaf.first_leaf = left_leaf
         return left_leaf, right_leaf
 
     def _insert_empty(self, insert_entry: Entry, rank: int) -> GPlusTreeBase:
@@ -504,10 +512,23 @@ class GPlusTreeBase(AbstractSetDataStructure):
         """
         Iterates over all leaf-level GPlusNodes in the tree,
         starting from the leftmost leaf node and following `next` pointers or recursive .
+        
+        PERFORMANCE NOTE (Issue #5): 
+        Currently descends from root to find leftmost leaf in O(height) time.
+        When leaf sets contain recursively instantiated G-trees (e.g., KList
+        expanded to GKPlusTree), this traversal becomes expensive as it must
+        traverse nested tree structures.
+        
+        OPTIMIZATION TODO:
+        Add a first_leaf pointer to enable O(1) access to the first leaf.
+        This would eliminate the descent phase and significantly speed up
+        sequential access patterns.
 
         Yields:
             GPlusNode: Each leaf-level node in left-to-right order.
         """
+        # TODO(#5): Replace this descent with: current = self.first_leaf if self.first_leaf else <fallback>
+        # This would provide O(1) access instead of O(height) traversal
         # Descend to the leftmost leaf
         current = self
         
