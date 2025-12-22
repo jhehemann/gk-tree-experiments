@@ -5,7 +5,7 @@ History-independent ordered-set trees with high-probability balancing and fast s
 ## Overview
 - **$\text{G}^+$-tree**: single-dimension, history-independent tree (analogous to a $\text{B}^+$-tree, but for the G-tree family). Item ranks are derived from key hashes, so identical key sets yield identical layouts.
 - **$\text{G}^{k+}$-tree**: multi-dimension extension of $\text{G}^+$-trees. Nodes have a size limit; when a node exceeds the limit, a new $\text{G}^{k+}$-tree is instantiated inside that node (a deeper dimension) and the overflowing items are inserted into it using ranks from hashing each item's previous hash.
-- **$k$-list**: cache-friendly leaf representation used by both tree types and the recursion anchor for the highest dimension (deepest level) within a node.
+- **$k$-list**: cache-friendly set data structure used by both tree types as the recursion anchor for the highest dimension (deepest level) within a node.
 
 ## Features
 - History-independent layout; identical key sets yield identical trees.
@@ -18,7 +18,7 @@ Requires Python 3.10–3.12.
 
 Poetry (recommended):
 ```bash
-poetry install
+poetry install && poetry shell
 ```
 
 Pip (editable for local development):
