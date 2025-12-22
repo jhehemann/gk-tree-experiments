@@ -75,6 +75,3 @@ python tests/test_runner.py --log-level INFO --verbosity 2
 - [stats/](stats/): scripts for measuring structure statistics across parameters.
 - [scripts/](scripts/): adversarial-key discovery and analysis tools.
 - [tests/](tests/): unittest suites and helpers.
-
-## License
-MIT

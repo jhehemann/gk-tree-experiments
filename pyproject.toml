@@ -11,11 +11,11 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
+numpy = "^2.2.5"
+tqdm = "^4.67.1"
 
 
 [tool.poetry.group.dev.dependencies]
-numpy = "^2.2.5"
-tqdm = "^4.67.1"
 asv = "^0.6.4"
 build = "^1.0.0"
 wheel = "^0.44.0"
