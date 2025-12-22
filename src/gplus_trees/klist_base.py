@@ -120,7 +120,6 @@ class KListNodeBase:
         # Handle overflow
         if len(entries) > self.__class__.CAPACITY:
             pop_entry = entries.pop()
-            # logger.debug(f"POP ENTRY {pop_entry.item.key}")
             keys.pop()
             if pop_entry.item.key >= 0:
                 real_keys.pop()

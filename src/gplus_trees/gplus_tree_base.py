@@ -787,8 +787,6 @@ def gtree_stats_(t: GPlusTreeBase,
             # Inherit child violations first
             if not cs.set_thresholds_met:
                 stats.set_thresholds_met = False
-                # if logger.isEnabledFor(logging.DEBUG):
-                    # logger.debug(f"  Child violation inherited: cs.set_thresholds_met={cs.set_thresholds_met}")
             
             # Check current node violations (only if no child violations yet)
             if stats.set_thresholds_met:
@@ -898,8 +896,6 @@ def gtree_stats_(t: GPlusTreeBase,
 
         stats.all_leaf_values_present = all_values_present
         stats.real_item_count = true_count
-        # logger.debug(f"  Leaf: {[e.item.key for e in node_set]} item_count={node_item_count}, real_item_count={stats.real_item_count}")
-        # logger.debug(f"  Leaf: {print_pretty(node_set)} item_count={node_item_count}, real_item_count={stats.real_item_count}")
         stats.leaf_count = 1
 
     # Root-level validation (only occurs once)
@@ -1006,10 +1002,8 @@ def print_pretty(set: AbstractSetDataStructure):
     
     if hasattr(tree, 'DIM'):
         dim = tree.DIM if hasattr(tree, 'DIM') else None
-        # logger.debug(f"print_pretty() called for {set_type} with DIM={dim}")
         dum_key = get_dummy(dim).key
     else:
-        # logger.debug(f"print_pretty() called for {set_type} without DIM")
         dum_key = DUMMY_KEY
 
     # 1) First pass: collect each node's text and track max length
