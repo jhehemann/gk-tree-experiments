@@ -51,9 +51,11 @@ Adversarial keys:
 ```bash
 python scripts/find_adversarial_keys.py
 python scripts/analyze_adversarial_keys_scenarios.py
+python scripts/analyze_single_insertion.py
 ```
   - `find_adversarial_keys.py` writes rank-1 keys into benchmarks/adversarial_keys_new/ (counts/K/dim sets are defined inside the script).
   - `analyze_adversarial_keys_scenarios.py` profiles patterns; adjust `K`, `DIMENSIONS`, `SIZE` near the bottom of the script.
+  - `analyze_single_insertion.py` inspects single insertion case for adversarial keys.
 
 Benchmarks:
 - Isolated performance runs via the `./benchmark` wrapper; see [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for workflow and scenarios.
