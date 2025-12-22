@@ -152,7 +152,7 @@ def create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=10, size=
         if i == 0:
             rank_list[middle] = 2
         rank_lists.append(rank_list)
-    return rank_lists, middle
+    return rank_lists, [middle]
 
 def create_middle_pattern_rank_lists_single_2_insert_first(dimensions=10, size=10):
     """
@@ -232,11 +232,11 @@ def create_two_middle_twos_rank_lists(dimensions=10, size=100):
 
 if __name__ == "__main__":
     # Adversarial rank lists
-    k = 4  # K-list node capacity
-    dimensions = 5 # Simulate key ranks up to this many dimensions
-    size = 6
+    K = 4           # K-list node capacity
+    DIMENSIONS = 30  # Simulate key ranks up to this many dimensions
+    SIZE = 10        # Number of keys to generate
 
-    rank_lists, insert_key_idx_list = create_first_and_middle_pattern_rank_lists(dimensions=dimensions, size=size)
+    rank_lists, insert_key_idx_list = create_middle_pattern_rank_lists_single_2_insert_middle(dimensions=DIMENSIONS, size=SIZE)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         display_rl = rl
@@ -249,7 +249,7 @@ if __name__ == "__main__":
         print(' '.join(colored_rl))
 
     def profile_find_keys():
-        keys = find_keys_for_rank_lists(rank_lists, k)
+        keys = find_keys_for_rank_lists(rank_lists, K)
         if len(keys) <= 20:
             print("Keys matching rank lists:", keys)
         else:
@@ -259,10 +259,10 @@ if __name__ == "__main__":
         if insert_key_idx_list:
             for insert_key_idx in reversed(insert_key_idx_list):
                 insert_keys.append(keys.pop(insert_key_idx))
-        return keys, reversed(insert_keys)
+        return keys, list(reversed(insert_keys))
 
     def profile_generate_tree(keys):
-        tree = generate_and_populate_tree(keys, k)
+        tree = generate_and_populate_tree(keys, K)
         return tree
     
     def profile_insert_specific(insert_key, insert_key_idx):
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         return tree
     
     # Profile find_keys_for_rank_lists
-    print("\nProfiling find_keys_for_rank_lists...")
+    print("\nProfiling adversarial key generation (find_keys_for_rank_lists)...")
     profiler1 = cProfile.Profile()
     profiler1.enable()
     keys, insert_keys = profile_find_keys()
@@ -284,18 +284,18 @@ if __name__ == "__main__":
         print("Insert keys:", insert_keys)
 
     # Profile generate_and_populate_tree 
-    print("\nProfiling generate_and_populate_tree...")
+    print("\nPROFILING TREE GENERATION WITH ADVERSARIAL KEYS (generate_and_populate_tree)...")
     profiler2 = cProfile.Profile()
     profiler2.enable()
     tree = profile_generate_tree(keys)
     profiler2.disable()
     print("\nTree generated and populated with keys.")
 
-    print("\nProfiling output for find_keys_for_rank_lists:")
+    print("\nPROFILING RESULTS ADVERSARIAL KEY GENERATION (find_keys_for_rank_lists):")
     stats1 = pstats.Stats(profiler1)
     stats1.sort_stats('cumtime').print_stats(20)
 
-    print("\nProfiling output for generate_and_populate_tree and print_tree_nodes:")
+    print("\nPROFILING RESULTS TREE GENERATION WITH ADVERSARIAL KEYS (generate_and_populate_tree):")
     stats2 = pstats.Stats(profiler2)
     stats2.sort_stats('cumtime').print_stats(20)
 
@@ -310,7 +310,7 @@ if __name__ == "__main__":
             print(f"\nSpecific key {insert_key} inserted into the tree.")
             
             # Print stats for this specific insertion
-            print(f"\nProfiling output for insert_specific ({insert_key}):")
+            print(f"\nPROFILING RESULTS SPECIFIC KEY INSERTION (insert_specific) ({insert_key}):")
             stats3 = pstats.Stats(profiler3)
             stats3.sort_stats('cumtime').print_stats(20)
     
