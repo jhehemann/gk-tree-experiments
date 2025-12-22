@@ -50,12 +50,10 @@ class BenchmarkUtils:
         # Use getEffectiveLevel() to handle NOTSET correctly
         effective_level = gplus_logger.getEffectiveLevel()
         if effective_level <= logging.DEBUG:
-            warnings.warn(
+            raise ValueError(
                 f"Logging level is set to {logging.getLevelName(effective_level)}. "
-                "This may contaminate benchmark results with expensive logging output. "
-                "Consider setting logging to INFO or higher for accurate measurements.",
-                RuntimeWarning,
-                stacklevel=2
+                "Benchmarks require logging to be at INFO level or higher to avoid "
+                "performance contamination from verbose debug output."
             )
     
     @staticmethod
