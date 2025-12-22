@@ -46,9 +46,9 @@ class BenchmarkUtils:
         Issues a warning if DEBUG or lower (more verbose) logging is enabled,
         as this can significantly contaminate benchmark results with I/O overhead.
         """
-        root_logger = logging.getLogger()
+        gplus_logger = logging.getLogger("gplus_trees")
         # Use getEffectiveLevel() to handle NOTSET correctly
-        effective_level = root_logger.getEffectiveLevel()
+        effective_level = gplus_logger.getEffectiveLevel()
         if effective_level <= logging.DEBUG:
             warnings.warn(
                 f"Logging level is set to {logging.getLevelName(effective_level)}. "
