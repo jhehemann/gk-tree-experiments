@@ -91,7 +91,7 @@ To verify correctness without timing overhead:
 ./benchmark run --quick 'HEAD^!'
 
 # Or use ASV directly for more control
-cd ../.isolated-benchmarks/gplus-trees
+cd ../.isolated-benchmarks/gk-tree-experiments
 poetry run asv run --quick --show-stderr HEAD^!
 ```
 
@@ -104,8 +104,8 @@ project-root/                          # Working directory (untouched)
 │   └── ISOLATED_BENCHMARKS.md         # This documentation
 └── benchmark                          # Convenience wrapper
 
-../.isolated-benchmarks/                # Isolated benchmark environment
-├── gplus-trees/                       # Separate clone for benchmarking
+../.isolated-benchmarks/               # Isolated benchmark environment
+├── gk-tree-experiments/               # Separate clone for benchmarking
 ├── results/                           # ASV benchmark results
 ├── html/                              # Generated HTML reports
 ├── logs/                              # Benchmark execution logs

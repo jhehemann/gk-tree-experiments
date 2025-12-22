@@ -29,7 +29,7 @@ class IsolatedBenchmarkRunner:
     def __init__(self, working_dir=None):
         self.working_dir = Path(working_dir or os.getcwd())
         self.benchmark_dir = self.working_dir.parent / ".isolated-benchmarks"
-        self.repo_dir = self.benchmark_dir / "gplus-trees"
+        self.repo_dir = self.benchmark_dir / "gk-tree-experiments"
         self.results_dir = self.benchmark_dir / "results"
         self.logs_dir = self.benchmark_dir / "logs"
         self.status_file = self.benchmark_dir / "status.json"
@@ -115,7 +115,7 @@ class IsolatedBenchmarkRunner:
         # Create ASV configuration for isolated environment
         asv_config = {
             "version": 1,
-            "project": "gplus-trees-isolated",
+            "project": "gk-tree-experiments-isolated",
             "project_url": "isolated-benchmarking",
             "repo": str(self.repo_dir),
             "environment_type": "virtualenv",
