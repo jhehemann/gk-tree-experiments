@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "gplustree"
+name = "gk-trees"
 version = "0.1.0"
 description = "A history-independent tree data structure for O(log(n)) tree operations with high probability and fast sequential access"
 authors = ["Jannik Hehemann <jannik@hehemann-melle.de>"]
