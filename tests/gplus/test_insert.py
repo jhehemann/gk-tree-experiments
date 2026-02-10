@@ -1,5 +1,4 @@
 """Tests for G+-trees with factory pattern"""
-# pylint: skip-file
 
 import unittest
 import logging

@@ -1,5 +1,4 @@
 """Tests for G+-trees retrieve method"""
-# pylint: skip-file
 
 import unittest
 import logging

@@ -1,5 +1,4 @@
 """Tests for k-lists with factory pattern"""
-# pylint: skip-file
 
 import unittest
 import random

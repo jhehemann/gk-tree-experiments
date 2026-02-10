@@ -1,5 +1,4 @@
 """Tests for G+-trees with factory pattern"""
-# pylint: skip-file
 
 # Import the unified base class
 from tests.test_base import GPlusTreeTestCase

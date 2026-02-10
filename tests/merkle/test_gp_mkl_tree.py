@@ -1,5 +1,4 @@
 """Tests for Merkle G+-trees"""
-# pylint: skip-file
 
 import unittest
 import numpy as np
