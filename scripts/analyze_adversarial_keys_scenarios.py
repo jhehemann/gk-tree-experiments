@@ -6,11 +6,6 @@ from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import (
     GKPlusTreeBase,
 )
-import sys
-import os
-# Add project root to sys.path so that tests package can be found
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
-
 from tests.test_base import BaseTestCase
 import cProfile
 import pstats

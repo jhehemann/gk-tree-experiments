@@ -1,14 +1,9 @@
 """Tests for GK+ tree utility functions"""
-import sys
-import os
 import unittest
 import random
 from typing import List, Optional
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
-
-# Add the src directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
