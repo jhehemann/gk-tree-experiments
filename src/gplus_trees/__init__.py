@@ -22,6 +22,13 @@ from gplus_trees.g_k_plus import (  # noqa: F401
 # Shared primitives
 from gplus_trees.base import Entry, ItemData, LeafItem  # noqa: F401
 
+# Stats & invariants
+from gplus_trees.tree_stats import Stats, gtree_stats_  # noqa: F401
+from gplus_trees.invariants import (  # noqa: F401
+    InvariantError,
+    check_leaf_keys_and_values,
+)
+
 __all__ = [
     # G⁺-tree
     "GPlusTreeBase",
@@ -35,4 +42,9 @@ __all__ = [
     "Entry",
     "ItemData",
     "LeafItem",
+    # Stats & invariants
+    "Stats",
+    "gtree_stats_",
+    "InvariantError",
+    "check_leaf_keys_and_values",
 ]

@@ -1,5 +1,4 @@
-"""Statistics for gplus trees."""
-# pylint: skip-file
+"""Statistics for G⁺-trees."""
 
 import os
 import logging
@@ -13,16 +12,10 @@ import numpy as np
 import argparse
 
 from gplus_trees.base import LeafItem, ItemData
-from gplus_trees.gplus_tree_base import (
-    GPlusTreeBase,
-    gtree_stats_,
-    DUMMY_ITEM,
-)
+from gplus_trees.gplus_tree_base import GPlusTreeBase
+from gplus_trees.tree_stats import gtree_stats_
+from gplus_trees.invariants import assert_tree_invariants_raise, check_leaf_keys_and_values
 from gplus_trees.factory import create_gplustree
-
-from tests.utils import (
-    assert_tree_invariants_raise,
-)
 
 # Assume create_gtree(items) builds a GPlusTree from a list of (LeafItem, rank) pairs.
 def create_gtree(items, K=16):
@@ -70,62 +63,6 @@ def random_gtree_of_size(n: int, target_node_size: int) -> GPlusTreeBase:
 # The function random_klist_tree just wraps random_gtree_of_size with a given K.
 def random_klist_tree(n: int, K: int) -> GPlusTreeBase:
     return random_gtree_of_size(n, K)
-
-def check_leaf_keys_and_values(
-    tree: GPlusTreeBase,
-    expected_keys: Optional[List[int]] = None
-) -> Tuple[List[int], bool, bool, bool]:
-    """
-    Traverse all leaf nodes exactly once, gathering their real items (key, value),
-    then compute three invariants:
-      1. presence_ok: if `expected_keys` is provided, do we have exactly that set of keys?
-                      otherwise always True.
-      2. all_have_values: are all those items’ values not None?
-      3. order_ok: are the keys in strictly sorted order?
-    
-    Parameters:
-        tree:           The GPlusTreeBase to examine.
-        expected_keys:  Optional list of keys that must match exactly. If None, skip presence test.
-    
-    Returns:
-        (keys, presence_ok, all_have_values, order_ok)
-    """
-    keys = []
-    all_have_values = True
-    order_ok = True
-    
-    # Traverse leaf nodes and collect keys
-    prev_key = None
-    for leaf in tree.iter_leaf_nodes():
-        leaf_set = leaf.set
-        for entry in leaf_set:
-            item = entry.item
-            key = item.key
-            if prev_key is None:
-                if not item is DUMMY_ITEM:
-                    order_ok = False
-            else:
-                keys.append(key)
-
-                # Check if value is non-None
-                if item.value is None:
-                    all_have_values = False
-
-                # Check if keys are in sorted order
-                if key < prev_key:
-                    order_ok = False
-            prev_key = key
-
-    # Check presence only if expected_keys is provided
-    presence_ok = True
-    if expected_keys is not None:
-        if len(keys) != len(expected_keys):
-            presence_ok = False
-        else:
-            # Use a single pass to check presence equivalence
-            presence_ok = set(keys) == set(expected_keys)
-
-    return keys, presence_ok, all_have_values, order_ok
 
 def repeated_experiment(
         size: int,
