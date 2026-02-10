@@ -10,16 +10,7 @@ from statistics import mean
 from typing import List, Optional, Tuple
 from datetime import datetime
 import numpy as np
-import sys
 import argparse
-
-
-
-# Add the project root to the Python path so we can import from tests
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# random.seed(42)  # For reproducibility
-# np.random.seed(42)  # For reproducibility
 
 from gplus_trees.base import ItemData, LeafItem
 from gplus_trees.gplus_tree_base import (
