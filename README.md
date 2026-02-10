@@ -26,6 +26,23 @@ Pip (editable for local development):
 pip install -e .
 ```
 
+> **Note:** An editable install (`pip install -e .`) is required so that all
+> scripts, stats, and tests can import `gplus_trees` and `tests` without
+> `sys.path` manipulation.
+
+## Development
+Lint, format, and type-check:
+```bash
+ruff check .          # lint
+ruff format .         # auto-format
+mypy src/             # type-check
+```
+
+Pre-commit hooks (one-time setup):
+```bash
+pre-commit install
+```
+
 ## Experiments
 Statistics ($\text{G}^{k+}$):
 ```bash

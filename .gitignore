@@ -1,44 +1,52 @@
+# ── Secrets & keys ──────────────────────────────────────────────────
 *private_key.txt
 */keys.json
 
+# ── Python artifacts ────────────────────────────────────────────────
 **/__pycache__/
-*.DS_Store
-
+*.egg-info
+*.pyc
 .mypy_cache
-/.tox/
+.pytest_cache
+.ruff_cache
 
+# ── Virtual environments ────────────────────────────────────────────
 .env
 .1env
-leak_report
-
-/pip
-/tool_test.py
 .venv
-log
+.tox/
+
+# ── Build / packaging ──────────────────────────────────────────────
+/pip
+dist/
+build/
+
+# ── OS / editor ────────────────────────────────────────────────────
+*.DS_Store
+.vscode/
 poetry.toml
 
-.pytest_cache
+# ── Coverage ────────────────────────────────────────────────────────
 coverage.xml
 .coverage
 htmlcov
-*.egg-info
 
-/Pipfile.lock
-__pycache__/
-.env
-
-src/gplus_trees/archive/*
-/tests/benchmarks.py
-
+# ── Logs ────────────────────────────────────────────────────────────
 **/*.log
-
-/stats/run_stats.py
-
-.vscode/
-debug_print_pretty.py
-debug_insert_entry.py
 **/command.txt
 
+# ── Project-specific ignores ───────────────────────────────────────
+/stats/run_stats.py
+/tests/benchmarks.py
+/tool_test.py
+debug_print_pretty.py
+debug_insert_entry.py
+leak_report
+log
+
+# ── Benchmark artifacts ────────────────────────────────────────────
 .asv
 BENCHMARK_SUMMARY.md
 benchmarks/README.md
+
+/Pipfile.lock
