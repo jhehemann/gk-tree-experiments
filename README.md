@@ -38,6 +38,14 @@ ruff format .         # auto-format
 mypy src/             # type-check
 ```
 
+Run tests:
+```bash
+pytest                # recommended: runs all tests with pytest
+pytest -v             # verbose output
+pytest -k test_name   # run tests matching pattern
+python -m unittest discover -s tests -v  # alternative: unittest runner
+```
+
 Pre-commit hooks (one-time setup):
 ```bash
 pre-commit install
@@ -78,15 +86,25 @@ Benchmarks:
 - Isolated performance runs via the `./benchmark` wrapper; see [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for workflow and scenarios.
 
 ## Tests
+Quick start:
 ```bash
-python -m unittest discover -s tests -v
-python tests/test_runner.py --log-level INFO --verbosity 2
+pytest              # run all tests
+pytest -v           # verbose output
+pytest -k insert    # run tests with "insert" in name
+pytest tests/gplus/ # run specific directory
 ```
-- `test_runner.py` flags:
-  - `-f/--files`: target specific test files (supports `file.py::Class::method`).
-  - `-c/--classes`: supply class lists per file (`file.py:ClassA,ClassB`).
-  - `--verbosity`: 0–3 verbosity levels.
-  - `--log-level`: logging level (DEBUG/INFO/WARNING/ERROR/CRITICAL).
+
+Alternative runners:
+```bash
+python -m unittest discover -s tests -v       # unittest discovery
+python tests/test_runner.py --log-level INFO  # custom runner with logging
+```
+
+`test_runner.py` flags:
+- `-f/--files`: target specific test files (supports `file.py::Class::method`).
+- `-c/--classes`: supply class lists per file (`file.py:ClassA,ClassB`).
+- `--verbosity`: 0–3 verbosity levels.
+- `--log-level`: logging level (DEBUG/INFO/WARNING/ERROR/CRITICAL).
 
 ## Project layout
 - [src/gplus_trees/](src/gplus_trees/): core implementations and factories for G+ and GK+ trees.
