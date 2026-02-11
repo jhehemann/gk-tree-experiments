@@ -1537,47 +1537,66 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
         Returns:
             Either the original tree or a new KList based on the threshold
-            
+
         Note (Issue #1):
             If conversion occurs, caller must call _invalidate_tree_size() on the parent tree.
-            The item_count() used here relies on cached values, which may be stale if not
-            properly invalidated after previous operations.
+
+        Implementation note:
+            During a recursive unzip, inner-tree halves may lack their
+            dimension dummy or have expanded leaves whose sub-trees also
+            lack dummies.  The old formula
+            ``item_count - 1 - expanded_count`` relied on every level
+            having its dummy present, which is not guaranteed for unzip
+            artifacts.
+
+            Instead we use ``real_item_count`` (items with key >= 0) as a
+            **fast-reject guard**: since the resulting KList always
+            contains at least the real items, ``real_item_count > threshold``
+            means the tree definitely cannot be collapsed.
+
+            When ``real_item_count <= threshold`` the tree is small enough
+            to speculatively convert via ``_tree_to_klist`` and verify the
+            actual KList size (which may be slightly larger due to
+            lower-dimension dummies that are preserved).  This avoids
+            relying on ``expanded_count`` caches that can be stale after
+            recursive unzip/collapse operations.
         """
-        # Get the threshold based on the KList capacity
         k = self.KListClass.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
-        
+
         if tree.DIM == 1:
             # We want to keep the GKPlusTree structure for dimension 1
             return tree
-        
+
         if tree.is_empty():
             return tree
 
-        tree_item_count = tree.item_count()
-        expected_klist_size = tree_item_count - 1  # Exclude the tree's own dummy item
-        real_item_count = tree.real_item_count()
-        
-        # Fast path: no dummy items in the tree
-        if expected_klist_size == real_item_count:
-            if expected_klist_size <= threshold:
-                new_klist = _tree_to_klist(tree)
-                if IS_DEBUG():
-                    logger.debug(f"[DIM {self.DIM}] GKPlusTree with tree item count {tree_item_count}, real item count {real_item_count} and expected klist item count {expected_klist_size} is below threshold {threshold}: {print_pretty(tree)}")
-                    logger.debug(f"[DIM {self.DIM}] Converted GKPlusTree to KList: {print_pretty(new_klist)}")
-                return new_klist
+        # Fast path: if the tree has more real items than the threshold,
+        # the resulting KList would have at least that many entries, so
+        # collapsing is impossible.
+        real_count = tree.real_item_count()
+        if real_count > threshold:
             return tree
-        
-        # The dummy item from the tree and from all expanded leafs are removed when collapsed
-        expanded_leafs_count = tree.expanded_count()
-        expected_klist_size -= expanded_leafs_count
 
-        if expected_klist_size <= threshold:
-            new_klist = _tree_to_klist(tree)
+        # The tree has few enough real items that it may fit in a KList.
+        # Convert and verify the resulting size (which also includes
+        # lower-dimension dummies that _tree_to_klist preserves).
+        new_klist = _tree_to_klist(tree)
+        klist_size = new_klist.item_count()
+
+        if klist_size <= threshold:
             if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] GKPlusTree with tree item count {tree_item_count}, real item count {real_item_count} and expected klist item count {expected_klist_size} is below threshold {threshold}: {print_pretty(tree)}")
+                logger.debug(
+                    f"[DIM {self.DIM}] GKPlusTree (DIM {tree.DIM}) with "
+                    f"real_item_count {real_count} collapsed to KList with "
+                    f"{klist_size} items (threshold {threshold}): "
+                    f"{print_pretty(tree)}"
+                )
                 logger.debug(f"[DIM {self.DIM}] Converted GKPlusTree to KList: {print_pretty(new_klist)}")
             return new_klist
+
+        # Resulting KList exceeds the threshold (due to preserved
+        # lower-dimension dummies).  Keep the tree structure.
         return tree
 
 
