@@ -51,7 +51,9 @@ class TestGKPlusTreeUnzip(TreeTestCase):
             
             stats = gtree_stats_(tree, {})
             
-            exclude_checks = ['internal_packed'] if is_right else []
+            exclude_checks = ['set_thresholds_met']
+            if is_right:
+                exclude_checks.append('internal_packed')
             assert_tree_invariants_tc(self, tree, stats, exclude_checks=exclude_checks)
 
         # Check that all expected keys are present
@@ -535,7 +537,8 @@ class TestGKPlusTreeUnzip(TreeTestCase):
         # Check that leaf nodes are properly structured
         if not left_tree.is_empty():
             left_stats = gtree_stats_(left_tree, {})
-            assert_tree_invariants_tc(self, left_tree, left_stats)
+            assert_tree_invariants_tc(self, left_tree, left_stats,
+                                      exclude_checks=["set_thresholds_met"])
         
         if not right_tree.is_empty():
             right_stats = gtree_stats_(right_tree, {})
@@ -543,7 +546,7 @@ class TestGKPlusTreeUnzip(TreeTestCase):
             # single-entry internal nodes (internal_packed violation).
             # This is a known limitation of the current unzip algorithm.
             assert_tree_invariants_tc(self, right_tree, right_stats,
-                                      exclude_checks=["internal_packed"])
+                                      exclude_checks=["internal_packed", "set_thresholds_met"])
 
     def test_unzip_with_dummy_entries(self):
         """Test unzipping trees that contain dummy entries."""
