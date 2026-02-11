@@ -43,33 +43,26 @@ def assert_tree_invariants_raise(
 
     for flag in TREE_FLAGS:
         if flag == "set_thresholds_met":
-            if type(t) is not GKPlusTreeBase:
+            if not isinstance(t, GKPlusTreeBase):
                 continue
         if not getattr(stats, flag):
             raise InvariantError(f"Invariant failed: {flag} is False")
 
     if not t.is_empty():
         if stats.item_count <= 0:
-            logger.error("Invariant failed: item_count=%d ≤ 0 for non-empty tree", stats.item_count)
-            return
+            raise InvariantError(f"Invariant failed: item_count={stats.item_count} ≤ 0 for non-empty tree")
         if stats.item_slot_count <= 0:
-            logger.error("Invariant failed: item_slot_count=%d ≤ 0 for non-empty tree", stats.item_slot_count)
-            return
+            raise InvariantError(f"Invariant failed: item_slot_count={stats.item_slot_count} ≤ 0 for non-empty tree")
         if stats.gnode_count <= 0:
-            logger.error("Invariant failed: gnode_count=%d ≤ 0 for non-empty tree", stats.gnode_count)
-            return
+            raise InvariantError(f"Invariant failed: gnode_count={stats.gnode_count} ≤ 0 for non-empty tree")
         if stats.gnode_height <= 0:
-            logger.error("Invariant failed: gnode_height=%d ≤ 0 for non-empty tree", stats.gnode_height)
-            return
+            raise InvariantError(f"Invariant failed: gnode_height={stats.gnode_height} ≤ 0 for non-empty tree")
         if stats.rank <= 0:
-            logger.error("Invariant failed: rank=%d ≤ 0 for non-empty tree", stats.rank)
-            return
+            raise InvariantError(f"Invariant failed: rank={stats.rank} ≤ 0 for non-empty tree")
         if stats.least_item is None:
-            logger.error("Invariant failed: least_item is None for non-empty tree")
-            return
+            raise InvariantError("Invariant failed: least_item is None for non-empty tree")
         if stats.greatest_item is None:
-            logger.error("Invariant failed: greatest_item is None for non-empty tree")
-            return
+            raise InvariantError("Invariant failed: greatest_item is None for non-empty tree")
 
         if hasattr(t, 'get_size'):
             size = t.real_item_count()

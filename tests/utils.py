@@ -22,7 +22,7 @@ def assert_tree_invariants_tc(tc, t: GPlusTreeBase, stats: Stats, err_msg: Optio
         if flag in exclude_checks:
             continue
         if flag == "set_thresholds_met":
-            if type(t) is not GKPlusTreeBase:
+            if not isinstance(t, GKPlusTreeBase):
                 # this flag is only relevant for GKPlusTreeBase
                 continue
         tc.assertTrue(
