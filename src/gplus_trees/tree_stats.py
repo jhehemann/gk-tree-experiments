@@ -5,7 +5,7 @@ from __future__ import annotations
 import collections
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
 from gplus_trees.logging_config import get_logger
@@ -36,6 +36,7 @@ class Stats:
     linked_leaf_nodes: bool
     all_leaf_values_present: bool
     leaf_keys_in_order: bool
+    inner_stats: Optional[List['Stats']] = None
 
 
 def gtree_stats_(
@@ -52,6 +53,7 @@ def gtree_stats_(
     # Lazy imports to break circular dependency
     from gplus_trees.gplus_tree_base import GPlusTreeBase, DUMMY_KEY, get_dummy
     from gplus_trees.klist_base import KListBase
+    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
     from gplus_trees.display import print_pretty
 
     if rank_hist is None:
@@ -77,6 +79,7 @@ def gtree_stats_(
             linked_leaf_nodes=True,
             all_leaf_values_present=True,
             leaf_keys_in_order=True,
+            inner_stats=None,
         )
 
     K = t.SetClass.KListNodeClass.CAPACITY
@@ -91,6 +94,20 @@ def gtree_stats_(
     node_rank = node.rank
     node_item_count = node_set.item_count()
     rank_hist[node_rank] = rank_hist.get(node_rank, 0) + node_set.item_count()
+
+    # ---------- check inner (higher-dimension) tree if node_set is a GKPlusTreeBase ----
+    # When a KList overflows, it is replaced by a recursively instantiated
+    # GKPlusTreeBase at dimension D+1.  That inner tree has its own structural
+    # invariants (heap, search tree, packed, replicas, thresholds, …) that
+    # must also be validated.  We call gtree_stats_ on the inner tree and
+    # merge its boolean flags into the outer stats.
+    #
+    # This is O(total gnodes across all dimensions) — each gnode is visited
+    # exactly once because the inner call only processes the inner tree's
+    # gnodes, not the outer tree's.
+    inner_set_stats = None
+    if isinstance(node_set, GKPlusTreeBase) and not node_set.is_empty():
+        inner_set_stats = gtree_stats_(node_set, rank_hist=None, _is_root=True)
 
     # ---------- recurse on children only if rank > 1 ------------------------------------
     right_stats = gtree_stats_(node_right_subtree, rank_hist, False)
@@ -121,6 +138,7 @@ def gtree_stats_(
         linked_leaf_nodes=True,
         all_leaf_values_present=True,
         leaf_keys_in_order=True,
+        inner_stats=None,
     )
 
     # Precompute common values using right subtree stats
@@ -253,6 +271,37 @@ def gtree_stats_(
     stats.internal_has_replicas &= right_stats.internal_has_replicas
     stats.internal_packed &= right_stats.internal_packed
     stats.linked_leaf_nodes &= right_stats.linked_leaf_nodes
+
+    # ----- INNER (HIGHER-DIMENSION) TREE STATS -----
+    # Merge boolean flags from the inner tree's stats into the outer stats.
+    # This propagates any invariant violation in a higher-dimension tree
+    # up to the outer tree's stats.  We also collect all inner_stats into
+    # a flat list so callers can inspect per-dimension breakdowns.
+    all_inner = []
+
+    if inner_set_stats is not None:
+        # Merge boolean flags from the inner tree
+        stats.is_heap &= inner_set_stats.is_heap
+        stats.is_search_tree &= inner_set_stats.is_search_tree
+        stats.internal_has_replicas &= inner_set_stats.internal_has_replicas
+        stats.internal_packed &= inner_set_stats.internal_packed
+        stats.set_thresholds_met &= inner_set_stats.set_thresholds_met
+        stats.linked_leaf_nodes &= inner_set_stats.linked_leaf_nodes
+        stats.all_leaf_values_present &= inner_set_stats.all_leaf_values_present
+        stats.leaf_keys_in_order &= inner_set_stats.leaf_keys_in_order
+        all_inner.append(inner_set_stats)
+        # Recursively collect any deeper inner stats
+        if inner_set_stats.inner_stats:
+            all_inner.extend(inner_set_stats.inner_stats)
+
+    # Collect inner stats from child subtrees and right subtree
+    for cs in child_stats:
+        if cs.inner_stats:
+            all_inner.extend(cs.inner_stats)
+    if right_stats.inner_stats:
+        all_inner.extend(right_stats.inner_stats)
+
+    stats.inner_stats = all_inner if all_inner else None
 
     # ----- LEAST / GREATEST -----
     if child_stats and child_stats[0].least_item is not None:
