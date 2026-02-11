@@ -17,7 +17,9 @@ from gplus_trees.base import (
 )
 from gplus_trees.klist_base import KListBase
 import logging
-from gplus_trees.base import logger
+from gplus_trees.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # ── Backward-compatible re-exports ──────────────────────────────────
 # These symbols used to live here; they now live in dedicated modules

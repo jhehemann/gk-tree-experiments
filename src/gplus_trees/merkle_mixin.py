@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import struct
-import logging
 from typing import Optional, Union
 
 from gplus_trees.base import InternalItem, LeafItem
+from gplus_trees.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MerkleNodeMixin:

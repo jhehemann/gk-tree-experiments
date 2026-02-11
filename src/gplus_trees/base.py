@@ -2,15 +2,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import hashlib
-from typing import Optional, TypeVar, Generic, Tuple, Union
 import logging
+from typing import Optional, TypeVar, Generic, Tuple, Union
 
 # from gplus_trees.klist_base import KListBase
 from gplus_trees.utils import get_digest
 from gplus_trees.logging_config import get_logger
 
-# Get logger for this module
-logger = get_logger("GPlusTree")
+logger = get_logger(__name__)
 
 class ItemData:
     __slots__ = ("key", "value", "dim_hash_map")

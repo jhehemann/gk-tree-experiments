@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
+from gplus_trees.logging_config import get_logger
 
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
 
-# Re-use the logger from the base module
-from gplus_trees.base import logger
+logger = get_logger(__name__)
 
 
 @dataclass

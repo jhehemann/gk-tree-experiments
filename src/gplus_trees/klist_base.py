@@ -10,7 +10,8 @@ if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
 
 from gplus_trees.logging_config import get_logger
-logger = get_logger("KList")
+
+logger = get_logger(__name__)
 
 class KListNodeBase:
     """
