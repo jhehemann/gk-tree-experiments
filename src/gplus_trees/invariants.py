@@ -10,6 +10,10 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
+from gplus_trees.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
     from gplus_trees.tree_stats import Stats
@@ -46,25 +50,25 @@ def assert_tree_invariants_raise(
 
     if not t.is_empty():
         if stats.item_count <= 0:
-            logging.error(f"Invariant failed: item_count={stats.item_count} ≤ 0 for non-empty tree")
+            logger.error("Invariant failed: item_count=%d ≤ 0 for non-empty tree", stats.item_count)
             return
         if stats.item_slot_count <= 0:
-            logging.error(f"Invariant failed: item_slot_count={stats.item_slot_count} ≤ 0 for non-empty tree")
+            logger.error("Invariant failed: item_slot_count=%d ≤ 0 for non-empty tree", stats.item_slot_count)
             return
         if stats.gnode_count <= 0:
-            logging.error(f"Invariant failed: gnode_count={stats.gnode_count} ≤ 0 for non-empty tree")
+            logger.error("Invariant failed: gnode_count=%d ≤ 0 for non-empty tree", stats.gnode_count)
             return
         if stats.gnode_height <= 0:
-            logging.error(f"Invariant failed: gnode_height={stats.gnode_height} ≤ 0 for non-empty tree")
+            logger.error("Invariant failed: gnode_height=%d ≤ 0 for non-empty tree", stats.gnode_height)
             return
         if stats.rank <= 0:
-            logging.error(f"Invariant failed: rank={stats.rank} ≤ 0 for non-empty tree")
+            logger.error("Invariant failed: rank=%d ≤ 0 for non-empty tree", stats.rank)
             return
         if stats.least_item is None:
-            logging.error("Invariant failed: least_item is None for non-empty tree")
+            logger.error("Invariant failed: least_item is None for non-empty tree")
             return
         if stats.greatest_item is None:
-            logging.error("Invariant failed: greatest_item is None for non-empty tree")
+            logger.error("Invariant failed: greatest_item is None for non-empty tree")
             return
 
         if hasattr(t, 'get_size'):
