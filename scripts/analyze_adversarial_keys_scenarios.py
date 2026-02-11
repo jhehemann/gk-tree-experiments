@@ -1,4 +1,6 @@
 import random
+import argparse
+import logging
 from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.gplus_tree_base import print_pretty
 from gplus_trees.utils import find_keys_for_rank_lists
@@ -192,12 +194,28 @@ def create_dim_1_first_and_middle_2_rank_lists(dimensions=10, size=10):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Analyze adversarial key scenarios for GK+ tree")
+    parser.add_argument("--log-level", type=str, default="INFO",
+                       choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+                       help="Set the logging level (default: INFO)")
+    args = parser.parse_args()
+    
+    # Configure logging
+    log_level = getattr(logging, args.log_level.upper())
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        force=True
+    )
+    logging.getLogger("gplus_trees").setLevel(log_level)
+    
     # Adversarial rank lists
     K = 4           # K-list node capacity
-    DIMENSIONS = 20  # Simulate key ranks up to this many dimensions
-    SIZE = 100        # Number of keys to generate
+    DIMENSIONS = 5  # Simulate key ranks up to this many dimensions
+    SIZE = 10        # Number of keys to generate
 
-    rank_lists, insert_key_idx_list = create_dim_1_first_2_rank_lists(dimensions=DIMENSIONS, size=SIZE)
+    rank_lists, insert_key_idx_list = create_dim_1_first_and_middle_2_rank_lists(dimensions=DIMENSIONS, size=SIZE)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         display_rl = rl
