@@ -1040,6 +1040,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                         left.node.set, _, _ = left.node.set.insert_entry(entry)
                 left.node.set = left.check_and_convert_set(left.node.set)
                 # TODO(#1): Add left._invalidate_tree_size() after set conversion
+                left._invalidate_tree_size()
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
                 
                 if IS_DEBUG():
@@ -1056,6 +1057,7 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}. Pivot next left subtree: {print_pretty(r_pivot_next.left_subtree) if r_pivot_next and r_pivot_next.left_subtree else None}")
                 left.node.set = self.check_and_convert_set(left.node.set)
                 # TODO(#1): Add left._invalidate_tree_size() after set conversion
+                left._invalidate_tree_size()
             else:
                 raise TypeError(f"Set types should match after conversion, got {type(left.node.set).__name__} and {type(other.node.set).__name__}")
 
@@ -1174,6 +1176,13 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
             left_set, left_subtree_of_key, right_set, next_entry = node.set.split_inplace(key)
         else:
             left_set, left_subtree_of_key, right_set, next_entry = node.set.unzip(key)
+
+        # After splitting an inner-tree set, either half may have shrunk
+        # below the collapse threshold.  Re-check both so that undersized
+        # GKPlusTrees are converted back to KLists.  For KList splits this
+        # is a no-op (a KList never needs expansion right after a split).
+        left_set = self.check_and_convert_set(left_set)
+        right_set = self.check_and_convert_set(right_set)
 
         if IS_DEBUG():
             logger.debug(f"[DIM {self.DIM}] Split results - Left: {print_pretty(left_set)}")
