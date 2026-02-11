@@ -1,7 +1,15 @@
-# logconfig.py
-"""Test logging configuration - now using centralized logging."""
+"""Test logging configuration.
 
-from gplus_trees.logging_config import get_test_logger
+This module exists only for backward compatibility.  New test modules
+should obtain their logger directly via::
 
-# Get a logger for tests
-logger = get_test_logger("main")
+    import logging
+    logger = logging.getLogger(__name__)
+
+Logging *configuration* (level, format, handlers) is handled by pytest
+through ``[tool.pytest.ini_options]`` in ``pyproject.toml``.
+"""
+
+import logging
+
+logger = logging.getLogger(__name__)

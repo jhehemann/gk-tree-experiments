@@ -9,8 +9,6 @@ from gplus_trees.factory import make_gplustree_classes
 from tests.test_base import BaseTestCase
 import logging
 
-# Configure logging for test
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Test with different capacities to ensure factory works correctly

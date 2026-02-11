@@ -12,7 +12,9 @@ from tests.utils import assert_tree_invariants_tc
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from statistics import median_low
 
-from tests.logconfig import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TestGKPlusTreeUnzip(TreeTestCase):
     """Tests for the unzip() method in GKPlusTreeBase."""

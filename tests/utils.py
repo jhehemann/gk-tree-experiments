@@ -1,6 +1,5 @@
 """Utility functions for testing GPlusTree invariants."""
 
-import logging
 from typing import Optional
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,

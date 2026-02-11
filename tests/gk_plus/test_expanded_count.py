@@ -1,10 +1,9 @@
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
-from gplus_trees.logging_config import get_test_logger
 import logging
 
-logger = get_test_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class TestGKPlusTreeExpandedCountTracking(GKPlusTreeTestCase):
     def test_expansion_empty_tree(self):

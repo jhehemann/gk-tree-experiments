@@ -8,8 +8,9 @@ from tests.test_base import (
     GKPlusTreeTestCase as TreeTestCase,
 )
 
-from tests.logconfig import logger
 import logging
+
+logger = logging.getLogger(__name__)
 
 class TestInsertMultipleDimensions(TreeTestCase):
     ASSERTION_MESSAGE_TEMPLATE = (

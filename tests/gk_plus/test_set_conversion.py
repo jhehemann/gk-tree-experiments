@@ -13,10 +13,9 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
 from gplus_trees.g_k_plus.utils import calc_rank
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
+import logging
 
-from gplus_trees.logging_config import get_test_logger
-
-logger = get_test_logger("SetConversion")
+logger = logging.getLogger(__name__)
 
 class TestSetConversion(GKPlusTreeTestCase):
     def create_entries(self, keys: List[int], with_subtrees: Optional[bool] = False) -> List[Entry]:

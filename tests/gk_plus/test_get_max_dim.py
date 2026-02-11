@@ -1,6 +1,8 @@
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from tests.logconfig import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TestGKPlusDimensionTracking(GKPlusTreeTestCase):    

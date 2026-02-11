@@ -12,7 +12,9 @@ from gplus_trees.gplus_tree_base import (
 from gplus_trees.base import Entry
 
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
-from tests.logconfig import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TestInsertInTree(TreeTestCase):
