@@ -169,13 +169,20 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         return self.size
 
     def get_tree_item_count(self) -> int:
-        """Get the number of items in the tree (only leafs), including all dummy items in all expanded dimensions.
+        """Get the number of items in the tree (only leafs), including all
+        dummy items in all expanded dimensions.
 
         Complexity:
-            O(n) — visits every subtree.  Result is cached in ``self.item_cnt``;
-            subsequent calls return in O(1) until ``_invalidate_tree_size()``.
-            When leaf sets are inner GK+-trees, their ``item_count`` may also
-            recurse into the next dimension.
+            After initial population the result is cached in
+            ``self.item_cnt``; subsequent calls return in O(1) until
+            ``_invalidate_tree_size()``.
+
+            When caches are stale only along the mutation path (O(h)
+            nodes), recomputation at each node iterates its set
+            (KList → O(k) bounded, GKPlusTree → O(n_inner) flat
+            iteration) and calls ``item_count()`` on each child’s
+            ``left_subtree`` which returns in O(1) from cache for
+            off-path children.
         """
         if self.is_empty():
             self.item_cnt = 0
@@ -199,10 +206,8 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         """Get the number of real items in the tree, excluding dummy items.
 
         Complexity:
-            O(n) — visits every subtree.  Result is cached in ``self.size``;
-            subsequent calls return in O(1) until ``_invalidate_tree_size()``.
-            When leaf sets are inner GK+-trees, their ``real_item_count`` may
-            also recurse into the next dimension.
+            Same caching / invalidation behaviour as
+            ``get_tree_item_count`` — see its docstring.
         """
         if self.is_empty():
             self.size = 0
@@ -253,8 +258,9 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         return self._insert_non_empty(x_entry, rank)
 
     def _invalidate_tree_size(self) -> None:
-        """
-        Invalidate the tree size. This is a placeholder for future implementation.
+        """Invalidate all cached counts (item_cnt, size, expanded_cnt)
+        so that the next query recomputes them from the (now-modified)
+        tree structure.
         """
         self.item_cnt = None
         self.size = None
