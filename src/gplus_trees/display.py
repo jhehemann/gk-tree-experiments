@@ -171,3 +171,72 @@ def collect_leaf_keys(tree: 'GPlusTreeBase') -> list[str]:
             if e.item.key != DUMMY_KEY:
                 out.append(e.item.key)
     return out
+
+
+def print_structure(
+    tree: 'GPlusTreeBase',
+    indent: int = 0,
+    depth: int = 0,
+    max_depth: int = 2,
+) -> str:
+    """Return a debugging-oriented structural dump of a G⁺-tree.
+
+    Recursively prints each node's rank, set type, right subtree, and
+    (for leaf nodes) linked-list next pointer.  The heavy lifting for
+    KList nodes is delegated to :pymethod:`KListBase.print_structure`.
+    """
+    prefix = ' ' * indent
+    if tree is None or tree.is_empty():
+        return f"{prefix}Empty {tree.__class__.__name__}"
+
+    if depth > max_depth:
+        return f"{prefix}... (max depth reached)"
+
+    result = []
+    node = tree.node
+
+    kwargs_print = []
+    if hasattr(node, 'size'):
+        kwargs_print.append(f", size={node.size}")
+    joined_kwargs = ", ".join(kwargs_print)
+
+    result.append(
+        f"{prefix}{node.__class__.__name__}(rank={node.rank}, "
+        f"set={type(node.set).__name__}{joined_kwargs})"
+    )
+    result.append(node.set.print_structure(indent + 4))
+
+    # Right subtree
+    if node.right_subtree is not None:
+        right_node = node.right_subtree.node
+        kwargs_print = []
+        if hasattr(right_node, 'size'):
+            kwargs_print.append(f", size={right_node.size}")
+        joined_kwargs = ", ".join(kwargs_print)
+        result.append(
+            f"{prefix}    Right: {right_node.__class__.__name__}(rank={right_node.rank}, "
+            f"set={type(right_node.set).__name__}{joined_kwargs})"
+        )
+        result.append(right_node.set.print_structure(indent + 8))
+    else:
+        result.append(f"{prefix}    Right: Empty")
+
+    # Linked-list next pointer (leaf nodes only)
+    if node.rank == 1 and hasattr(node, 'next') and node.next:
+        if not node.next.is_empty():
+            next_node = node.next.node
+            kwargs_print = []
+            if hasattr(next_node, 'size'):
+                kwargs_print.append(f", size={next_node.size}")
+            joined_kwargs = ", ".join(kwargs_print)
+            result.append(
+                f"{prefix}    Next: {next_node.__class__.__name__}(rank={next_node.rank}, "
+                f"set={type(next_node.set).__name__}{joined_kwargs})"
+            )
+            result.append(next_node.set.print_structure(indent + 8))
+        else:
+            result.append(f"{prefix}    Next: Empty")
+    elif node.rank == 1 and hasattr(node, 'next') and node.next is None:
+        result.append(f"{prefix}    Next: Empty")
+
+    return "\n".join(result)
