@@ -28,20 +28,21 @@ h_{d+1} small.
 """
 
 from __future__ import annotations
-from typing import Optional, Tuple, TYPE_CHECKING
 
-from gplus_trees.utils import calc_rank_from_digest_k
+from typing import TYPE_CHECKING
+
 from gplus_trees.base import (
     AbstractSetDataStructure,
     Entry,
     _get_replica,
 )
-from gplus_trees.klist_base import KListBase
-from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
+from gplus_trees.gplus_tree_base import get_dummy
+from gplus_trees.klist_base import KListBase
+from gplus_trees.utils import calc_rank_from_digest_k
 
 if TYPE_CHECKING:
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, GKPlusNodeBase
+    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
 
 class GKPlusInsertMixin:
@@ -51,11 +52,10 @@ class GKPlusInsertMixin:
     # Public helpers
     # ------------------------------------------------------------------
 
-    def update(self, cur, x_entry) -> Tuple['GKPlusTreeBase', bool]:
+    def update(self, cur, x_entry) -> tuple[GKPlusTreeBase, bool]:
         """Placeholder for future update logic (e.g. value replacement)."""
         raise NotImplementedError(
-            f"Entry with key {x_entry.item.key} already exists in the "
-            "tree. Updates are not yet implemented."
+            f"Entry with key {x_entry.item.key} already exists in the tree. Updates are not yet implemented."
         )
 
     # ------------------------------------------------------------------
@@ -77,7 +77,7 @@ class GKPlusInsertMixin:
 
         return leaf_set
 
-    def _make_leaf_trees(self, x_entry: Entry) -> Tuple['GKPlusTreeBase', 'GKPlusTreeBase']:
+    def _make_leaf_trees(self, x_entry: Entry) -> tuple[GKPlusTreeBase, GKPlusTreeBase]:
         """
         Builds two linked leaf-level GKPlusTreeBase nodes for x_item insertion
         and returns the corresponding G+-trees.
@@ -106,7 +106,7 @@ class GKPlusInsertMixin:
     # Core insertion methods
     # ------------------------------------------------------------------
 
-    def _insert_empty(self, x_entry: Entry, rank: int) -> 'GKPlusTreeBase':
+    def _insert_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Build the initial tree structure depending on rank."""
         # Single-level leaf
         inserted = True
@@ -122,7 +122,7 @@ class GKPlusInsertMixin:
         self.node = self.NodeClass(rank, root_set, r_leaf_t)
         return self, inserted, None
 
-    def _insert_non_empty(self, x_entry: Entry, rank: int) -> 'GKPlusTreeBase':
+    def _insert_non_empty(self, x_entry: Entry, rank: int) -> GKPlusTreeBase:
         """Optimized version for inserting into a non-empty tree."""
         x_item = x_entry.item
         x_key = x_item.key
@@ -157,12 +157,12 @@ class GKPlusInsertMixin:
 
     def _handle_rank_mismatch(
         self,
-        cur: 'GKPlusTreeBase',
-        parent: 'GKPlusTreeBase',
+        cur: GKPlusTreeBase,
+        parent: GKPlusTreeBase,
         p_next: Entry,
         rank: int,
-        left_parent: Optional['GKPlusTreeBase'] = None,
-    ) -> 'GKPlusTreeBase':
+        left_parent: GKPlusTreeBase | None = None,
+    ) -> GKPlusTreeBase:
         """
         If the current node's rank < rank, we need to create or unfold a
         node to match the new rank.
@@ -178,16 +178,11 @@ class GKPlusInsertMixin:
         TreeClass = type(self)
 
         if parent is None and left_parent is None:
-
             # create a new root node
             old_node = self.node
             dummy = get_dummy(dim=TreeClass.DIM)
             root_set, _, _ = self.SetClass().insert_entry(Entry(dummy, None))
-            self.node = self.NodeClass(
-                rank,
-                root_set,
-                TreeClass(old_node, self.l_factor)
-            )
+            self.node = self.NodeClass(rank, root_set, TreeClass(old_node, self.l_factor))
             return self
 
         # Unfold intermediate node between parent and current
@@ -215,7 +210,7 @@ class GKPlusInsertMixin:
         x_entry: Entry,
         rank: int,
         add_dummy: bool = True,
-    ) -> Tuple['GKPlusTreeBase', bool, Optional[Entry], Optional[Entry]]:
+    ) -> tuple[GKPlusTreeBase, bool, Entry | None, Entry | None]:
         """Insert an entry that is the new minimum into the tree.
 
         Args:
@@ -237,14 +232,14 @@ class GKPlusInsertMixin:
         raise NotImplementedError("_insert_min into non-empty tree is not yet implemented")
 
     # ------------------------------------------------------------------
-    # _insert_new_item – broken into first-iteration and split phases
+    # _insert_new_item - broken into first-iteration and split phases
     # ------------------------------------------------------------------
 
     def _insert_new_item(
         self,
-        cur: 'GKPlusTreeBase',
+        cur: GKPlusTreeBase,
         x_entry: Entry,
-    ) -> 'GKPlusTreeBase':
+    ) -> GKPlusTreeBase:
         """
         Insert a new item key. For internal nodes, we only store the key.
         For leaf nodes, we store the full item.
@@ -283,8 +278,15 @@ class GKPlusInsertMixin:
             # ── First iteration (no split required) ──────────────────
             if right_parent is None:
                 result = self._insert_first_iteration(
-                    cur, node, x_entry, x_item, x_key, replica,
-                    is_leaf, check_and_convert_set, capacity,
+                    cur,
+                    node,
+                    x_entry,
+                    x_item,
+                    x_key,
+                    replica,
+                    is_leaf,
+                    check_and_convert_set,
+                    capacity,
                     GKPlusTreeBase,
                 )
                 # result is either a final return tuple or a continuation tuple
@@ -295,10 +297,22 @@ class GKPlusInsertMixin:
 
             # ── Subsequent iterations (split + reconstruct) ──────────
             result = self._insert_with_split(
-                cur, node, x_entry, x_item, x_key, replica,
-                is_leaf, check_and_convert_set, capacity,
-                right_parent, right_entry, left_parent, left_x_entry,
-                TreeClass, NodeClass, l_factor,
+                cur,
+                node,
+                x_entry,
+                x_item,
+                x_key,
+                replica,
+                is_leaf,
+                check_and_convert_set,
+                capacity,
+                right_parent,
+                right_entry,
+                left_parent,
+                left_x_entry,
+                TreeClass,
+                NodeClass,
+                l_factor,
                 GKPlusTreeBase,
             )
             if result[0] == "_continue":
@@ -308,8 +322,15 @@ class GKPlusInsertMixin:
 
     def _insert_first_iteration(
         self,
-        cur, node, x_entry, x_item, x_key, replica,
-        is_leaf, check_and_convert_set, capacity,
+        cur,
+        node,
+        x_entry,
+        x_item,
+        x_key,
+        replica,
+        is_leaf,
+        check_and_convert_set,
+        capacity,
         GKPlusTreeBase,
     ):
         """Handle the first iteration of ``_insert_new_item`` (no split).
@@ -348,19 +369,31 @@ class GKPlusInsertMixin:
         # Signal to caller to continue into the split phase
         return (
             "_continue",
-            cur,       # right_parent
-            cur,       # left_parent
+            cur,  # right_parent
+            cur,  # left_parent
             next_entry,  # right_entry
             insert_entry,  # left_x_entry
-            subtree,   # new cur
+            subtree,  # new cur
         )
 
     def _insert_with_split(
         self,
-        cur, node, x_entry, x_item, x_key, replica,
-        is_leaf, check_and_convert_set, capacity,
-        right_parent, right_entry, left_parent, left_x_entry,
-        TreeClass, NodeClass, l_factor,
+        cur,
+        node,
+        x_entry,
+        x_item,
+        x_key,
+        replica,
+        is_leaf,
+        check_and_convert_set,
+        capacity,
+        right_parent,
+        right_entry,
+        left_parent,
+        left_x_entry,
+        TreeClass,
+        NodeClass,
+        l_factor,
         GKPlusTreeBase,
     ):
         """Handle subsequent iterations of ``_insert_new_item`` (split phase).
@@ -391,10 +424,12 @@ class GKPlusInsertMixin:
             insert_entry = x_entry if is_leaf else Entry(replica, None)
             if isinstance(right_split, GKPlusTreeBase):
                 digest = x_item.get_digest_for_dim(self.DIM + 1)
-                new_rank = calc_rank_from_digest_k(digest, capacity)
-                tree_insert = bulk_create_gkplus_tree([insert_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass)
+                calc_rank_from_digest_k(digest, capacity)
+                tree_insert = bulk_create_gkplus_tree(
+                    [insert_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass
+                )
 
-                right_split, r_pivot, r_pivot_next = tree_insert.zip(tree_insert, right_split)
+                right_split, _r_pivot, _r_pivot_next = tree_insert.zip(tree_insert, right_split)
                 right_split._invalidate_tree_size()
             else:
                 right_split, _, _ = right_split.insert_entry(insert_entry)
@@ -436,9 +471,7 @@ class GKPlusInsertMixin:
             next_cur = cur.node.right_subtree
         else:
             # Collapse single-item nodes for non-leaves
-            new_subtree = (
-                next_entry.left_subtree if next_entry is not None else cur.node.right_subtree
-            )
+            new_subtree = next_entry.left_subtree if next_entry is not None else cur.node.right_subtree
 
             if left_x_entry is not None:
                 left_x_entry.left_subtree = new_subtree
@@ -455,7 +488,7 @@ class GKPlusInsertMixin:
         # Handle leaf level with early return optimization
         if is_leaf:
             if next_entry is None and node.next is not None:
-                    next_entry = node.next.find_pivot()[0]
+                next_entry = node.next.find_pivot()[0]
             if new_tree and cur:
                 new_tree.node.next = cur.node.next
                 cur.node.next = new_tree
@@ -473,7 +506,7 @@ class GKPlusInsertMixin:
     # Dummy singleton tree
     # ------------------------------------------------------------------
 
-    def _create_dummy_singleton_tree(self, rank: int, dim: int, l_factor: float, KListClass) -> 'GKPlusTreeBase':
+    def _create_dummy_singleton_tree(self, rank: int, dim: int, l_factor: float, KListClass) -> GKPlusTreeBase:
         """Create a dummy singleton tree with a single entry containing the dummy item.
 
         Args:

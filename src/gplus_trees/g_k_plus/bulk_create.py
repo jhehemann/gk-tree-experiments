@@ -1,9 +1,9 @@
 """Bulk creation and conversion utilities for GK+-trees.
 
 Provides:
-- ``bulk_create_gkplus_tree`` – bottom-up bulk creation from an entry sequence.
-- ``_tree_to_klist`` / ``_klist_to_tree`` – bidirectional conversions.
-- ``_bulk_create_klist`` – helper to populate a KList from entries.
+- ``bulk_create_gkplus_tree`` - bottom-up bulk creation from an entry sequence.
+- ``_tree_to_klist`` / ``_klist_to_tree`` - bidirectional conversions.
+- ``_bulk_create_klist`` - helper to populate a KList from entries.
 
 Internal helpers ``_build_leaf_level_trees`` and ``_build_internal_levels``
 are used by ``bulk_create_gkplus_tree`` and are not part of the public API.
@@ -25,35 +25,38 @@ Complexity summary (n = entries, k = KList capacity, h = resulting height):
 """
 
 from __future__ import annotations
-from typing import Optional, Union
+
 from itertools import islice
 
-from gplus_trees.utils import calc_rank_from_digest_k
 from gplus_trees.base import (
-    LeafItem,
-    InternalItem,
     DummyItem,
     Entry,
+    InternalItem,
+    LeafItem,
     _get_replica,
 )
-from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import get_dummy
-
+from gplus_trees.klist_base import KListBase
+from gplus_trees.utils import calc_rank_from_digest_k
 
 # ---------------------------------------------------------------------------
-# RankData – bookkeeping for bulk tree construction
+# RankData - bookkeeping for bulk tree construction
 # ---------------------------------------------------------------------------
+
 
 class RankData:
     """Consolidated data structure for each rank level in bulk tree creation."""
-    __slots__ = ('entries', 'child_indices', 'next_child_idx', 'boundaries', 'pivot_item')
 
-    def __init__(self,
-                 entries: Optional[list[Entry]] = None,
-                 child_indices: Optional[list[int]] = None,
-                 next_child_idx: int = 0,
-                 boundaries: Optional[list[int]] = None,
-                 pivot_item: Optional[Union[LeafItem, InternalItem, DummyItem]] = None):
+    __slots__ = ("boundaries", "child_indices", "entries", "next_child_idx", "pivot_item")
+
+    def __init__(
+        self,
+        entries: list[Entry] | None = None,
+        child_indices: list[int] | None = None,
+        next_child_idx: int = 0,
+        boundaries: list[int] | None = None,
+        pivot_item: LeafItem | InternalItem | DummyItem | None = None,
+    ):
         self.entries = entries
         self.child_indices = child_indices
         self.next_child_idx = next_child_idx
@@ -73,6 +76,7 @@ def _get_create_gkplus_tree():
     global _create_gkplus_tree
     if _create_gkplus_tree is None:
         from gplus_trees.g_k_plus.factory import create_gkplus_tree
+
         _create_gkplus_tree = create_gkplus_tree
     return _create_gkplus_tree
 
@@ -80,6 +84,7 @@ def _get_create_gkplus_tree():
 # ---------------------------------------------------------------------------
 # KList ↔ Tree conversions
 # ---------------------------------------------------------------------------
+
 
 def _tree_to_klist(tree) -> KListBase:
     """Convert a GKPlusTree to a KList.
@@ -136,6 +141,7 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0):
 # ---------------------------------------------------------------------------
 # Bulk creation helpers
 # ---------------------------------------------------------------------------
+
 
 def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KListBase:
     """Create a KList from a list of entries."""
@@ -261,7 +267,7 @@ def _build_internal_levels(
 
             # Create node entries and attach left subtrees
             # Skip the pivot entry as it has no left subtree
-            for entry, child_idx in islice(zip(node_entries, node_child_indices), 1, None):
+            for entry, child_idx in islice(zip(node_entries, node_child_indices, strict=False), 1, None):
                 next_child_idx = prev_child_idx + 1
 
                 if child_idx is not None:
@@ -283,12 +289,7 @@ def _build_internal_levels(
             if node_entries_len <= threshold:
                 node_set = bulk_create_klist_fn(node_entries, KListClass)
             else:
-                node_set = bulk_create_gkplus_tree_fn(
-                    node_entries,
-                    tree_dim_plus_one,
-                    l_factor,
-                    KListClass
-                )
+                node_set = bulk_create_gkplus_tree_fn(node_entries, tree_dim_plus_one, l_factor, KListClass)
 
             # Create tree node with right subtree
             prev_child_idx += 1
@@ -318,8 +319,9 @@ def _build_internal_levels(
 # Main entry point
 # ---------------------------------------------------------------------------
 
+
 def bulk_create_gkplus_tree(
-    entries: Union[list[Entry], KListBase],
+    entries: list[Entry] | KListBase,
     DIM: int,
     l_factor: float,
     KListClass: type[KListBase],
@@ -354,7 +356,6 @@ def bulk_create_gkplus_tree(
     get_replica_fn = _get_replica
     threshold = int(k * l_factor)
     dummy = Entry(get_dummy(DIM), None)
-    dummy_key = dummy.item.key
 
     # Consolidated rank data structure
     rank_data_map: dict[int, RankData] = {}
@@ -463,14 +464,7 @@ def bulk_create_gkplus_tree(
     )
 
     root_tree = _build_internal_levels(
-        rank_data_map,
-        leaf_trees,
-        KListClass,
-        TreeClass,
-        NodeClass,
-        threshold,
-        l_factor,
-        max_rank
+        rank_data_map, leaf_trees, KListClass, TreeClass, NodeClass, threshold, l_factor, max_rank
     )
 
     return root_tree

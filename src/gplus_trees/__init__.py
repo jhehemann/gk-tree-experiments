@@ -9,42 +9,41 @@ See subpackage ``__init__`` files for the full public surface.
 """
 
 # G⁺-tree
-from gplus_trees.factory import create_gplustree, make_gplustree_classes  # noqa: F401
-from gplus_trees.gplus_tree_base import GPlusTreeBase  # noqa: F401
+# Shared primitives
+from gplus_trees.base import Entry, ItemData, LeafItem
+from gplus_trees.factory import create_gplustree, make_gplustree_classes
 
 # Gᵏ⁺-tree
-from gplus_trees.g_k_plus import (  # noqa: F401
+from gplus_trees.g_k_plus import (
     GKPlusTreeBase,
     create_gkplus_tree,
     make_gkplustree_classes,
 )
-
-# Shared primitives
-from gplus_trees.base import Entry, ItemData, LeafItem  # noqa: F401
-
-# Stats & invariants
-from gplus_trees.tree_stats import Stats, gtree_stats_  # noqa: F401
-from gplus_trees.invariants import (  # noqa: F401
+from gplus_trees.gplus_tree_base import GPlusTreeBase
+from gplus_trees.invariants import (
     InvariantError,
     check_leaf_keys_and_values,
 )
 
+# Stats & invariants
+from gplus_trees.tree_stats import Stats, gtree_stats_
+
 __all__ = [
-    # G⁺-tree
-    "GPlusTreeBase",
-    "create_gplustree",
-    "make_gplustree_classes",
-    # Gᵏ⁺-tree
-    "GKPlusTreeBase",
-    "create_gkplus_tree",
-    "make_gkplustree_classes",
     # Primitives
     "Entry",
+    # Gᵏ⁺-tree
+    "GKPlusTreeBase",
+    # G⁺-tree
+    "GPlusTreeBase",
+    "InvariantError",
     "ItemData",
     "LeafItem",
     # Stats & invariants
     "Stats",
-    "gtree_stats_",
-    "InvariantError",
     "check_leaf_keys_and_values",
+    "create_gkplus_tree",
+    "create_gplustree",
+    "gtree_stats_",
+    "make_gkplustree_classes",
+    "make_gplustree_classes",
 ]

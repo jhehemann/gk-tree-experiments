@@ -7,8 +7,7 @@ dependency between ``stats`` and ``tests``.
 
 from __future__ import annotations
 
-import logging
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from gplus_trees.logging_config import get_logger
 
@@ -35,16 +34,15 @@ class InvariantError(Exception):
 
 
 def assert_tree_invariants_raise(
-    t: 'GPlusTreeBase',
-    stats: 'Stats',
+    t: GPlusTreeBase,
+    stats: Stats,
 ) -> None:
     """Check all invariants, raising :class:`InvariantError` on the first failure."""
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
     for flag in TREE_FLAGS:
-        if flag == "set_thresholds_met":
-            if not isinstance(t, GKPlusTreeBase):
-                continue
+        if flag == "set_thresholds_met" and not isinstance(t, GKPlusTreeBase):
+            continue
         if not getattr(stats, flag):
             raise InvariantError(f"Invariant failed: {flag} is False")
 
@@ -64,7 +62,7 @@ def assert_tree_invariants_raise(
         if stats.greatest_item is None:
             raise InvariantError("Invariant failed: greatest_item is None for non-empty tree")
 
-        if hasattr(t, 'get_size'):
+        if hasattr(t, "get_size"):
             size = t.real_item_count()
             if size != stats.real_item_count:
                 raise InvariantError(
@@ -72,9 +70,10 @@ def assert_tree_invariants_raise(
                 )
 
 
-def _get_dummy_for_tree(tree: 'GPlusTreeBase'):
+def _get_dummy_for_tree(tree: GPlusTreeBase):
     """Return the sentinel dummy item for *tree* (works for both G⁺ and Gᵏ⁺)."""
     from gplus_trees.gplus_tree_base import DUMMY_ITEM, get_dummy
+
     dim = getattr(tree.__class__, "DIM", None)
     if dim is not None:
         return get_dummy(dim=dim)
@@ -82,9 +81,9 @@ def _get_dummy_for_tree(tree: 'GPlusTreeBase'):
 
 
 def check_leaf_keys_and_values(
-    tree: 'GPlusTreeBase',
-    expected_keys: Optional[List[int]] = None,
-) -> Tuple[List[int], bool, bool, bool]:
+    tree: GPlusTreeBase,
+    expected_keys: list[int] | None = None,
+) -> tuple[list[int], bool, bool, bool]:
     """Traverse leaf nodes and validate keys / values.
 
     Works for both :class:`GPlusTreeBase` and :class:`GKPlusTreeBase`.
@@ -95,7 +94,7 @@ def check_leaf_keys_and_values(
     """
     dummy = _get_dummy_for_tree(tree)
 
-    keys: List[int] = []
+    keys: list[int] = []
     all_have_values = True
     order_ok = True
 

@@ -25,11 +25,12 @@ threshold = k · l_factor):
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
-from gplus_trees.klist_base import KListBase
 from gplus_trees.g_k_plus.bulk_create import _klist_to_tree, _tree_to_klist
+from gplus_trees.klist_base import KListBase
 
 if TYPE_CHECKING:
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
@@ -38,9 +39,7 @@ if TYPE_CHECKING:
 class GKPlusConversionMixin:
     """Mixin that contributes KList↔GKPlusTree conversion methods to *GKPlusTreeBase*."""
 
-    def check_and_convert_set(self,
-                              set: AbstractSetDataStructure
-                              ) -> AbstractSetDataStructure:
+    def check_and_convert_set(self, set: AbstractSetDataStructure) -> AbstractSetDataStructure:
         """Check and convert set between KList and GKPlusTree based on thresholds.
 
         TODO(#1): After calling this method and replacing node.set, the caller MUST
@@ -55,12 +54,9 @@ class GKPlusConversionMixin:
         elif isinstance(set, GKPlusTreeBase):
             return self.check_and_collapse_tree(set)
         else:
-            raise TypeError(f"Unsupported set type: {type(set).__name__}. "
-                            "Expected KListBase or GKPlusTreeBase.")
+            raise TypeError(f"Unsupported set type: {type(set).__name__}. Expected KListBase or GKPlusTreeBase.")
 
-    def check_and_expand_klist(self,
-                               klist: KListBase
-                               ) -> AbstractSetDataStructure:
+    def check_and_expand_klist(self, klist: KListBase) -> AbstractSetDataStructure:
         """
         Check if a KList exceeds the threshold and should be converted to a GKPlusTree.
 
@@ -84,9 +80,7 @@ class GKPlusConversionMixin:
 
         return klist
 
-    def check_and_collapse_tree(self,
-                                tree: 'GKPlusTreeBase'
-                                ) -> AbstractSetDataStructure:
+    def check_and_collapse_tree(self, tree: GKPlusTreeBase) -> AbstractSetDataStructure:
         """
         Check if a GKPlusTree has few enough items to be collapsed into a KList.
 

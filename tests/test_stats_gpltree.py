@@ -1,15 +1,15 @@
 """Tests for the gtree_stats_ function and Stats dataclass in tree_stats.py"""
 
-import unittest
 import logging
+import unittest
 
-from gplus_trees.base import ItemData, LeafItem, InternalItem, DummyItem, Entry, _get_replica
-from gplus_trees.factory import make_gplustree_classes, create_gplustree
-from gplus_trees.gplus_tree_base import DUMMY_KEY, DUMMY_ITEM, gtree_stats_, print_pretty
-from gplus_trees.tree_stats import Stats, _get_capacity
+from gplus_trees.base import Entry, InternalItem, ItemData, LeafItem
+from gplus_trees.factory import create_gplustree, make_gplustree_classes
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
+from gplus_trees.gplus_tree_base import DUMMY_KEY, gtree_stats_
 from gplus_trees.klist_base import KListBase
+from gplus_trees.tree_stats import Stats, _get_capacity
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def _build_tree_with_items(keys, ranks):
     """
     tree = create_gplustree(K_VALUE)
     item_map = {}
-    for k, r in zip(keys, ranks):
+    for k, r in zip(keys, ranks, strict=False):
         item = _make_item(k)
         item_map[k] = item
         tree.insert(item, r)
@@ -42,6 +42,7 @@ def _build_tree_with_items(keys, ranks):
 
 
 # ─── Tests on empty / trivially-small trees ────────────────────────
+
 
 class TestStatsEmptyTree(unittest.TestCase):
     """gtree_stats_ on an empty tree should return neutral / zero stats."""
@@ -134,6 +135,7 @@ class TestStatsSingleHighRankItem(unittest.TestCase):
 
 # ─── Multi-item trees with valid structure ─────────────────────────
 
+
 class TestStatsMultipleItems(unittest.TestCase):
     """Build a tree with several items and verify aggregated stats."""
 
@@ -177,8 +179,7 @@ class TestStatsLargerTree(unittest.TestCase):
 
     def setUp(self):
         self.keys = list(range(1, 21))
-        self.ranks = [1, 3, 2, 1, 4, 1, 2, 3, 1, 2,
-                      1, 5, 1, 2, 3, 1, 1, 2, 1, 6]
+        self.ranks = [1, 3, 2, 1, 4, 1, 2, 3, 1, 2, 1, 5, 1, 2, 3, 1, 1, 2, 1, 6]
         self.tree, _ = _build_tree_with_items(self.keys, self.ranks)
 
     def test_real_item_count(self):
@@ -199,6 +200,7 @@ class TestStatsLargerTree(unittest.TestCase):
 
 
 # ─── Deliberate violations ─────────────────────────────────────────
+
 
 class TestStatsHeapViolation(unittest.TestCase):
     """Manually break the heap property and verify stats detect it."""
@@ -251,8 +253,7 @@ class TestStatsSearchTreeViolation(unittest.TestCase):
         # Swap the DUMMY_ITEM slot with item3 → key order violated
         tree.node.set.head.entries[0].item = item3
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.is_search_tree,
-                         "Expected is_search_tree=False after swapping first key")
+        self.assertFalse(stats.is_search_tree, "Expected is_search_tree=False after swapping first key")
 
 
 class TestStatsLinkedLeafViolation(unittest.TestCase):
@@ -278,8 +279,7 @@ class TestStatsLinkedLeafViolation(unittest.TestCase):
         tree.node.next = extra_leaf
 
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.linked_leaf_nodes,
-                         "Expected linked_leaf_nodes=False with rogue leaf attached")
+        self.assertFalse(stats.linked_leaf_nodes, "Expected linked_leaf_nodes=False with rogue leaf attached")
         # The extra leaf items should be counted
         self.assertEqual(stats.real_item_count, 3)
 
@@ -303,15 +303,15 @@ class TestStatsInternalPackedViolation(unittest.TestCase):
                 child = entry.left_subtree
                 if child.node.rank >= 2 and child.node.right_subtree:
                     target = child.node.right_subtree
-                    if (not target.is_empty()
-                            and target.node.rank >= 2
-                            and target.node.set.item_count() >= 2):
+                    if not target.is_empty() and target.node.rank >= 2 and target.node.set.item_count() >= 2:
                         # Remove the last real entry
                         entries_list = list(target.node.set)
                         target.node.set.delete(entries_list[-1].item.key)
                         stats = gtree_stats_(self.tree)
-                        self.assertFalse(stats.internal_packed,
-                                         "Expected internal_packed=False after deleting entry from internal node")
+                        self.assertFalse(
+                            stats.internal_packed,
+                            "Expected internal_packed=False after deleting entry from internal node",
+                        )
                         return
 
         # If no suitable internal node found, skip
@@ -360,9 +360,10 @@ class TestStatsInternalReplicaViolation(unittest.TestCase):
             self.skipTest("Could not find an internal replica to tamper with")
 
         stats = gtree_stats_(self.tree)
-        self.assertFalse(stats.internal_has_replicas,
-                         "Expected internal_has_replicas=False "
-                         "after replacing a replica with a LeafItem carrying a value")
+        self.assertFalse(
+            stats.internal_has_replicas,
+            "Expected internal_has_replicas=False after replacing a replica with a LeafItem carrying a value",
+        )
 
 
 class TestStatsLeafKeysOrder(unittest.TestCase):
@@ -375,18 +376,15 @@ class TestStatsLeafKeysOrder(unittest.TestCase):
 
     def test_disordered_keys_via_swap(self):
         """Swap two leaf entries' items so leaf keys are out of order."""
-        tree, items = _build_tree_with_items([1, 2, 3], [1, 1, 1])
+        tree, _items = _build_tree_with_items([1, 2, 3], [1, 1, 1])
         # Direct swap on the single leaf node
         entries = list(tree.node.set)
         real_entries = [e for e in entries if e.item.key >= 0]
         if len(real_entries) >= 2:
             # Swap keys by swapping Item objects
-            real_entries[0].item, real_entries[-1].item = (
-                real_entries[-1].item, real_entries[0].item
-            )
+            real_entries[0].item, real_entries[-1].item = (real_entries[-1].item, real_entries[0].item)
             stats = gtree_stats_(tree)
-            self.assertFalse(stats.leaf_keys_in_order,
-                             "Expected leaf_keys_in_order=False after swapping leaf keys")
+            self.assertFalse(stats.leaf_keys_in_order, "Expected leaf_keys_in_order=False after swapping leaf keys")
 
 
 class TestStatsAllLeafValuesPresent(unittest.TestCase):
@@ -399,7 +397,7 @@ class TestStatsAllLeafValuesPresent(unittest.TestCase):
 
     def test_missing_leaf_value(self):
         """Set a leaf item's value to None → all_leaf_values_present=False."""
-        tree, items = _build_tree_with_items([1, 2, 3], [1, 1, 1])
+        tree, _items = _build_tree_with_items([1, 2, 3], [1, 1, 1])
         # Null out the value of the first real item at the leaf
         for entry in tree.node.set:
             if entry.item.key >= 0:
@@ -407,11 +405,13 @@ class TestStatsAllLeafValuesPresent(unittest.TestCase):
                 break
 
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.all_leaf_values_present,
-                         "Expected all_leaf_values_present=False after nulling a leaf value")
+        self.assertFalse(
+            stats.all_leaf_values_present, "Expected all_leaf_values_present=False after nulling a leaf value"
+        )
 
 
 # ─── set_thresholds_met violation ──────────────────────────────────
+
 
 class TestStatsSetThresholdsMetViolation(unittest.TestCase):
     """Test ``set_thresholds_met`` using GKPlus-trees.
@@ -430,7 +430,7 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
         """Build a GK+-tree by inserting items with given keys and ranks."""
         tree = create_gkplus_tree(K=K, dimension=1, l_factor=l_factor)
         item_map = {}
-        for k, r in zip(keys, ranks):
+        for k, r in zip(keys, ranks, strict=False):
             item = _make_item(k)
             item_map[k] = item
             tree.insert(item, r)
@@ -457,21 +457,19 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
         extra_item = _make_item(99)
         tree.node.set.insert_entry(Entry(extra_item, None))
 
-        self.assertGreater(tree.node.set.item_count(), threshold,
-                           "Precondition: KList count must exceed threshold")
+        self.assertGreater(tree.node.set.item_count(), threshold, "Precondition: KList count must exceed threshold")
 
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.set_thresholds_met,
-                         "Expected set_thresholds_met=False when GKPlus KList exceeds threshold")
+        self.assertFalse(
+            stats.set_thresholds_met, "Expected set_thresholds_met=False when GKPlus KList exceeds threshold"
+        )
 
     def test_internal_klist_exceeds_threshold(self):
         """Overflow an internal node's KList in a GKPlus-tree
         → set_thresholds_met=False."""
         K = K_VALUE
         l_factor = 1.0
-        tree, _ = self._build_gkplus_tree(
-            [1, 2, 3, 4, 5], [2, 3, 2, 1, 4], K=K, l_factor=l_factor
-        )
+        tree, _ = self._build_gkplus_tree([1, 2, 3, 4, 5], [2, 3, 2, 1, 4], K=K, l_factor=l_factor)
         threshold = int(l_factor * K)
 
         def _overflow_internal(t):
@@ -492,16 +490,15 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
             for entry in node.set:
                 if entry.left_subtree and _overflow_internal(entry.left_subtree):
                     return True
-            if node.right_subtree and _overflow_internal(node.right_subtree):
-                return True
-            return False
+            return bool(node.right_subtree and _overflow_internal(node.right_subtree))
 
         if not _overflow_internal(tree):
             self.skipTest("Could not overflow any internal node's KList")
 
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.set_thresholds_met,
-                         "Expected set_thresholds_met=False after overflowing GKPlus internal KList")
+        self.assertFalse(
+            stats.set_thresholds_met, "Expected set_thresholds_met=False after overflowing GKPlus internal KList"
+        )
 
     def test_standard_gplus_tree_overflow_is_irrelevant(self):
         """In a standard GPlusTree, set_thresholds_met may fire False
@@ -517,6 +514,7 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
 
 
 # ─── set_thresholds_met regression (random tree collapse) ─────────
+
 
 class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
     """Regression tests for ``set_thresholds_met`` invariant violations
@@ -541,6 +539,7 @@ class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
     def _build_random_tree(self, n, K, l_factor, seed):
         """Build a random GK+-tree replicating the stats script logic."""
         import random as _random
+
         import numpy as _np
 
         rng = _random.Random(seed)
@@ -552,7 +551,7 @@ class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
         ranks = np_rng.geometric(p, size=n)
 
         tree = create_gkplus_tree(K=K, l_factor=l_factor)
-        for idx, rank in zip(indices, ranks):
+        for idx, rank in zip(indices, ranks, strict=False):
             item = LeafItem(ItemData(idx, "val"))
             tree.insert(item, int(rank))
 
@@ -565,6 +564,7 @@ class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
         (threshold=4) and reproduce the collapse bug.
         """
         from gplus_trees.invariants import assert_tree_invariants_raise
+
         tree = self._build_random_tree(n=200, K=4, l_factor=1.0, seed=42)
         stats = gtree_stats_(tree)
         # Should not raise
@@ -576,13 +576,11 @@ class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
             with self.subTest(seed=seed):
                 tree = self._build_random_tree(n=200, K=4, l_factor=1.0, seed=seed)
                 stats = gtree_stats_(tree)
-                self.assertTrue(
-                    stats.set_thresholds_met,
-                    f"set_thresholds_met violated for seed={seed}"
-                )
+                self.assertTrue(stats.set_thresholds_met, f"set_thresholds_met violated for seed={seed}")
 
 
 # ─── _get_capacity helper ──────────────────────────────────────────
+
 
 class TestGetCapacity(unittest.TestCase):
     """Test the _get_capacity helper function."""
@@ -591,11 +589,11 @@ class TestGetCapacity(unittest.TestCase):
         for K in (2, 4, 8, 16):
             TreeK, _, _, _ = make_gplustree_classes(K)
             cap = _get_capacity(TreeK)
-            self.assertEqual(cap, K,
-                             f"Expected _get_capacity to return {K}, got {cap}")
+            self.assertEqual(cap, K, f"Expected _get_capacity to return {K}, got {cap}")
 
 
 # ─── rank_hist parameter ──────────────────────────────────────────
+
 
 class TestStatsRankHistogram(unittest.TestCase):
     """Verify the rank histogram is correctly populated."""
@@ -616,11 +614,11 @@ class TestStatsRankHistogram(unittest.TestCase):
         gtree_stats_(tree, rank_hist=hist)
         total = sum(hist.values())
         stats = gtree_stats_(tree)
-        self.assertEqual(total, stats.item_count,
-                         "Sum of rank_hist values should equal total item_count")
+        self.assertEqual(total, stats.item_count, "Sum of rank_hist values should equal total item_count")
 
 
 # ─── Edge cases ────────────────────────────────────────────────────
+
 
 class TestStatsRankConsistency(unittest.TestCase):
     """Stats.rank should equal the root node's rank."""
@@ -646,8 +644,9 @@ class TestStatsHeightLeafCountConsistency(unittest.TestCase):
         stats = gtree_stats_(tree)
         self.assertGreater(stats.gnode_height, 1)
         self.assertGreater(stats.leaf_count, 1)
-        self.assertGreater(stats.gnode_count, stats.leaf_count,
-                           "gnode_count should exceed leaf_count when internal nodes exist")
+        self.assertGreater(
+            stats.gnode_count, stats.leaf_count, "gnode_count should exceed leaf_count when internal nodes exist"
+        )
 
 
 class TestStatsItemSlotCount(unittest.TestCase):
@@ -656,8 +655,7 @@ class TestStatsItemSlotCount(unittest.TestCase):
     def test_slot_count(self):
         tree, _ = _build_tree_with_items([1, 2, 3, 4, 5], [2, 3, 2, 1, 4])
         stats = gtree_stats_(tree)
-        self.assertGreaterEqual(stats.item_slot_count, stats.item_count,
-                                "item_slot_count must be >= item_count")
+        self.assertGreaterEqual(stats.item_slot_count, stats.item_count, "item_slot_count must be >= item_count")
 
 
 class TestStatsMultipleKValues(unittest.TestCase):
@@ -695,12 +693,12 @@ class TestStatsIdempotent(unittest.TestCase):
         s2 = gtree_stats_(tree)
         for field in Stats.__dataclass_fields__:
             self.assertEqual(
-                getattr(s1, field), getattr(s2, field),
-                f"Stats.{field} differs between two consecutive calls"
+                getattr(s1, field), getattr(s2, field), f"Stats.{field} differs between two consecutive calls"
             )
 
 
 # ─── Inner (higher-dimension) tree stats ───────────────────────────
+
 
 class TestStatsInnerTreeBasic(unittest.TestCase):
     """Verify that inner_stats is populated when a GKPlus leaf's KList
@@ -722,11 +720,13 @@ class TestStatsInnerTreeBasic(unittest.TestCase):
         inner_stats after calling gtree_stats_."""
         tree = self._build_expanded_tree()
         # Precondition: node.set must be a GKPlusTreeBase
-        self.assertIsInstance(tree.node.set, GKPlusTreeBase,
-                              "Expected node.set to be a recursively instantiated GKPlusTreeBase")
+        self.assertIsInstance(
+            tree.node.set, GKPlusTreeBase, "Expected node.set to be a recursively instantiated GKPlusTreeBase"
+        )
         stats = gtree_stats_(tree)
-        self.assertIsNotNone(stats.inner_stats,
-                             "Expected inner_stats to be populated when node_set is a GKPlusTreeBase")
+        self.assertIsNotNone(
+            stats.inner_stats, "Expected inner_stats to be populated when node_set is a GKPlusTreeBase"
+        )
         self.assertGreater(len(stats.inner_stats), 0)
 
     def test_inner_stats_is_valid_stats(self):
@@ -736,10 +736,8 @@ class TestStatsInnerTreeBasic(unittest.TestCase):
         stats = gtree_stats_(tree)
         for i, inner in enumerate(stats.inner_stats):
             self.assertIsInstance(inner, Stats, f"inner_stats[{i}] should be a Stats")
-            self.assertGreater(inner.gnode_count, 0,
-                               f"inner_stats[{i}].gnode_count should be > 0")
-            self.assertGreater(inner.item_count, 0,
-                               f"inner_stats[{i}].item_count should be > 0")
+            self.assertGreater(inner.gnode_count, 0, f"inner_stats[{i}].gnode_count should be > 0")
+            self.assertGreater(inner.item_count, 0, f"inner_stats[{i}].item_count should be > 0")
 
     def test_inner_tree_all_flags_true(self):
         """A well-formed expanded tree should have all inner invariant
@@ -800,11 +798,9 @@ class TestStatsInnerTreeViolationPropagation(unittest.TestCase):
         # Inner should report the violation
         self.assertIsNotNone(stats.inner_stats)
         inner_search_ok = all(s.is_search_tree for s in stats.inner_stats)
-        self.assertFalse(inner_search_ok,
-                         "Expected at least one inner_stats to have is_search_tree=False")
+        self.assertFalse(inner_search_ok, "Expected at least one inner_stats to have is_search_tree=False")
         # Outer should inherit the violation
-        self.assertFalse(stats.is_search_tree,
-                         "Inner search-tree violation must propagate to outer stats")
+        self.assertFalse(stats.is_search_tree, "Inner search-tree violation must propagate to outer stats")
 
     def test_inner_leaf_value_violation_propagates(self):
         """Null a leaf value in the inner tree → all_leaf_values_present
@@ -822,8 +818,7 @@ class TestStatsInnerTreeViolationPropagation(unittest.TestCase):
             break
 
         stats = gtree_stats_(tree)
-        self.assertFalse(stats.all_leaf_values_present,
-                         "Inner all_leaf_values_present=False must propagate to outer")
+        self.assertFalse(stats.all_leaf_values_present, "Inner all_leaf_values_present=False must propagate to outer")
 
     def test_inner_heap_violation_propagates(self):
         """Break the heap property in the inner tree and verify it
@@ -836,8 +831,7 @@ class TestStatsInnerTreeViolationPropagation(unittest.TestCase):
         if inner_tree.node.rank > 1:
             inner_tree.node.rank = 1  # lower root rank below children
             stats = gtree_stats_(tree)
-            self.assertFalse(stats.is_heap,
-                             "Inner heap violation must propagate to outer stats")
+            self.assertFalse(stats.is_heap, "Inner heap violation must propagate to outer stats")
         else:
             # Inner tree is a single leaf → can't violate heap
             self.skipTest("Inner tree has rank 1, cannot create heap violation")
@@ -850,8 +844,7 @@ class TestStatsNoInnerStatsForKList(unittest.TestCase):
         """Standard GPlusTree never has inner trees."""
         tree, _ = _build_tree_with_items([1, 2, 3, 4, 5], [2, 3, 2, 1, 4])
         stats = gtree_stats_(tree)
-        self.assertIsNone(stats.inner_stats,
-                          "Standard GPlusTree should not have inner_stats")
+        self.assertIsNone(stats.inner_stats, "Standard GPlusTree should not have inner_stats")
 
     def test_small_gkplus_tree_no_inner_stats(self):
         """A GKPlus tree with few items (no KList overflow) should have
@@ -860,11 +853,9 @@ class TestStatsNoInnerStatsForKList(unittest.TestCase):
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1.0)
         for key in [10, 20, 30]:
             tree.insert(_make_item(key), rank=1)
-        self.assertIsInstance(tree.node.set, KListBase,
-                              "Precondition: node.set should still be a KList")
+        self.assertIsInstance(tree.node.set, KListBase, "Precondition: node.set should still be a KList")
         stats = gtree_stats_(tree)
-        self.assertIsNone(stats.inner_stats,
-                          "Non-expanded GKPlus tree should not have inner_stats")
+        self.assertIsNone(stats.inner_stats, "Non-expanded GKPlus tree should not have inner_stats")
 
     def test_empty_tree_no_inner_stats(self):
         stats = gtree_stats_(None)
@@ -883,13 +874,12 @@ class TestStatsInnerStatsIdempotent(unittest.TestCase):
         s2 = gtree_stats_(tree)
 
         self.assertEqual(len(s1.inner_stats or []), len(s2.inner_stats or []))
-        for i, (a, b) in enumerate(zip(s1.inner_stats or [], s2.inner_stats or [])):
+        for i, (a, b) in enumerate(zip(s1.inner_stats or [], s2.inner_stats or [], strict=False)):
             for field in Stats.__dataclass_fields__:
-                if field == 'inner_stats':
+                if field == "inner_stats":
                     continue  # Skip recursive comparison
                 self.assertEqual(
-                    getattr(a, field), getattr(b, field),
-                    f"inner_stats[{i}].{field} differs between consecutive calls"
+                    getattr(a, field), getattr(b, field), f"inner_stats[{i}].{field} differs between consecutive calls"
                 )
 
 
@@ -904,7 +894,7 @@ class TestStatsInnerMultiNodeTree(unittest.TestCase):
         # K=2 means threshold=2; any leaf with > 2 entries triggers expansion
         keys = list(range(10, 110, 10))
         ranks = [2, 3, 2, 1, 4, 1, 2, 3, 1, 2]
-        for k, r in zip(keys, ranks):
+        for k, r in zip(keys, ranks, strict=False):
             tree.insert(_make_item(k), r)
 
         stats = gtree_stats_(tree)
@@ -929,19 +919,29 @@ class TestStatsInnerStatsField(unittest.TestCase):
     def test_inner_stats_default_none(self):
         """Stats created manually should default inner_stats to None."""
         s = Stats(
-            gnode_height=0, gnode_count=0, item_count=0,
-            real_item_count=0, item_slot_count=0, leaf_count=0,
-            rank=-1, is_heap=True, least_item=None, greatest_item=None,
-            is_search_tree=True, internal_has_replicas=True,
-            internal_packed=True, set_thresholds_met=True,
-            linked_leaf_nodes=True, all_leaf_values_present=True,
+            gnode_height=0,
+            gnode_count=0,
+            item_count=0,
+            real_item_count=0,
+            item_slot_count=0,
+            leaf_count=0,
+            rank=-1,
+            is_heap=True,
+            least_item=None,
+            greatest_item=None,
+            is_search_tree=True,
+            internal_has_replicas=True,
+            internal_packed=True,
+            set_thresholds_met=True,
+            linked_leaf_nodes=True,
+            all_leaf_values_present=True,
             leaf_keys_in_order=True,
         )
         self.assertIsNone(s.inner_stats)
 
     def test_inner_stats_in_dataclass_fields(self):
         """inner_stats should be a recognized dataclass field."""
-        self.assertIn('inner_stats', Stats.__dataclass_fields__)
+        self.assertIn("inner_stats", Stats.__dataclass_fields__)
 
 
 if __name__ == "__main__":

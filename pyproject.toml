@@ -55,11 +55,14 @@ ignore = [
 known-first-party = ["gplus_trees", "tests"]
 
 # ── Mypy (type checker) ────────────────────────────────────────────
+# NOTE: mypy is available locally but not enforced in CI.
+# The mixin-based architecture causes widespread attr-defined / union-attr
+# false positives. Re-enable in CI after adding Protocol stubs.
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false       # start permissive, tighten later
+disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
 

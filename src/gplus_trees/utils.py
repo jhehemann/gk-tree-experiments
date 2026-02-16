@@ -1,37 +1,32 @@
 """
 Utility functions for GPlusTree operations, including key discovery based on hash ranks.
 """
+
 import hashlib
-from typing import List, Union
 
 
-def get_digest(hash_input: Union[int, bytes], dim: int) -> bytes:
+def get_digest(hash_input: int | bytes, dim: int) -> bytes:
     """
     Generates a SHA-256 digest from an input value and a dimension integer.
-    
+
     Args:
         hash_input (Union[int, bytes]): The input value to hash
         dim (int): The dimension level to incorporate into the digest.
-    
+
     Returns:
         bytes: The resulting SHA-256 digest of the input value and the dimension.
-    
+
     Raises:
         TypeError: If hash_input is not of type int or bytes.
     """
     if isinstance(hash_input, bytes):
-        digest = hashlib.sha256(
-            hash_input + int(dim).to_bytes(32, 'big')
-        ).digest()
+        digest = hashlib.sha256(hash_input + int(dim).to_bytes(32, "big")).digest()
     elif isinstance(hash_input, int):
-        digest = hashlib.sha256(
-            abs(hash_input).to_bytes(32, 'big') + int(dim).to_bytes(32, 'big')
-        ).digest()
+        digest = hashlib.sha256(abs(hash_input).to_bytes(32, "big") + int(dim).to_bytes(32, "big")).digest()
     else:
         raise TypeError("key_or_digest must be int or bytes")
-    
-    return digest
 
+    return digest
 
 
 def count_trailing_zero_bits(digest: bytes) -> int:
@@ -40,7 +35,7 @@ def count_trailing_zero_bits(digest: bytes) -> int:
         if byte == 0:
             tz += 8
         else:
-            # (byte & -byte) isolates the lowest set bit, 
+            # (byte & -byte) isolates the lowest set bit,
             # bit_length()-1 gives its zero-based position within the byte
             tz += (byte & -byte).bit_length() - 1
             break
@@ -50,13 +45,13 @@ def count_trailing_zero_bits(digest: bytes) -> int:
 def get_group_size(k: int) -> int:
     """
     Calculate the group size of trailing zero-groupings of an item key's hash to count based on an expected gplus node size k (power of 2).
-    
+
     Parameters:
         k (int): The expected gplus node size, must be a positive power of 2.
-    
+
     Returns:
         int: The group size, which is log2(k).
-    
+
     Raises:
         ValueError: If k is not a positive power of 2.
     """
@@ -79,11 +74,11 @@ def calc_rank_from_digest_k(digest: bytes, k: int) -> int:
     return calc_rank_from_digest(digest, group_size)
 
 
-def find_keys_for_rank_lists(rank_lists: List[List[int]], k: int, spacing: bool = False) -> List[int]:
+def find_keys_for_rank_lists(rank_lists: list[list[int]], k: int, spacing: bool = False) -> list[int]:
     """Find keys whose repeated hashes match the rank lists at their positions."""
     group_size = get_group_size(k)
     key_count = len(rank_lists[0])
-    result_keys: List[int] = []
+    result_keys: list[int] = []
     next_candidate_key = 1  # Start from 1 to reserve 0 as non-existing split key option
     MAX_SEARCH_LIMIT = 10_000_000_000
 
@@ -93,28 +88,20 @@ def find_keys_for_rank_lists(rank_lists: List[List[int]], k: int, spacing: bool 
         found_between_key = False
 
         while key < search_limit:
-            digest = hashlib.sha256(
-                abs(key).to_bytes(32, 'big')
-                + int(1).to_bytes(32, 'big')
-            ).digest()
+            digest = hashlib.sha256(abs(key).to_bytes(32, "big") + (1).to_bytes(32, "big")).digest()
             match = True
 
-            dim_index = 0
-            for rank_list in rank_lists:
+            for dim_index, rank_list in enumerate(rank_lists):
                 desired_rank = rank_list[key_idx]
                 calculated_rank = calc_rank_from_digest(digest, group_size)
                 if calculated_rank != desired_rank:
                     match = False
                     break
-                
+
                 # Move to next dimension - hash with dimension number (2, 3, 4, ...)
                 if dim_index < len(rank_lists) - 1:
                     dim = dim_index + 2  # dimension 2, 3, 4, ...
-                    digest = hashlib.sha256(
-                        digest
-                        + dim.to_bytes(32, 'big')
-                    ).digest()
-                dim_index += 1
+                    digest = hashlib.sha256(digest + dim.to_bytes(32, "big")).digest()
 
             if match:
                 if not spacing or found_between_key:

@@ -2,29 +2,30 @@
 ASV benchmarks for KListBase operations.
 
 This module contains comprehensive benchmarks for the KListBase class,
-focusing on batch construction (full data structure creation) and 
+focusing on batch construction (full data structure creation) and
 retrieve() operations with various data patterns and sizes.
 """
 
 import gc
+from typing import ClassVar
 
+from benchmarks.benchmark_utils import DEFAULT_BENCHMARK_SEED, BaseBenchmark, BenchmarkUtils, stable_seed_offset
 from gplus_trees.factory import make_gplustree_classes
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED, stable_seed_offset
 
 
 class KListBatchInsertBenchmarks(BaseBenchmark):
     """Benchmarks for K-List construction via sequential inserts."""
 
     # For each K in [4, 8, 16, 32, 64, 128], test sizes = [K, 2K, 4K, 8K] via l_factor
-    k_values = [4, 8, 16, 32, 64]
-    l_factors = [1, 2, 4, 8]
+    k_values: ClassVar[list[int]] = [4, 8, 16, 32, 64]
+    l_factors: ClassVar[list[int]] = [1, 2, 4, 8]
 
-    params = [
-        k_values,           # capacity (K)
-        l_factors,          # l_factor (size = K * l_factor)
-        ['uniform', 'sequential', 'clustered']  # data distributions
+    params: ClassVar[list[list]] = [
+        k_values,  # capacity (K)
+        l_factors,  # l_factor (size = K * l_factor)
+        ["uniform", "sequential", "clustered"],  # data distributions
     ]
-    param_names = ['capacity', 'l_factor', 'distribution']
+    param_names: ClassVar[list[str]] = ["capacity", "l_factor", "distribution"]
 
     # Timing configuration for robust measurements
     min_run_count = 5
@@ -40,12 +41,10 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
         # Generate deterministic test data using combined parameter hash for seed variation
         seed_offset = stable_seed_offset(capacity, size, distribution)
         self.keys = BenchmarkUtils.generate_deterministic_keys(
-            size=size,
-            seed=DEFAULT_BENCHMARK_SEED + seed_offset,
-            distribution=distribution
+            size=size, seed=DEFAULT_BENCHMARK_SEED + seed_offset, distribution=distribution
         )
         self.entries = BenchmarkUtils.create_test_entries(self.keys)
-        
+
         gc.collect()
         gc.disable()  # Re-enabled in teardown by BaseBenchmark
 
@@ -59,7 +58,7 @@ class KListBatchInsertBenchmarks(BaseBenchmark):
 
 class KListRetrieveBenchmarks(BaseBenchmark):
     """Benchmarks for KListBase.retrieve() method.
-    
+
     Cache Behavior:
         This benchmark uses class-level caching to avoid rebuilding KLists
         for each hit_ratio test. KLists are cached by (capacity, size).
@@ -67,21 +66,21 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     """
 
     # For each K in [4, 8, 16, 32, 64], test sizes = [K, 2K, 4K, 8K] via l_factor
-    k_values = [4, 8, 16, 32, 64]
-    l_factors = [1, 2, 4, 8]
+    k_values: ClassVar[list[int]] = [4, 8, 16, 32, 64]
+    l_factors: ClassVar[list[int]] = [1, 2, 4, 8]
 
-    params = [
-        k_values,           # capacity (K)
-        l_factors,          # l_factor (size = K * l_factor)
-        [0.0, 1.0],    # hit ratios
+    params: ClassVar[list[list]] = [
+        k_values,  # capacity (K)
+        l_factors,  # l_factor (size = K * l_factor)
+        [0.0, 1.0],  # hit ratios
     ]
-    param_names = ['capacity', 'l_factor', 'hit_ratio']
+    param_names: ClassVar[list[str]] = ["capacity", "l_factor", "hit_ratio"]
 
     min_run_count = 5
 
     # Class-level cache for initialized KLlists and insert keys
-    _klist_cache = {}
-    _data_cache = {}
+    _klist_cache: ClassVar[dict] = {}
+    _data_cache: ClassVar[dict] = {}
 
     def setup(self, capacity, l_factor, hit_ratio):
         """Setup populated KList and lookup keys for benchmarking."""
@@ -96,9 +95,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
             seed_offset = stable_seed_offset(capacity, size)
             base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
-                size=size,
-                seed=base_seed,
-                distribution='sequential'
+                size=size, seed=base_seed, distribution="sequential"
             )
             entries = BenchmarkUtils.create_test_entries(insert_keys)
             klist = self.KListClass()
@@ -115,9 +112,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
         seed_offset = stable_seed_offset(capacity, size)
         base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
-            insert_keys=self.insert_keys,
-            hit_ratio=hit_ratio,
-            seed=base_seed + 1000
+            insert_keys=self.insert_keys, hit_ratio=hit_ratio, seed=base_seed + 1000
         )
         gc.collect()
         gc.disable()  # Re-enabled in teardown by BaseBenchmark
@@ -125,7 +120,7 @@ class KListRetrieveBenchmarks(BaseBenchmark):
     @classmethod
     def clear_cache(cls):
         """Clear the KList cache to free memory when needed.
-        
+
         Note: This is not called automatically. It can be used for memory
         management in long benchmark sessions if needed.
         """

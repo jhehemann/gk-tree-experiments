@@ -1,14 +1,16 @@
 """
 Adversarial benchmarks for GKPlusTree using keys with successive rank=1 across dimensions.
 """
-import gc
 
+import gc
+import os
+import pickle
+from typing import ClassVar
+
+from benchmarks.benchmark_utils import DEFAULT_BENCHMARK_SEED, BaseBenchmark, BenchmarkUtils, stable_seed_offset
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_ranks
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED, stable_seed_offset
-import os
-import pickle
 
 
 # Utility to load previously generated adversarial keys
@@ -16,12 +18,14 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
     """
     Load adversarial keys from a pickle file corresponding to the given parameters.
     """
-    keys_dir = os.path.join(os.path.dirname(__file__), 'adversarial_keys')
+    keys_dir = os.path.join(os.path.dirname(__file__), "adversarial_keys")
     file_name = f"keys_sz{key_count}_k{capacity}_d{dim_limit}.pkl"
     file_path = os.path.join(keys_dir, file_name)
     if not os.path.exists(file_path):
         # Find the next higher key_count file with same k and d
-        available_files = [f for f in os.listdir(keys_dir) if f.startswith(f"keys_sz") and f.endswith(f"_k{capacity}_d{dim_limit}.pkl")]
+        available_files = [
+            f for f in os.listdir(keys_dir) if f.startswith("keys_sz") and f.endswith(f"_k{capacity}_d{dim_limit}.pkl")
+        ]
         sizes = []
         for fname in available_files:
             try:
@@ -34,28 +38,31 @@ def load_adversarial_keys_from_file(key_count: int, capacity: int, dim_limit: in
             next_file = f"keys_sz{sizes[0]}_k{capacity}_d{dim_limit}.pkl"
             file_path = os.path.join(keys_dir, next_file)
         else:
-            raise FileNotFoundError(f"No adversarial key file found for k={capacity}, d={dim_limit} with size >= {key_count}")
-    with open(file_path, 'rb') as f:
+            raise FileNotFoundError(
+                f"No adversarial key file found for k={capacity}, d={dim_limit} with size >= {key_count}"
+            )
+    with open(file_path, "rb") as f:
         keys = pickle.load(f)
         return keys[:key_count]
 
 
 class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     """Adversarial insert benchmarks: sequential insert of keys with successive rank=1."""
+
     # benchmark individual dimension limits for each K
-    l_factors = [1.0, 2.0, 4.0]  # l_factor values
-    capacities_and_dim_limits = [
+    l_factors: ClassVar[list[float]] = [1.0, 2.0, 4.0]  # l_factor values
+    capacities_and_dim_limits: ClassVar[list[tuple]] = [
         (4, [1, 10, 20, 30, 40]),
         (8, [1, 10, 20, 40, 80]),
         (16, [1, 10, 20, 40, 80, 160]),
     ]
     # (32, [1, 10, 20, 40, 80, 160, 320])  # IGNORE 32 for now due to long runtimes
 
-    params = [
+    params: ClassVar[list[list]] = [
         [(cap, lim) for cap, limits in capacities_and_dim_limits for lim in limits],
         l_factors,
     ]
-    param_names = ['capacity_dim_limit', 'l_factor']
+    param_names: ClassVar[list[str]] = ["capacity_dim_limit", "l_factor"]
     min_run_count = 3
 
     def setup(self, capacity_dim_limit, l_factor):
@@ -63,8 +70,7 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
         key_count = 1000
         capacity, dim_limit = capacity_dim_limit
 
-        self.keys = load_adversarial_keys_from_file(
-                key_count, capacity, dim_limit)
+        self.keys = load_adversarial_keys_from_file(key_count, capacity, dim_limit)
         self.items = BenchmarkUtils.create_test_items(self.keys)
         self.ranks = calc_ranks(self.keys, capacity)
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
@@ -76,27 +82,28 @@ class GKPlusTreeAdversarialInsertBenchmarks(BaseBenchmark):
     def time_adversarial_insert(self, capacity_dim_limit, l_factor):
         """Benchmark sequential insertion of adversarial keys."""
         tree = self.tree_class(l_factor=l_factor)
-        for item, rank in zip(self.items, self.ranks):
+        for item, rank in zip(self.items, self.ranks, strict=False):
             tree, _, _ = tree.insert(item, rank)
 
 
 class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
     """Adversarial retrieve benchmarks: sequential retrieve of adversarial keys.
-    
+
     Cache Behavior:
         This benchmark uses class-level caching to avoid rebuilding trees
         for each parameter set. Trees are cached by (capacity, size, dim_limit, l_factor).
         The cache persists across benchmark runs within the same process.
     """
-    params = [
-        [4, 8, 16],    # K values (capacities)
+
+    params: ClassVar[list[list]] = [
+        [4, 8, 16],  # K values (capacities)
         [10, 20, 40],  # successive dimensions to enforce rank=1
         [1.0, 2.0, 4.0],  # l_factor values
-        [1.0] # hit ratio
+        [1.0],  # hit ratio
     ]
-    param_names = ['capacity', 'dim_limit', 'l_factor', 'hit_ratio']
+    param_names: ClassVar[list[str]] = ["capacity", "dim_limit", "l_factor", "hit_ratio"]
     min_run_count = 3
-    _tree_cache = {}
+    _tree_cache: ClassVar[dict] = {}
 
     def setup(self, capacity, dim_limit, l_factor, hit_ratio):
         super().setup(capacity, dim_limit, l_factor, hit_ratio)
@@ -105,11 +112,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         tree_cache_key = (capacity, size, dim_limit, l_factor)
 
         if tree_cache_key not in self._tree_cache:
-            insert_keys = load_adversarial_keys_from_file(
-                key_count=size,
-                capacity=capacity,
-                dim_limit=dim_limit
-            )
+            insert_keys = load_adversarial_keys_from_file(key_count=size, capacity=capacity, dim_limit=dim_limit)
             entries = BenchmarkUtils.create_test_entries(insert_keys)
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
             tree = bulk_create_gkplus_tree(entries, dim_limit, l_factor, klist_class)
@@ -120,17 +123,15 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         seed_offset = stable_seed_offset(size, capacity, dim_limit, hit_ratio)
         base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
-            insert_keys=self.insert_keys,
-            hit_ratio=hit_ratio,
-            seed=base_seed + 1000
+            insert_keys=self.insert_keys, hit_ratio=hit_ratio, seed=base_seed + 1000
         )
         gc.collect()
         gc.disable()  # Re-enabled in teardown by BaseBenchmark
-    
+
     @classmethod
     def clear_cache(cls):
         """Clear the tree cache to free memory when needed.
-        
+
         Note: This is not called automatically. It can be used for memory
         management in long benchmark sessions if needed.
         """

@@ -1,16 +1,18 @@
-import random
 import argparse
+import cProfile
 import logging
-from gplus_trees.g_k_plus.utils import calc_ranks
-from gplus_trees.gplus_tree_base import print_pretty
-from gplus_trees.utils import find_keys_for_rank_lists
+import pstats
+import random
+
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import (
     GKPlusTreeBase,
 )
+from gplus_trees.g_k_plus.utils import calc_ranks
+from gplus_trees.gplus_tree_base import print_pretty
+from gplus_trees.utils import find_keys_for_rank_lists
 from tests.test_base import BaseTestCase
-import cProfile
-import pstats
+
 
 def iter_nodes(tree):
     """
@@ -32,6 +34,7 @@ def iter_nodes(tree):
             if tree.node.right_subtree is not None:
                 stack.append(tree.node.right_subtree)
 
+
 def print_tree_nodes(tree):
     """
     Print the structure of the tree using print_pretty for the first node,
@@ -48,13 +51,16 @@ def print_tree_nodes(tree):
             print()
             print_tree_nodes(tree.node.set)
 
+
 def create_rank_lists(num_lists, size, key_range):
     """Create multiple rank lists of unique keys."""
     return [random.sample(range(key_range[0], key_range[1]), size) for _ in range(num_lists)]
 
+
 def create_uniform_rank_lists(dimensions=10, size=10, rank=1):
     """Create a list of rank lists, each filled with the same value."""
     return [[rank] * size for _ in range(dimensions)]
+
 
 def generate_and_populate_tree(keys, k):
     """Create a GKPlusTree, insert items based on rank_lists, and return the tree."""
@@ -77,10 +83,11 @@ def create_adversarial_1_rank_lists(dimensions=10, size=10):
     Create rank lists where all elements are 1.
     """
     rank_lists = []
-    for i in range(dimensions):
+    for _i in range(dimensions):
         rank_list = [1] * size
         rank_lists.append(rank_list)
     return rank_lists, None
+
 
 def create_adversarial_rank_lists_i_eq_2(dimensions=10, size=10):
     """
@@ -132,7 +139,7 @@ def create_middle_in_pattern_rank_lists(dimensions=10, size=10, k=4):
     spacing = spacing_factor  # Spacing factor to shift positions
     left = spacing
     right = size - spacing - 1
-    for i in range(dimensions):
+    for _i in range(dimensions):
         rank_list = [1] * size
         if left <= right:
             rank_list[left] = 2
@@ -195,44 +202,45 @@ def create_dim_1_first_and_middle_2_rank_lists(dimensions=10, size=10):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze adversarial key scenarios for GK+ tree")
-    parser.add_argument("--log-level", type=str, default="INFO",
-                       choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-                       help="Set the logging level (default: INFO)")
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Set the logging level (default: INFO)",
+    )
     args = parser.parse_args()
-    
+
     # Configure logging
     log_level = getattr(logging, args.log_level.upper())
     logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        force=True
+        level=log_level, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S", force=True
     )
     logging.getLogger("gplus_trees").setLevel(log_level)
-    
+
     # Adversarial rank lists
-    K = 4           # K-list node capacity
+    K = 4  # K-list node capacity
     DIMENSIONS = 5  # Simulate key ranks up to this many dimensions
-    SIZE = 10        # Number of keys to generate
+    SIZE = 10  # Number of keys to generate
 
     rank_lists, insert_key_idx_list = create_dim_1_first_and_middle_2_rank_lists(dimensions=DIMENSIONS, size=SIZE)
     print("Adversarial rank lists:")
     for rl in rank_lists:
         display_rl = rl
         if len(rl) > 20:
-            display_rl = rl[:10] + ['...'] + rl[-10:]
-        colored_rl = [
-            f"\033[31m{num}\033[0m" if num != 1 and num != '...' else str(num)
-            for num in display_rl
-        ]
-        print(' '.join(colored_rl))
+            display_rl = [*rl[:10], "...", *rl[-10:]]
+        colored_rl = [f"\033[31m{num}\033[0m" if num != 1 and num != "..." else str(num) for num in display_rl]
+        print(" ".join(colored_rl))
 
     def profile_find_keys():
         keys = find_keys_for_rank_lists(rank_lists, K)
         if len(keys) <= 20:
             print("Keys matching rank lists:", keys)
         else:
-            print(f"Keys matching rank lists (showing first 10 and last 10 of {len(keys)}):", keys[:10] + ['...'] + keys[-10:])
+            print(
+                f"Keys matching rank lists (showing first 10 and last 10 of {len(keys)}):",
+                [*keys[:10], "...", *keys[-10:]],
+            )
         insert_keys = []
         print("Insert key indices (inserted after all other keys):", insert_key_idx_list)
         if insert_key_idx_list:
@@ -243,7 +251,7 @@ if __name__ == "__main__":
     def profile_generate_tree(keys):
         tree = generate_and_populate_tree(keys, K)
         return tree
-    
+
     def profile_insert_specific(insert_key, insert_key_idx):
         if insert_key is None:
             raise ValueError("Insert specific should not be called when insert_key is None.")
@@ -252,7 +260,7 @@ if __name__ == "__main__":
         rank = rank_lists[0][insert_key_idx]
         tree.insert(item, rank)
         return tree
-    
+
     # Profile find_keys_for_rank_lists
     print("\nProfiling adversarial key generation (find_keys_for_rank_lists)...")
     profiler1 = cProfile.Profile()
@@ -262,7 +270,7 @@ if __name__ == "__main__":
     if insert_keys:
         print("Insert keys:", insert_keys)
 
-    # Profile generate_and_populate_tree 
+    # Profile generate_and_populate_tree
     print("\nPROFILING TREE GENERATION WITH ADVERSARIAL KEYS (generate_and_populate_tree)...")
     profiler2 = cProfile.Profile()
     profiler2.enable()
@@ -272,28 +280,25 @@ if __name__ == "__main__":
 
     print("\nPROFILING RESULTS ADVERSARIAL KEY GENERATION (find_keys_for_rank_lists):")
     stats1 = pstats.Stats(profiler1)
-    stats1.sort_stats('cumtime').print_stats(20)
+    stats1.sort_stats("cumtime").print_stats(20)
 
     print("\nPROFILING RESULTS TREE GENERATION WITH ADVERSARIAL KEYS (generate_and_populate_tree):")
     stats2 = pstats.Stats(profiler2)
-    stats2.sort_stats('cumtime').print_stats(20)
+    stats2.sort_stats("cumtime").print_stats(20)
 
     if insert_keys:
         # Profile insert_specific
-        for insert_key, insert_key_idx in zip(insert_keys, insert_key_idx_list):
+        for insert_key, insert_key_idx in zip(insert_keys, insert_key_idx_list, strict=False):
             print(f"\nProfiling insert_specific: {insert_key}...")
             profiler3 = cProfile.Profile()
             profiler3.enable()
             tree = profile_insert_specific(insert_key, insert_key_idx)
             profiler3.disable()
             print(f"\nSpecific key {insert_key} inserted into the tree.")
-            
+
             # Print stats for this specific insertion
             print(f"\nPROFILING RESULTS SPECIFIC KEY INSERTION (insert_specific) ({insert_key}):")
             stats3 = pstats.Stats(profiler3)
-            stats3.sort_stats('cumtime').print_stats(20)
-    
+            stats3.sort_stats("cumtime").print_stats(20)
+
     # print_tree_nodes(tree)
-
-    
-
