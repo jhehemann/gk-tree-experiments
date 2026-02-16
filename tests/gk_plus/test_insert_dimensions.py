@@ -1,37 +1,37 @@
 import copy
+import logging
+from typing import ClassVar
 
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import (
     BaseTestCase,
+)
+from tests.test_base import (
     GKPlusTreeTestCase as TreeTestCase,
 )
 
-import logging
-
 logger = logging.getLogger(__name__)
 
+
 class TestInsertMultipleDimensions(TreeTestCase):
-    ASSERTION_MESSAGE_TEMPLATE = (
-        "TREE RESULT"
-        "\nTREE: {tree}\n\n"
-        "\nROOT SET: {root}\n"
-    )
-    
+    ASSERTION_MESSAGE_TEMPLATE = "TREE RESULT\nTREE: {tree}\n\n\nROOT SET: {root}\n"
+
     # Initialize items once to avoid re-creating them in each test
-    _KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    ITEMS = {k: BaseTestCase.make_item(BaseTestCase, k, "val") for k in _KEYS}
-    
-    def _run_insert_case_multi_dim(self, keys, rank_combo, insert_pair,
-                        exp_keys, case_name, gnode_capacity=2, l_factor: float = 1.0):
+    _KEYS: ClassVar[list[int]] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    ITEMS: ClassVar[dict] = {k: BaseTestCase.make_item(BaseTestCase, k, "val") for k in _KEYS}
+
+    def _run_insert_case_multi_dim(
+        self, keys, rank_combo, insert_pair, exp_keys, case_name, gnode_capacity=2, l_factor: float = 1.0
+    ):
         if len(rank_combo) != len(keys):
             raise ValueError("Rank combo length must match number of keys.")
-        
+
         # build the tree once
         base_tree = create_gkplus_tree(K=gnode_capacity, dimension=1, l_factor=l_factor)
 
-        for key, rank in zip(keys, rank_combo):
+        for key, rank in zip(keys, rank_combo, strict=False):
             base_tree, _, _ = base_tree.insert(self.ITEMS[key], rank)
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -39,9 +39,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
             logger.debug(f"Root node: {print_pretty(base_tree.node.set)}")
 
         msg_head = (
-            f"\n\nKey-Rank combo:\n"
-            f"K: {keys}\n"
-            f"R: {rank_combo}"
+            f"\n\nKey-Rank combo:\nK: {keys}\nR: {rank_combo}"
             # f"\n\nTREE AFTER INITIAL INSERTIONS: {print_pretty(base_tree)}\n"
         )
 
@@ -62,7 +60,7 @@ class TestInsertMultipleDimensions(TreeTestCase):
         exp_tree_keys = sorted(dummies_tree + exp_keys)
 
         # assertions
-        self.validate_tree(tree,  exp_tree_keys,  msg)
+        self.validate_tree(tree, exp_tree_keys, msg)
 
     def test_early_return_dim_2(self):
         """Test size is correctly maintained in a larger tree with random insertions"""
@@ -77,11 +75,11 @@ class TestInsertMultipleDimensions(TreeTestCase):
         insert_key_idx = 0
         logger.debug(f"Insert key: {keys[insert_key_idx]}")
         insert_item = self.make_item(keys[insert_key_idx])
-        
+
         # Insert all items
         inserted_count = 0
         for i, key in enumerate(keys):
-        # for i in range(1, 1000):
+            # for i in range(1, 1000):
             if keys[i] == keys[insert_key_idx]:
                 logger.debug(f"Skipping key {keys[i]} as it is the insert key")
                 continue
@@ -96,9 +94,15 @@ class TestInsertMultipleDimensions(TreeTestCase):
             expected_item_count = inserted_count + dummy_cnt
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"Tree after inserting {inserted_count} items: {print_pretty(tree)}")
-                logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+                logger.debug(
+                    f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}"
+                )
 
-            self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
+            self.assertEqual(
+                expected_item_count,
+                tree.item_count(),
+                f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}",
+            )
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Tree after initial insertions: {print_pretty(tree)}")
@@ -116,9 +120,15 @@ class TestInsertMultipleDimensions(TreeTestCase):
             logger.debug(f"Tree structure: {tree.print_structure()}")
         expected_item_count = inserted_count + dummy_cnt
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}")
+            logger.debug(
+                f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs}. Leaf keys: {expected_keys}"
+            )
 
-        self.assertEqual(expected_item_count, tree.item_count(), f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}")
+        self.assertEqual(
+            expected_item_count,
+            tree.item_count(),
+            f"Tree size should be {expected_item_count} after inserting {inserted_count} items with max dimension {max_dim} and expanded leaf count {expanded_leafs} (dummy count {dummy_cnt}). Leaf keys: {expected_keys}",
+        )
 
         text = " | ".join(str(e.item.key) for e in tree.node.set)
         logger.debug(f"Root set keys after all inserts: {text}")
@@ -140,14 +150,14 @@ class TestInsertMultipleDimensions(TreeTestCase):
         for i, key in enumerate(keys):
             item = self.make_item(key)
             rank = ranks[i]
-            tree, _, _ = tree.insert(item, rank=rank)        
+            tree, _, _ = tree.insert(item, rank=rank)
 
         dum_keys = self.get_dummies(tree)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Keys ({len(keys)}): {keys}")
             logger.debug(f"Dummies ({len(dum_keys)}): {dum_keys}")
         exp_keys = sorted(dum_keys + keys)
-        
+
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Expected keys after insertions ({len(exp_keys)}): {exp_keys}")
             logger.debug(f"Tree after inserting items: {print_pretty(tree)}")
@@ -157,21 +167,19 @@ class TestInsertMultipleDimensions(TreeTestCase):
 
     def test_insert_middle(self):
         """Test inserting specific keys into a tree with multiple dimensions"""
-        keys  =  [1, 3, 7, 9, 11]
-        ranks =  [1, 1, 2, 2, 2]
-        
+        keys = [1, 3, 7, 9, 11]
+        ranks = [1, 1, 2, 2, 2]
+
         insert_key = 5
         insert_rank = 2
         insert_pair = (insert_key, insert_rank)
 
         # array of tuples with (case_name, split_key)
-        insert_cases = [(f"Insert key {insert_key} rank {insert_rank}",  insert_pair)]
+        insert_cases = [(f"Insert key {insert_key} rank {insert_rank}", insert_pair)]
 
         for case_name, insert_pair in insert_cases:
-            exp_keys = sorted([k for k in keys] + [insert_key])  
+            exp_keys = sorted([k for k in keys] + [insert_key])
             with self.subTest(case=case_name, insert_pair=insert_pair):
                 self._run_insert_case_multi_dim(
-                    keys, ranks,
-                    insert_pair, exp_keys, case_name,
-                    gnode_capacity=4, l_factor=1.0
+                    keys, ranks, insert_pair, exp_keys, case_name, gnode_capacity=4, l_factor=1.0
                 )

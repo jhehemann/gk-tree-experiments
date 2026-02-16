@@ -6,15 +6,14 @@ Uses shared ``MerkleNodeMixin`` / ``MerkleTreeMixin`` to avoid code
 duplication with the GPlus-tree Merkle variant.
 """
 
-from typing import Type
-
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, GKPlusNodeBase
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusNodeBase, GKPlusTreeBase
 from gplus_trees.merkle_mixin import MerkleNodeMixin, MerkleTreeMixin
 
 
 class MerkleGKPlusNodeBase(MerkleNodeMixin, GKPlusNodeBase):
     """GKPlusNodeBase extended with Merkle hash support."""
-    __slots__ = GKPlusNodeBase.__slots__ + ("merkle_hash",)
+
+    __slots__ = (*GKPlusNodeBase.__slots__, "merkle_hash")
 
     def __init__(self, rank, set, right=None):
         super().__init__(rank, set, right)
@@ -23,4 +22,5 @@ class MerkleGKPlusNodeBase(MerkleNodeMixin, GKPlusNodeBase):
 
 class MerkleGKPlusTreeBase(MerkleTreeMixin, GKPlusTreeBase):
     """GKPlusTreeBase extended with Merkle tree operations."""
-    NodeClass: Type[MerkleGKPlusNodeBase]
+
+    NodeClass: type[MerkleGKPlusNodeBase]

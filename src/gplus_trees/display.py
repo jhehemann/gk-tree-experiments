@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import collections
 import math
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
 
 if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
-    from gplus_trees.klist_base import KListBase
 
 
 # ANSI colour codes
-PRIMARY = '\033[32m'    # green
-SECONDARY = '\033[33m'  # yellow
-RESET = '\033[0m'
+PRIMARY = "\033[32m"  # green
+SECONDARY = "\033[33m"  # yellow
+RESET = "\033[0m"
 
 
-def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
+def print_pretty(set: AbstractSetDataStructure | None) -> str:
     """
     Prints a G⁺-tree so:
       • Lines go from highest rank down to 1.
@@ -27,13 +26,13 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
       • All columns have the same width, so initial indent and
         inter-node spacing are uniform.
     """
-    from gplus_trees.gplus_tree_base import GPlusTreeBase, DUMMY_KEY, get_dummy
+    from gplus_trees.gplus_tree_base import DUMMY_KEY, GPlusTreeBase, get_dummy
     from gplus_trees.klist_base import KListBase
 
     if set is None:
         return f"{type(set).__name__}: None"
 
-    if not (isinstance(set, GPlusTreeBase) or isinstance(set, KListBase)):
+    if not (isinstance(set, (GPlusTreeBase, KListBase))):
         raise TypeError(f"print_pretty() expects GPlusTreeBase or KListBase, got {type(set).__name__}")
 
     if set.is_empty():
@@ -46,7 +45,7 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
         texts = []
         node = set.head
         while node is not None:
-            text = ("[" + SEP.join(str(e.item.key) for e in node.entries) + "]")
+            text = "[" + SEP.join(str(e.item.key) for e in node.entries) + "]"
             texts.append(text)
             node = node.next
         res_text = " ".join(texts)
@@ -54,8 +53,8 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
 
     tree = set
 
-    if hasattr(tree, 'DIM'):
-        dim = tree.DIM if hasattr(tree, 'DIM') else None
+    if hasattr(tree, "DIM"):
+        dim = tree.DIM if hasattr(tree, "DIM") else None
         dum_key = get_dummy(dim).key
     else:
         dum_key = DUMMY_KEY
@@ -68,9 +67,9 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
         if tree.is_empty():
             return
         nonlocal max_len
-        dim = tree.DIM if hasattr(tree, 'DIM') else None
+        dim = tree.DIM if hasattr(tree, "DIM") else None
 
-        p_dim = parent.DIM if parent and hasattr(parent, 'DIM') else None
+        p_dim = parent.DIM if parent and hasattr(parent, "DIM") else None
         other_dim = False
         other_dim_processed = False
 
@@ -152,7 +151,7 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
         else:
             column_diff = column_counts[i - 1] - column_counts[i]
             cumm_indent += float(column_diff) / 2
-            spaces = int(math.floor(((2 + column_width) * cumm_indent) + 0.5))
+            spaces = math.floor(((2 + column_width) * cumm_indent) + 0.5)
             prefix = "     " + spaces * " "
         line = "".join(layers[rank])
         layer_id = f"{PRIMARY}Rank {rank}{RESET}" if rank > 0 else f"{SECONDARY}Other Dims{RESET}"
@@ -162,9 +161,10 @@ def print_pretty(set: Union[AbstractSetDataStructure, None]) -> str:
     return res_text
 
 
-def collect_leaf_keys(tree: 'GPlusTreeBase') -> list[str]:
+def collect_leaf_keys(tree: GPlusTreeBase) -> list[str]:
     """Collect all non-dummy leaf keys from a G⁺-tree."""
     from gplus_trees.gplus_tree_base import DUMMY_KEY
+
     out = []
     for leaf in tree.iter_leaf_nodes():
         for e in leaf.set:
@@ -174,7 +174,7 @@ def collect_leaf_keys(tree: 'GPlusTreeBase') -> list[str]:
 
 
 def print_structure(
-    tree: 'GPlusTreeBase',
+    tree: GPlusTreeBase,
     indent: int = 0,
     depth: int = 0,
     max_depth: int = 2,
@@ -185,7 +185,7 @@ def print_structure(
     (for leaf nodes) linked-list next pointer.  The heavy lifting for
     KList nodes is delegated to :pymethod:`KListBase.print_structure`.
     """
-    prefix = ' ' * indent
+    prefix = " " * indent
     if tree is None or tree.is_empty():
         return f"{prefix}Empty {tree.__class__.__name__}"
 
@@ -196,21 +196,18 @@ def print_structure(
     node = tree.node
 
     kwargs_print = []
-    if hasattr(node, 'size'):
+    if hasattr(node, "size"):
         kwargs_print.append(f", size={node.size}")
     joined_kwargs = ", ".join(kwargs_print)
 
-    result.append(
-        f"{prefix}{node.__class__.__name__}(rank={node.rank}, "
-        f"set={type(node.set).__name__}{joined_kwargs})"
-    )
+    result.append(f"{prefix}{node.__class__.__name__}(rank={node.rank}, set={type(node.set).__name__}{joined_kwargs})")
     result.append(node.set.print_structure(indent + 4))
 
     # Right subtree
     if node.right_subtree is not None:
         right_node = node.right_subtree.node
         kwargs_print = []
-        if hasattr(right_node, 'size'):
+        if hasattr(right_node, "size"):
             kwargs_print.append(f", size={right_node.size}")
         joined_kwargs = ", ".join(kwargs_print)
         result.append(
@@ -222,11 +219,11 @@ def print_structure(
         result.append(f"{prefix}    Right: Empty")
 
     # Linked-list next pointer (leaf nodes only)
-    if node.rank == 1 and hasattr(node, 'next') and node.next:
+    if node.rank == 1 and hasattr(node, "next") and node.next:
         if not node.next.is_empty():
             next_node = node.next.node
             kwargs_print = []
-            if hasattr(next_node, 'size'):
+            if hasattr(next_node, "size"):
                 kwargs_print.append(f", size={next_node.size}")
             joined_kwargs = ", ".join(kwargs_print)
             result.append(
@@ -236,7 +233,7 @@ def print_structure(
             result.append(next_node.set.print_structure(indent + 8))
         else:
             result.append(f"{prefix}    Next: Empty")
-    elif node.rank == 1 and hasattr(node, 'next') and node.next is None:
+    elif node.rank == 1 and hasattr(node, "next") and node.next is None:
         result.append(f"{prefix}    Next: Empty")
 
     return "\n".join(result)

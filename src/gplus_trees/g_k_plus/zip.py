@@ -22,15 +22,16 @@ inner-tree traversal cost (see navigation.py).
 """
 
 from __future__ import annotations
-from typing import Tuple, TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 from gplus_trees.base import (
     Entry,
     _get_replica,
 )
-from gplus_trees.klist_base import KListBase
-from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
+from gplus_trees.gplus_tree_base import get_dummy
+from gplus_trees.klist_base import KListBase
 
 if TYPE_CHECKING:
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
@@ -39,7 +40,9 @@ if TYPE_CHECKING:
 class GKPlusZipMixin:
     """Mixin that contributes ``check_convert_same_sets`` and ``zip`` to *GKPlusTreeBase*."""
 
-    def check_convert_same_sets(self, left: 'GKPlusTreeBase', other: 'GKPlusTreeBase') -> Tuple['GKPlusTreeBase', 'GKPlusTreeBase']:
+    def check_convert_same_sets(
+        self, left: GKPlusTreeBase, other: GKPlusTreeBase
+    ) -> tuple[GKPlusTreeBase, GKPlusTreeBase]:
         """
         Check and convert the sets of left and right trees to appropriate types.
 
@@ -56,16 +59,20 @@ class GKPlusZipMixin:
         if l_set_is_klist != o_set_is_klist:
             if l_set_is_klist:
                 # Convert left from KList to GKPlusTree
-                left.node.set = bulk_create_gkplus_tree(left.node.set, other.node.set.DIM, other.l_factor, type(left.node.set))
+                left.node.set = bulk_create_gkplus_tree(
+                    left.node.set, other.node.set.DIM, other.l_factor, type(left.node.set)
+                )
             else:
                 # Convert other from KList to GKPlusTree
-                other.node.set = bulk_create_gkplus_tree(other.node.set, left.node.set.DIM, left.l_factor, type(other.node.set))
+                other.node.set = bulk_create_gkplus_tree(
+                    other.node.set, left.node.set.DIM, left.l_factor, type(other.node.set)
+                )
                 _, _, other.node.set, _ = other.node.set.unzip(-1)
 
         return left, other
 
     # TODO: Return r_pivot properly so find_pivot calls are minimized
-    def zip(self, left: 'GKPlusTreeBase', other: 'GKPlusTreeBase', is_root: bool = True) -> 'GKPlusTreeBase':
+    def zip(self, left: GKPlusTreeBase, other: GKPlusTreeBase, is_root: bool = True) -> GKPlusTreeBase:
         """
         Zip two GKPlusTreeBase instances together, merging their entries.
 
@@ -82,7 +89,6 @@ class GKPlusZipMixin:
 
         if other.DIM != left.DIM:
             raise ValueError(f"Dimension mismatch: left.DIM={left.DIM}, other.DIM={other.DIM}")
-
 
         # Early returns for empty trees
         if left.is_empty():
@@ -122,9 +128,10 @@ class GKPlusZipMixin:
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
                 other.node.set, _, _ = other.node.set.insert_entry(replica_entry, other.node.rank)
             else:
-                singleton_tree = bulk_create_gkplus_tree([replica_entry], left.DIM + 1, l_factor=left.l_factor, KListClass=left.SetClass)
+                singleton_tree = bulk_create_gkplus_tree(
+                    [replica_entry], left.DIM + 1, l_factor=left.l_factor, KListClass=left.SetClass
+                )
                 other.node.set, r_pivot, r_pivot_next = singleton_tree.zip(singleton_tree, other.node.set)
-
 
             other.node.set = other.check_and_convert_set(other.node.set)
             other._invalidate_tree_size()  # Correctly invalidates after conversion
@@ -139,12 +146,10 @@ class GKPlusZipMixin:
                 r_pivot_next = r_pivot_sub_next
 
             else:
-
                 if r_pivot_next is not None:
                     other_min_leaf_tree = r_pivot_next.left_subtree.get_min_leaf_tree()
                 else:
                     other_min_leaf_tree = other.node.right_subtree.get_min_leaf_tree()
-
 
                 if left.node.rank == 1:
                     left.node.next = other_min_leaf_tree
@@ -163,7 +168,9 @@ class GKPlusZipMixin:
 
         # Case 2: Left rank > other rank - recursively zip into right subtree
         elif left.node.rank > other.node.rank:
-            left.node.right_subtree, r_pivot, r_pivot_next = left.node.right_subtree.zip(left.node.right_subtree, other, is_root=False)
+            left.node.right_subtree, r_pivot, r_pivot_next = left.node.right_subtree.zip(
+                left.node.right_subtree, other, is_root=False
+            )
 
             left._invalidate_tree_size()
             return left, r_pivot, r_pivot_next
@@ -184,7 +191,6 @@ class GKPlusZipMixin:
                 left._invalidate_tree_size()
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
 
-
             elif isinstance(left.node.set, GKPlusTreeBase) and isinstance(other.node.set, GKPlusTreeBase):
                 # Both are GKPlusTreeBase (after conversion) - recursively zip
                 left.node.set, r_pivot, r_pivot_next = left.node.set.zip(left.node.set, other.node.set)
@@ -192,8 +198,9 @@ class GKPlusZipMixin:
                 # TODO(#1): Add left._invalidate_tree_size() after set conversion
                 left._invalidate_tree_size()
             else:
-                raise TypeError(f"Set types should match after conversion, got {type(left.node.set).__name__} and {type(other.node.set).__name__}")
-
+                raise TypeError(
+                    f"Set types should match after conversion, got {type(left.node.set).__name__} and {type(other.node.set).__name__}"
+                )
 
             # Link leaf nodes
             if left.node.rank == 1:
@@ -204,9 +211,7 @@ class GKPlusZipMixin:
                 return left, r_pivot, r_pivot_next
 
             else:
-
                 if r_pivot.left_subtree is None:
-
                     if r_pivot_next is not None:
                         other_min_leaf_tree = r_pivot_next.left_subtree.get_min_leaf_tree()
                     else:
@@ -220,7 +225,9 @@ class GKPlusZipMixin:
                     if r_pivot_next is None and other_min_leaf_tree.node.next is not None:
                         r_pivot_next = other_min_leaf_tree.node.next.node.set.find_pivot()[0]
                 else:
-                    r_pivot.left_subtree, r_pivot_sub, r_pivot_sub_next = left.node.right_subtree.zip(left.node.right_subtree, r_pivot.left_subtree)
+                    r_pivot.left_subtree, r_pivot_sub, r_pivot_sub_next = left.node.right_subtree.zip(
+                        left.node.right_subtree, r_pivot.left_subtree
+                    )
 
                     r_pivot.left_subtree._invalidate_tree_size()
                     other._invalidate_tree_size()
@@ -228,6 +235,5 @@ class GKPlusZipMixin:
                     r_pivot_next = r_pivot_sub_next
 
                 left.node.right_subtree = other.node.right_subtree
-
 
             return left, r_pivot, r_pivot_next

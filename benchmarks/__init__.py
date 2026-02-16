@@ -13,6 +13,6 @@ by using multiple iterations, deterministic test data, and proper statistical an
 """
 
 # Import benchmark utilities for easier access
-from .benchmark_utils import BenchmarkUtils, BaseBenchmark
+from .benchmark_utils import BaseBenchmark, BenchmarkUtils
 
-__all__ = ['BenchmarkUtils', 'BaseBenchmark']
+__all__ = ["BaseBenchmark", "BenchmarkUtils"]

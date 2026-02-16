@@ -1,14 +1,14 @@
-from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
-
-from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
-from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.gplus_tree_base import print_pretty
-
 import logging
+
+from gplus_trees.g_k_plus.factory import create_gkplus_tree
+from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
+from gplus_trees.gplus_tree_base import print_pretty
+from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 
 logger = logging.getLogger(__name__)
 
-class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):        
+
+class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     def test_single_insertion_size(self):
         """Test size is 1 after inserting a single item"""
         tree = create_gkplus_tree(K=2)
@@ -16,11 +16,8 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         item = self.make_item(key)
         tree, _, _ = tree.insert(item, rank=1)
 
-        self.assertFalse(tree.is_empty(), 
-                         "Tree should not be empty after insertion")
-        self.assertEqual(tree.item_count(), 2, 
-                         "Tree size should be 2 after single insertion. "
-                         "Item + 1 dummy item")
+        self.assertFalse(tree.is_empty(), "Tree should not be empty after insertion")
+        self.assertEqual(tree.item_count(), 2, "Tree size should be 2 after single insertion. Item + 1 dummy item")
 
     # def test_insertion_triggers_single_expansion_in_leaf(self):
     #     """Test that inserting an item triggers expansion when necessary"""
@@ -45,17 +42,17 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #         if logger.isEnabledFor(logging.DEBUG):
     #             logger.debug(f"Tree after insertions: {print_pretty(tree)}")
     #             logger.debug(f"Node set: {print_pretty(tree.node.set)}")
-            
+
     #         node_size = tree.node.set.item_count()
     #         self.assertEqual(node_size, 4,
     #                         f"Node size should be 4 (including dummy) after inserting 2 items triggering a single expansion to dimension 2, got: "
     #                         f"{node_size} for set: {print_pretty(tree.node.set)}")
-            
+
     #         self._assert_leaf_node_properties(
     #                 tree.node,
     #                 [self.dummy_map[-2], self.dummy_map[-1], item_map[5], item_map[9]]
     #             )
-        
+
     #     with self.subTest("Dim 2 root"):
     #         root_dim2 = tree.node.set.node
     #         root_dim2_size = root_dim2.set.item_count()
@@ -125,7 +122,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
         logger.debug(f"Keys: {keys}")
         ranks = calc_ranks_multi_dims(keys=keys, k=k, dimensions=3)
         logger.debug(f"Ranks: {ranks}")
-        item_map = { k: self.make_item(k) for k in keys}
+        item_map = {k: self.make_item(k) for k in keys}
 
         items = [self.make_item(k) for k in keys]
         for i in range(len(keys)):
@@ -134,28 +131,25 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
             item = item_map[key]
             tree, _, _ = tree.insert(item, rank=rank)
 
-        self.assertFalse(tree.is_empty(), 
-                         f"Tree should not be empty after inserting items for keys {keys}")
-        
+        self.assertFalse(tree.is_empty(), f"Tree should not be empty after inserting items for keys {keys}")
+
         with self.subTest("Dim 1 single node"):
             root_d1 = tree.node
-            self.assertEqual(root_d1.rank, 1,
-                             f"Root rank in dim 1 should be 1, got: {root_d1.rank}")
+            self.assertEqual(root_d1.rank, 1, f"Root rank in dim 1 should be 1, got: {root_d1.rank}")
             node_size = root_d1.set.item_count()
             dummy_keys = self.get_dummies(tree)
             dummy_items = [self.make_dummy_item(k) for k in dummy_keys]
             exp_node_size = len(keys) + len(dummy_keys)
-            self.assertEqual(node_size, exp_node_size,
-                            f"Leaf size in dim 1 should be {exp_node_size}, got: "
-                            f"{node_size} for set: {print_pretty(root_d1.set)}")
+            self.assertEqual(
+                node_size,
+                exp_node_size,
+                f"Leaf size in dim 1 should be {exp_node_size}, got: {node_size} for set: {print_pretty(root_d1.set)}",
+            )
 
             self._assert_leaf_node_properties(
-                    tree.node,
-                    dummy_items + items,
-                )
-            
-        
-
+                tree.node,
+                dummy_items + items,
+            )
 
     # def test_insertion_triggers_multiple_expansions_in_leaf(self):
     #     """Test that inserting an item triggers expansion when necessary"""
@@ -180,9 +174,9 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #         logger.debug(f"Tree after insertions: {print_pretty(tree)}")
     #         logger.debug(f"Node set: {print_pretty(tree.node.set)}")
 
-    #     self.assertFalse(tree.is_empty(), 
+    #     self.assertFalse(tree.is_empty(),
     #                      f"Tree should not be empty after inserting items for keys {keys}")
-        
+
     #     with self.subTest("Dim 1 single node"):
     #         root_d1 = tree.node
     #         node_size = root_d1.set.item_count()
@@ -194,7 +188,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #                 tree.node,
     #                 [self.dummy_map[-2], self.dummy_map[-3], self.dummy_map[-1], item_map[11], item_map[22]]
     #             )
-            
+
     #     with self.subTest("Dim 2 root"):
     #         root_d2 = root_d1.set.node
     #         root_d2_size = root_d2.set.item_count()
@@ -209,7 +203,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #         self.assertIsNotNone(root_d2_entries[1].left_subtree,
     #                           f"Root entry #1's ({root_d2_entries[1].item.key}) left subtree in dim 2 should not be None, "
     #                           f"got: {print_pretty(root_d2_entries[1].left_subtree)}")
-        
+
     #     with self.subTest("Dim 2 leaf 1"):
     #         root_entries_d2 = list(root_d2.set)
     #         leaf1 = root_entries_d2[1].left_subtree.node
@@ -220,7 +214,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             leaf1,
     #             [self.dummy_map[-2]],
     #         )
-        
+
     #     with self.subTest("Dim 2 leaf 2"):
     #         leaf2 = root_d2.right_subtree.node
     #         leaf2_size = leaf2.set.item_count()
@@ -253,7 +247,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             leaf1,
     #             [self.dummy_map[-3]],
     #         )
-        
+
     #     with self.subTest("Dim 3 right internal node"):
     #         # Check right internal node in dimension 3
     #         right_internal = root_d3.right_subtree.node
@@ -265,7 +259,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             [self.dummy_map[-1], self.get_replica_from_key(22)],
     #             2
     #         )
-        
+
     #     with self.subTest("Dim 3 leaf 2"):
     #         # Check leaf 2 in dimension 3
     #         right_internal_entries = list(right_internal.set)
@@ -277,7 +271,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             leaf2,
     #             [self.dummy_map[-1], item_map[11]]
     #         )
-        
+
     #     with self.subTest("Dim 3 leaf 3"):
     #         # Check leaf 3 in dimension 3
     #         leaf3 = right_internal.right_subtree.node
@@ -288,7 +282,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             leaf3,
     #             [item_map[22]],
     #         )
-        
+
     # def test_insertion_triggers_single_expansion_in_root(self):
     #     """Test that inserting an item triggers expansion when necessary"""
     #     k = 2
@@ -303,7 +297,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
 
     #     # Create items
     #     item_map = { k: self.make_item(k) for k in keys}
-        
+
     #     for i in range(2):
     #         key = keys[i]
     #         rank = rank_lists[0][i]
@@ -376,7 +370,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             [self.dummy_map[-2], self.dummy_map[-1]],
     #             3
     #         )
-        
+
     #     with self.subTest("Dim 2 leaf 1"):
     #         # Check leaf 1 in dimension 2
     #         root_entries_d2 = list(root_d2.set)
@@ -432,7 +426,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #     ]
     #     keys = self.find_keys_for_rank_lists(rank_lists, k)
     #     item_map = { k: self.make_item(k) for k in keys}
-        
+
     #     for i in range(2):
     #         key = keys[i]
     #         rank = rank_lists[0][i]
@@ -440,7 +434,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #         tree, _, _ = tree.insert(item, rank=rank)
 
     #     self.assertFalse(tree.is_empty(), "Tree should not be empty after insertions")
-        
+
     #     with self.subTest("Dim 1 root"):
     #         # Insert one more item to trigger expansion in the root
     #         root_d1 = tree.node
@@ -478,7 +472,7 @@ class TestGKPlusNodeItemCounts(GKPlusTreeTestCase):
     #             leaf2,
     #             [item_map[15]],
     #         )
-            
+
     #     with self.subTest("Dim 1 leaf 3"):
     #         # Check leaf 3 in dimension 1
     #         leaf3 = root_d1.right_subtree.node

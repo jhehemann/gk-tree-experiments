@@ -11,16 +11,15 @@ import unittest
 from gplus_trees.base import Entry
 from gplus_trees.factory import create_gplustree
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
+from tests.test_base import BaseTreeTestCase, GKPlusTreeTestCase
 
-from tests.test_base import BaseTreeTestCase
-from tests.test_base import GKPlusTreeTestCase
 
 class TestGPlusTreeInsertResult(BaseTreeTestCase):
     """Test InsertResult for GPlusTree insert method."""
-    
+
     def setUp(self):
         self.tree = create_gplustree(4)
-    
+
     def test_insert_empty_tree_returns_correct_result(self):
         """Test insert into empty tree returns correct InsertResult."""
         item = self.make_item(5, "test_value")
@@ -31,13 +30,13 @@ class TestGPlusTreeInsertResult(BaseTreeTestCase):
         self.assertIs(tree, self.tree)
         self.assertTrue(inserted)
         self.assertIsNone(next_entry)
-    
+
     def test_insert_new_item_returns_correct_result(self):
         """Test insert of new item returns correct InsertResult."""
         # First insert
         item1 = self.make_item(5, "value1")
         self.tree.insert(item1, 1)
-        
+
         # Second insert
         item2 = self.make_item(10, "value2")
         tree, inserted, next_entry = self.tree.insert(item2, 1)
@@ -45,12 +44,12 @@ class TestGPlusTreeInsertResult(BaseTreeTestCase):
         self.assertIs(tree, self.tree)
         self.assertTrue(inserted)
         self.assertIsNone(next_entry)  # No next entry at rank 1
-    
+
     def test_insert_existing_item_returns_correct_result(self):
         """Test insert of existing item returns correct InsertResult."""
         item = self.make_item(5, "original_value")
         self.tree.insert(item, 1)
-        
+
         # Insert same key with different value
         updated_item = self.make_item(5, "updated_value")
         tree, inserted, next_entry = self.tree.insert(updated_item, 1)
@@ -58,17 +57,17 @@ class TestGPlusTreeInsertResult(BaseTreeTestCase):
         self.assertIs(tree, self.tree)
         self.assertFalse(inserted)  # Should be False for existing items
         self.assertIsNone(next_entry)
-        
+
         # Verify the value was updated
         found_entry, _ = self.tree.retrieve(5)
         self.assertEqual(found_entry.item.value, "updated_value")
-    
+
     def test_insert_with_higher_rank_returns_correct_result(self):
         """Test insert with higher rank returns correct InsertResult."""
         # Insert at rank 1
         item1 = self.make_item(5, "value1")
         self.tree.insert(item1, 1)
-        
+
         # Insert at rank 2
         item2 = self.make_item(10, "value2")
         tree, inserted, next_entry = self.tree.insert(item2, 2)
@@ -84,7 +83,7 @@ class TestGPlusTreeInsertResult(BaseTreeTestCase):
         items = [self.make_item(i, f"value{i}") for i in [2, 4, 6, 8, 10]]
         for item in items:
             self.tree.insert(item, 1)
-        
+
         # Insert between existing items
         new_item = self.make_item(5, "value5")
         tree, inserted, next_entry = self.tree.insert(new_item, 1)
@@ -101,8 +100,7 @@ class TestGPlusTreeInsertResult(BaseTreeTestCase):
 
 class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
     """Test InsertResult for GKPlusTree insert method."""
-        
-    
+
     def test_insert_empty_tree_returns_correct_result(self):
         """Test insert into empty GKPlusTree returns correct InsertResult."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
@@ -114,7 +112,7 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
         self.assertIs(tree, tree)
         self.assertTrue(inserted)
         self.assertIsNone(next_entry)
-    
+
     def test_insert_new_item_returns_correct_result(self):
         """Test insert of new item into GKPlusTree returns correct InsertResult."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
@@ -129,11 +127,11 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
         self.assertIs(new_tree, tree)
         self.assertTrue(inserted)
         self.assertIsInstance(next_entry, (type(None), Entry))
-    
+
     def test_insert_existing_item_returns_correct_result(self):
         """Test insert of existing item into GKPlusTree returns correct InsertResult."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
-        
+
         item = self.make_item(5, "original_value")
         tree.insert(item, 1)
 
@@ -141,11 +139,11 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
         updated_item = self.make_item(5, "updated_value")
         with self.assertRaises(NotImplementedError) as context:
             tree.insert(updated_item, 1)
-        
+
         # Verify the error message
         self.assertIn("Entry with key 5 already exists", str(context.exception))
         self.assertIn("Updates are not yet implemented", str(context.exception))
-    
+
     def test_insert_with_dimensional_expansion_returns_correct_result(self):
         """Test insert that triggers dimensional expansion returns correct InsertResult."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
@@ -157,7 +155,7 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
             self.assertIs(new_tree, tree)
             self.assertTrue(inserted)
             self.assertIsInstance(next_entry, (type(None), Entry))
-    
+
     def test_insert_with_higher_rank_returns_correct_result(self):
         """Test insert with higher rank in GKPlusTree returns correct InsertResult."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
@@ -176,13 +174,14 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
 
 class TestKListInsertEntryResult(BaseTreeTestCase):
     """Test InsertResult for KList insert_entry method."""
-    
+
     def setUp(self):
         super().setUp()
         from gplus_trees.factory import make_gplustree_classes
+
         _, _, self.KListClass, _ = make_gplustree_classes(4)
         self.klist = self.KListClass()
-    
+
     def test_insert_entry_empty_klist_returns_correct_result(self):
         """Test insert_entry into empty KList returns correct InsertResult."""
         item = self.make_item(5, "test_value")
@@ -193,14 +192,14 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         self.assertIs(klist, self.klist)
         self.assertTrue(inserted)
         self.assertIsNone(next_entry)
-    
+
     def test_insert_entry_new_item_returns_correct_result(self):
         """Test insert_entry of new item returns correct InsertResult."""
         # First insert
         item1 = self.make_item(5, "value1")
         entry1 = Entry(item1, None)
         _, _, _ = self.klist.insert_entry(entry1)
-        
+
         # Second insert
         item2 = self.make_item(10, "value2")
         entry2 = Entry(item2, None)
@@ -215,7 +214,7 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         item = self.make_item(5, "original_value")
         entry = Entry(item, None)
         self.klist.insert_entry(entry)
-        
+
         # Insert same key with different value
         updated_item = self.make_item(5, "updated_value")
         updated_entry = Entry(updated_item, None)
@@ -232,7 +231,7 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         for item in items:
             entry = Entry(item, None)
             self.klist.insert_entry(entry)
-        
+
         # Insert between existing items
         new_item = self.make_item(5, "value5")
         new_entry = Entry(new_item, None)
@@ -260,7 +259,7 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         # Verify the entry was inserted with the correct left_subtree
         found_entry, _ = self.klist.retrieve(5)
         self.assertIs(found_entry.left_subtree, subtree)
-    
+
     def test_insert_entry_overflow_returns_correct_result(self):
         """Test insert_entry that causes overflow returns correct InsertResult."""
         # Fill KList to capacity
@@ -269,7 +268,7 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         for item in items:
             entry = Entry(item, None)
             self.klist.insert_entry(entry)
-        
+
         # Insert one more item to trigger overflow
         overflow_item = self.make_item(capacity + 1, f"value{capacity + 1}")
         overflow_entry = Entry(overflow_item, None)
@@ -278,13 +277,13 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
         self.assertIs(klist, self.klist)
         self.assertTrue(inserted)
         self.assertIsInstance(next_entry, (type(None), Entry))
-    
+
     def test_insert_entry_with_rank_parameter(self):
         """Test insert_entry with rank parameter (GKPlusTree specific)."""
         # This test is for completeness - rank parameter is used in GKPlusTree contexts
         item = self.make_item(5, "test_value")
         entry = Entry(item, None)
-        
+
         # Insert with rank parameter
         klist, inserted, next_entry = self.klist.insert_entry(entry, rank=1)
 
@@ -295,7 +294,7 @@ class TestKListInsertEntryResult(BaseTreeTestCase):
 
 class TestNextEntryCorrectness(BaseTreeTestCase):
     """Test that next_entry is always correctly returned for different insertion positions."""
-    
+
     def setUp(self):
         super().setUp()
         self.tree = create_gplustree(4)
@@ -303,7 +302,7 @@ class TestNextEntryCorrectness(BaseTreeTestCase):
         self.keys = [10, 20, 30, 40, 50, 60, 70, 80, 90]
         for key in self.keys:
             self.tree.insert(self.make_item(key, f"value_{key}"), 1)
-    
+
     def test_insert_at_beginning_returns_correct_next_entry(self):
         """Test inserting at the beginning returns correct next_entry."""
         # Insert at the very beginning (before 10)
@@ -334,7 +333,7 @@ class TestNextEntryCorrectness(BaseTreeTestCase):
             (45, 50),  # Insert between 40 and 50, next should be 50
             (75, 80),  # Insert between 70 and 80, next should be 80
         ]
-        
+
         for insert_key, expected_next_key in test_cases:
             with self.subTest(insert_key=insert_key, expected_next_key=expected_next_key):
                 _, inserted, next_entry = self.tree.insert(self.make_item(insert_key, f"value_{insert_key}"), 1)
@@ -351,7 +350,7 @@ class TestNextEntryCorrectness(BaseTreeTestCase):
         _, inserted, next_entry = self.tree.insert(self.make_item(30, "updated_value_30"), 1)
 
         self.assertFalse(inserted)  # Should be update, not insertion
-        
+
         # next_entry should point to the next item after 30 (which is 40)
         if next_entry is not None:
             self.assertEqual(next_entry.item.key, 40)
@@ -360,15 +359,15 @@ class TestNextEntryCorrectness(BaseTreeTestCase):
     def test_insert_sequence_maintains_correct_next_entries(self):
         """Test inserting a sequence of items maintains correct next_entries."""
         new_tree = create_gplustree(4)
-        
+
         # Insert items in non-sorted order and verify next_entry for each
         insert_sequence = [(25, 30), (15, 20), (35, 40), (5, 10), (45, None)]
         existing_keys = [10, 20, 30, 40]
-        
+
         # Pre-populate with some items
         for key in existing_keys:
             new_tree.insert(self.make_item(key, f"value_{key}"), 1)
-        
+
         for insert_key, expected_next_key in insert_sequence:
             with self.subTest(insert_key=insert_key, expected_next_key=expected_next_key):
                 _, inserted, next_entry = new_tree.insert(self.make_item(insert_key, f"value_{insert_key}"), 1)
@@ -384,12 +383,11 @@ class TestNextEntryCorrectness(BaseTreeTestCase):
 
 class TestGKPlusTreeNextEntryCorrectness(GKPlusTreeTestCase):
     """Test next_entry correctness for GKPlusTree insertions."""
-    
+
     def setUp(self):
         # Pre-populate with a sorted sequence
         self.keys = [10, 20, 30, 40, 50]
-        
-    
+
     def test_gkplus_insert_at_beginning_returns_correct_next_entry(self):
         """Test GKPlusTree insert at beginning returns correct next_entry."""
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
@@ -442,19 +440,20 @@ class TestGKPlusTreeNextEntryCorrectness(GKPlusTreeTestCase):
 
 class TestKListNextEntryCorrectness(BaseTreeTestCase):
     """Test next_entry correctness for KList insert_entry method."""
-    
+
     def setUp(self):
         super().setUp()
         from gplus_trees.factory import make_gplustree_classes
+
         _, _, self.KListClass, _ = make_gplustree_classes(4)
         self.klist = self.KListClass()
-        
+
         # Pre-populate with a sorted sequence
         self.keys = [10, 20, 30, 40, 50]
         for key in self.keys:
             entry = Entry(self.make_item(key, f"value_{key}"), None)
             self.klist.insert_entry(entry)
-    
+
     def test_klist_insert_at_beginning_returns_correct_next_entry(self):
         """Test KList insert at beginning returns correct next_entry."""
         entry = Entry(self.make_item(5, "value_5"), None)
@@ -484,7 +483,7 @@ class TestKListNextEntryCorrectness(BaseTreeTestCase):
             (35, 40),  # Between 30 and 40
             (45, 50),  # Between 40 and 50
         ]
-        
+
         for insert_key, expected_next_key in test_cases:
             with self.subTest(insert_key=insert_key, expected_next_key=expected_next_key):
                 entry = Entry(self.make_item(insert_key, f"value_{insert_key}"), None)
@@ -526,7 +525,7 @@ class TestKListNextEntryCorrectness(BaseTreeTestCase):
 
 class TestNextEntryEdgeCases(BaseTreeTestCase):
     """Test edge cases for next_entry behavior."""
-    
+
     def test_empty_tree_insert_returns_none_next_entry(self):
         """Test insert into empty tree returns None next_entry."""
         empty_tree = create_gplustree(4)
@@ -560,11 +559,11 @@ class TestNextEntryEdgeCases(BaseTreeTestCase):
     def test_higher_rank_insert_next_entry_behavior(self):
         """Test next_entry behavior for higher rank insertions."""
         tree = create_gplustree(4)
-        
+
         # Insert some items at rank 1
         for key in [10, 20, 30]:
             tree.insert(self.make_item(key, f"value_{key}"), 1)
-        
+
         # Insert at higher rank
         _, inserted, next_entry = tree.insert(self.make_item(15, "value_15"), 2)
 
@@ -577,20 +576,20 @@ class TestNextEntryEdgeCases(BaseTreeTestCase):
     def test_large_tree_next_entry_consistency(self):
         """Test next_entry consistency in larger tree structures."""
         tree = create_gplustree(4)
-        
+
         # Insert a smaller number of items to avoid potential infinite loops
         keys = list(range(0, 20, 5))  # [0, 5, 10, 15] - reduced from 100 to 20
         for key in keys:
             tree.insert(self.make_item(key, f"value_{key}"), 1)
-        
+
         # Test insertions at various positions
         test_insertions = [
-            (2, 5),    # Near beginning
-            (7, 10),   # In middle
-            (12, 15),  # In middle  
-            (17, None) # At end
+            (2, 5),  # Near beginning
+            (7, 10),  # In middle
+            (12, 15),  # In middle
+            (17, None),  # At end
         ]
-        
+
         for insert_key, expected_next_key in test_insertions:
             with self.subTest(insert_key=insert_key, expected_next_key=expected_next_key):
                 _, inserted, next_entry = tree.insert(self.make_item(insert_key, f"value_{insert_key}"), 1)

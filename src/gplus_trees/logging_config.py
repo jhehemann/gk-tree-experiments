@@ -49,7 +49,7 @@ def get_logger(name: str) -> logging.Logger:
     Parameters
     ----------
     name : str
-        Module name – almost always ``__name__``.
+        Module name - almost always ``__name__``.
 
     Returns
     -------

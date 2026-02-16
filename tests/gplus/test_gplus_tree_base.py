@@ -17,23 +17,20 @@ import unittest
 from gplus_trees.base import (
     DummyItem,
     Entry,
-    InternalItem,
     ItemData,
     LeafItem,
 )
 from gplus_trees.factory import create_gplustree, make_gplustree_classes
 from gplus_trees.gplus_tree_base import (
     DUMMY_ITEM,
-    DUMMY_KEY,
     GPlusTreeBase,
     _SplitContext,
     get_dummy,
 )
-
 from tests.test_base import GPlusTreeTestCase
 
-
 # ── retrieve(with_next=False) ──────────────────────────────────────
+
 
 class TestRetrieveWithNextFalse(GPlusTreeTestCase):
     """Exercise the ``with_next=False`` code path through GPlusTreeBase."""
@@ -102,11 +99,11 @@ class TestRetrieveWithNextFalse(GPlusTreeTestCase):
         for k, _ in keys_ranks:
             f_true, _ = self.tree.retrieve(k, with_next=True)
             f_false, _ = self.tree.retrieve(k, with_next=False)
-            self.assertIs(f_true, f_false,
-                          f"Found entries for key {k} must be identical objects")
+            self.assertIs(f_true, f_false, f"Found entries for key {k} must be identical objects")
 
 
 # ── _descend_to_leaf / _find_in_leaf ──────────────────────────────
+
 
 class TestDescendToLeaf(GPlusTreeTestCase):
     """Direct tests for the split-out ``_descend_to_leaf`` method."""
@@ -123,8 +120,7 @@ class TestDescendToLeaf(GPlusTreeTestCase):
             self.tree.insert(items[k], r)
         for k in [1, 3, 5, 7]:
             leaf = self.tree._descend_to_leaf(k)
-            self.assertEqual(leaf.rank, 1,
-                             f"_descend_to_leaf({k}) must reach a rank-1 node")
+            self.assertEqual(leaf.rank, 1, f"_descend_to_leaf({k}) must reach a rank-1 node")
 
     def test_nonexistent_key_still_reaches_leaf(self):
         """Even for a missing key, descent should reach a rank-1 node."""
@@ -173,6 +169,7 @@ class TestFindInLeaf(GPlusTreeTestCase):
 
 # ── iter_leaf_nodes ────────────────────────────────────────────────
 
+
 class TestIterLeafNodes(GPlusTreeTestCase):
     """Tests for ``GPlusTreeBase.iter_leaf_nodes``."""
 
@@ -199,8 +196,7 @@ class TestIterLeafNodes(GPlusTreeTestCase):
                 if entry.item.key >= 0:
                     all_keys.append(entry.item.key)
 
-        self.assertEqual(all_keys, sorted(all_keys),
-                         "Leaf keys must be in sorted order")
+        self.assertEqual(all_keys, sorted(all_keys), "Leaf keys must be in sorted order")
         # All inserted keys should be present
         for k, _ in keys_ranks:
             self.assertIn(k, all_keys, f"Key {k} missing from iter_leaf_nodes")
@@ -213,17 +209,15 @@ class TestIterLeafNodes(GPlusTreeTestCase):
 
         leaves = list(self.tree.iter_leaf_nodes())
         for i, leaf in enumerate(leaves[:-1]):
-            self.assertIsNotNone(leaf.next,
-                                 f"Leaf {i} should have a next pointer")
-            self.assertIs(leaf.next.node, leaves[i + 1],
-                          f"Leaf {i}.next.node should be leaf {i+1}")
+            self.assertIsNotNone(leaf.next, f"Leaf {i} should have a next pointer")
+            self.assertIs(leaf.next.node, leaves[i + 1], f"Leaf {i}.next.node should be leaf {i + 1}")
         # Last leaf should have no next
         if leaves:
-            self.assertIsNone(leaves[-1].next,
-                              "Last leaf should have no next pointer")
+            self.assertIsNone(leaves[-1].next, "Last leaf should have no next pointer")
 
 
 # ── physical_height (tree-level) ──────────────────────────────────
+
 
 class TestPhysicalHeight(GPlusTreeTestCase):
     """Tree-level ``physical_height`` tests (KList-level tests are in test_klist.py)."""
@@ -246,8 +240,9 @@ class TestPhysicalHeight(GPlusTreeTestCase):
         for k, r in keys_ranks:
             deep.insert(self.make_item(k, f"v{k}"), r)
 
-        self.assertGreaterEqual(deep.physical_height(), flat.physical_height(),
-                                "Deeper tree should have >= physical_height")
+        self.assertGreaterEqual(
+            deep.physical_height(), flat.physical_height(), "Deeper tree should have >= physical_height"
+        )
 
     def test_consistent_across_calls(self):
         keys_ranks = [(1, 2), (3, 3), (5, 1)]
@@ -259,6 +254,7 @@ class TestPhysicalHeight(GPlusTreeTestCase):
 
 
 # ── get_dummy / _get_dummy hook ───────────────────────────────────
+
 
 class TestGetDummy(unittest.TestCase):
     """Tests for the module-level ``get_dummy`` function and
@@ -293,6 +289,7 @@ class TestGetDummy(unittest.TestCase):
 
 # ── _make_empty_tree hook ─────────────────────────────────────────
 
+
 class TestMakeEmptyTree(unittest.TestCase):
     """Verify ``_make_empty_tree`` returns the correct concrete type."""
 
@@ -311,6 +308,7 @@ class TestMakeEmptyTree(unittest.TestCase):
 
 
 # ── _SplitContext ─────────────────────────────────────────────────
+
 
 class TestSplitContext(unittest.TestCase):
     """Basic construction and attribute access of ``_SplitContext``."""
@@ -334,14 +332,17 @@ class TestSplitContext(unittest.TestCase):
         tree1 = create_gplustree(4)
         tree2 = create_gplustree(4)
         ctx = _SplitContext(
-            right_parent=tree1, right_entry=None,
-            left_parent=tree1, left_x_entry=None,
+            right_parent=tree1,
+            right_entry=None,
+            left_parent=tree1,
+            left_x_entry=None,
         )
         ctx.right_parent = tree2
         self.assertIs(ctx.right_parent, tree2)
 
 
 # ── print_structure delegation ────────────────────────────────────
+
 
 class TestPrintStructure(GPlusTreeTestCase):
     """Ensure ``print_structure`` returns a non-empty string."""
@@ -359,6 +360,7 @@ class TestPrintStructure(GPlusTreeTestCase):
 
 
 # ── Type-error edge cases ────────────────────────────────────────
+
 
 class TestInsertTypeErrors(GPlusTreeTestCase):
     """Verify ``insert`` raises TypeError correctly."""
@@ -396,6 +398,7 @@ class TestRetrieveTypeErrors(GPlusTreeTestCase):
 
 
 # ── InsertResult backward compatibility ──────────────────────────
+
 
 class TestInsertResultUnpacking(GPlusTreeTestCase):
     """Ensure InsertResult can be unpacked as a plain tuple."""

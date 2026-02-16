@@ -25,19 +25,20 @@ inner tree, adding O(h_{d+1}) setup + O(n_{d+1}) scan per inner tree.
 """
 
 from __future__ import annotations
-from typing import Optional, Tuple, TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 from gplus_trees.base import Entry
-from gplus_trees.gplus_tree_base import print_pretty, get_dummy
+from gplus_trees.gplus_tree_base import get_dummy, print_pretty
 
 if TYPE_CHECKING:
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, GKPlusNodeBase
+    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusNodeBase, GKPlusTreeBase
 
 
 class GKPlusNavigationMixin:
     """Mixin that contributes navigation / query methods to *GKPlusTreeBase*."""
 
-    def find_pivot(self) -> Tuple[Optional[Entry], Optional[Entry]]:
+    def find_pivot(self) -> tuple[Entry | None, Entry | None]:
         """
         Returns the pivot entry of a node in the next lower dimension.
 
@@ -91,7 +92,7 @@ class GKPlusNavigationMixin:
     # TODO: Check indifference: This may return an entry with dummy key y, although a subsequent
     # leaf may have been expanded to a higher dimension with a dummy key x < y.
     # However, y is the first entry yielded when iterating over the tree.
-    def get_min(self) -> Tuple[Optional[Entry], Optional[Entry]]:
+    def get_min(self) -> tuple[Entry | None, Entry | None]:
         """
         Get the minimum entry in the tree. This corresponds to the entry with the dummy item
         of the maximum dimension in successive first leaf nodes.
@@ -113,7 +114,7 @@ class GKPlusNavigationMixin:
 
         return first_leaf.set.get_min()
 
-    def get_max(self) -> Tuple[Optional[Entry], Optional[Entry]]:
+    def get_max(self) -> tuple[Entry | None, Entry | None]:
         """
         Get the maximum entry in the tree.
 
@@ -128,7 +129,7 @@ class GKPlusNavigationMixin:
         max_leaf = self.get_max_leaf()
         return max_leaf.set.get_max()
 
-    def get_min_leaf_tree(self: 'GKPlusTreeBase') -> 'GKPlusTreeBase':
+    def get_min_leaf_tree(self: GKPlusTreeBase) -> GKPlusTreeBase:
         """
         Get the minimum leaf tree in the current dimension.
 
@@ -155,7 +156,7 @@ class GKPlusNavigationMixin:
                 cur = cur.node.right_subtree
         return cur
 
-    def get_max_leaf(self: 'GKPlusTreeBase') -> 'GKPlusNodeBase':
+    def get_max_leaf(self: GKPlusTreeBase) -> GKPlusNodeBase:
         """
         Get the rightmost leaf node in the current dimension.
 

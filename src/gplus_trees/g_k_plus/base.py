@@ -1,13 +1,10 @@
 """Abstract base class for GK+-tree set data structures."""
 
 from abc import abstractmethod
+from collections.abc import Iterator
+from typing import Optional
 
-from typing import Optional, Tuple, Iterator
-
-from gplus_trees.base import (
-    AbstractSetDataStructure,
-    Entry
-)
+from gplus_trees.base import AbstractSetDataStructure, Entry
 
 
 class GKTreeSetDataStructure(AbstractSetDataStructure):
@@ -16,7 +13,7 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
     """
 
     @abstractmethod
-    def get_min(self) -> Tuple[Optional['Entry'], Optional['Entry']]:
+    def get_min(self) -> tuple[Optional["Entry"], Optional["Entry"]]:
         """
         Retrieve the minimum entry in the set data structure.
         Returns:
@@ -63,7 +60,7 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
         pass
 
     @abstractmethod
-    def __iter__(self) -> Iterator['Entry']:
+    def __iter__(self) -> Iterator["Entry"]:
         """
         Iterate over the entries in the set data structure.
 

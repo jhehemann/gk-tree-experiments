@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import collections
-import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from gplus_trees.base import AbstractSetDataStructure
 from gplus_trees.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -19,6 +17,7 @@ logger = get_logger(__name__)
 @dataclass
 class Stats:
     """Aggregated statistics for a G⁺-tree."""
+
     gnode_height: int
     gnode_count: int
     item_count: int
@@ -27,8 +26,8 @@ class Stats:
     leaf_count: int
     rank: int
     is_heap: bool
-    least_item: Optional[Any]
-    greatest_item: Optional[Any]
+    least_item: Any | None
+    greatest_item: Any | None
     is_search_tree: bool
     internal_has_replicas: bool
     internal_packed: bool
@@ -36,12 +35,12 @@ class Stats:
     linked_leaf_nodes: bool
     all_leaf_values_present: bool
     leaf_keys_in_order: bool
-    inner_stats: Optional[List['Stats']] = None
+    inner_stats: list[Stats] | None = None
 
 
 def gtree_stats_(
-    t: 'GPlusTreeBase',
-    rank_hist: Optional[Dict[int, int]] = None,
+    t: GPlusTreeBase,
+    rank_hist: dict[int, int] | None = None,
     _is_root: bool = True,
 ) -> Stats:
     """
@@ -51,9 +50,9 @@ def gtree_stats_(
     otherwise a fresh Counter is used.
     """
     # Lazy imports to break circular dependency
-    from gplus_trees.gplus_tree_base import GPlusTreeBase, DUMMY_KEY, get_dummy
-    from gplus_trees.klist_base import KListBase
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
+    from gplus_trees.gplus_tree_base import get_dummy
+    from gplus_trees.klist_base import KListBase
 
     if rank_hist is None:
         rank_hist = collections.Counter()
@@ -82,7 +81,7 @@ def gtree_stats_(
         )
 
     K = t.SetClass.KListNodeClass.CAPACITY
-    if hasattr(t, 'l_factor'):
+    if hasattr(t, "l_factor"):
         threshold = t.l_factor * K
     else:
         threshold = K
@@ -156,7 +155,7 @@ def gtree_stats_(
 
         # Check search tree property within the node
         if prev_key is not None and prev_key >= current_key:
-            if hasattr(t, 'DIM'):
+            if hasattr(t, "DIM"):
                 if current_key >= get_dummy(t.DIM).key:
                     stats.is_search_tree = False
             else:
@@ -187,11 +186,11 @@ def gtree_stats_(
                 stats.set_thresholds_met = False
 
             # Check current node violations (only if no child violations yet)
-            if stats.set_thresholds_met:
-                if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
-                    stats.set_thresholds_met = False
-                elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
-                    stats.set_thresholds_met = False
+            if stats.set_thresholds_met and (
+                (isinstance(node_set, KListBase) and node_set.item_count() > threshold)
+                or (not isinstance(node_set, KListBase) and node_set.item_count() <= threshold)
+            ):
+                stats.set_thresholds_met = False
 
             stats.internal_has_replicas &= cs.internal_has_replicas
             stats.internal_packed &= cs.internal_packed
@@ -202,13 +201,13 @@ def gtree_stats_(
                 if not cs.is_search_tree:
                     stats.is_search_tree = False
                 elif cs.least_item and prev_key and cs.least_item.key < prev_key:
-                    if hasattr(t, 'DIM'):
+                    if hasattr(t, "DIM"):
                         if cs.least_item.key >= get_dummy(t.DIM).key:
                             stats.is_search_tree = False
                     else:
                         stats.is_search_tree = False
                 elif cs.greatest_item and cs.greatest_item.key >= current_key:
-                    if hasattr(t, 'DIM'):
+                    if hasattr(t, "DIM"):
                         if cs.greatest_item.key >= get_dummy(t.DIM).key:
                             stats.is_search_tree = False
                     else:
@@ -228,16 +227,16 @@ def gtree_stats_(
         stats.set_thresholds_met = False
 
     # Check current node violations (always check, regardless of current state)
-    if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
-        stats.set_thresholds_met = False
-    elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
+    if (isinstance(node_set, KListBase) and node_set.item_count() > threshold) or (
+        not isinstance(node_set, KListBase) and node_set.item_count() <= threshold
+    ):
         stats.set_thresholds_met = False
 
     if stats.is_search_tree:
         if not right_stats.is_search_tree:
             stats.is_search_tree = False
         elif right_stats.least_item and prev_key is not None and right_stats.least_item.key < prev_key:
-            if hasattr(t, 'DIM'):
+            if hasattr(t, "DIM"):
                 if right_stats.least_item.key >= get_dummy(t.DIM).key:
                     stats.is_search_tree = False
             else:
@@ -245,7 +244,7 @@ def gtree_stats_(
 
     stats.is_search_tree &= right_stats.is_search_tree
     if right_stats.least_item and right_stats.least_item.key < prev_key:
-        if hasattr(t, 'DIM'):
+        if hasattr(t, "DIM"):
             if right_stats.least_item.key >= get_dummy(t.DIM).key:
                 stats.is_search_tree = False
         else:
@@ -298,7 +297,7 @@ def gtree_stats_(
         stats.greatest_item = node_set.get_max()[0].item
 
     # ---------- leaf walk ONCE at the root -----------------------------
-    if node_rank == 1:          # leaf node: base values
+    if node_rank == 1:  # leaf node: base values
         true_count = 0
         all_values_present = True
 
@@ -348,7 +347,7 @@ def gtree_stats_(
             stats.leaf_count = max(leaf_count, stats.leaf_count)
             stats.real_item_count = max(item_count, stats.real_item_count)
         elif last_leaf is not None:
-            last_count = last_leaf.set.item_count()
+            last_leaf.set.item_count()
             last_item = last_leaf.set.get_max()[0].item
             if stats.greatest_item is not last_item:
                 stats.linked_leaf_nodes = False

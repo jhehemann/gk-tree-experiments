@@ -1,18 +1,19 @@
 """Tests for GK+-trees with factory pattern"""
 
-from typing import List, Tuple, Optional
+import logging
+
 from gplus_trees.base import Entry, LeafItem
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
 from tests.test_base import GKPlusTreeTestCase
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 # Inherit from the unified base class but keep backward compatibility
 class TreeTestCase(GKPlusTreeTestCase):
     """Legacy TreeTestCase that extends GKPlusTreeTestCase with backward compatibility."""
 
-    def _log_ranks(self, K: int, keys: Optional[List] = None, dimensions: int = 10) -> None:
+    def _log_ranks(self, K: int, keys: list | None = None, dimensions: int = 10) -> None:
         """
         Print the ranks of keys provided in <list> for debugging purposes.
         Args:
@@ -31,12 +32,12 @@ class TreeTestCase(GKPlusTreeTestCase):
 
         # Log ranks for debugging
         logger.debug(f"Ranks for keys: {list(keys)}")
-        for dim, ranks in enumerate(ranks):
-            logger.debug(f"Dimension {dim + 1}: {ranks}")
-    
+        for dim, rank_list in enumerate(ranks):
+            logger.debug(f"Dimension {dim + 1}: {rank_list}")
+
     def _assert_leaf_node_properties_for_leaf_in_expanded_internal_tree(
-        self, node, items: List[LeafItem]
-    ) -> Tuple[Optional[Entry], Optional[Entry]]:
+        self, node, items: list[LeafItem]
+    ) -> tuple[Entry | None, Entry | None]:
         """
         Verify that `node` is a rank 1 leaf containing exactly `items` in order,
         and that all its subtrees are empty.
@@ -46,25 +47,19 @@ class TreeTestCase(GKPlusTreeTestCase):
                 (next_entry is None if there's only one).
         """
         self.assertIsNotNone(node, "Node should not be None")
-        self.assertEqual(node.rank, 1, f"Leaf node rank should be 1")
-        actual_len   = node.set.item_count()
+        self.assertEqual(node.rank, 1, "Leaf node rank should be 1")
+        actual_len = node.set.item_count()
         expected_len = len(items)
-        self.assertEqual(
-            actual_len, expected_len,
-            f"Leaf node has {actual_len} items; expected {expected_len}"
-        )
-        self.assertIsNone(node.right_subtree, 
-                          "Expected leaf node's right_subtree to be None")
+        self.assertEqual(actual_len, expected_len, f"Leaf node has {actual_len} items; expected {expected_len}")
+        self.assertIsNone(node.right_subtree, "Expected leaf node's right_subtree to be None")
 
         # verify each entry's key/value
-        for i, (entry, expected) in enumerate(zip(node.set, items)):
+        for i, (entry, expected) in enumerate(zip(node.set, items, strict=False)):
             self.assertEqual(
-                entry.item.key, expected.key,
-                f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
+                entry.item.key, expected.key, f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
             )
             self.assertEqual(
-                entry.item.value, expected.value,
-                f"Entry #{i} ({expected.key}) value: expected "
-                f"{expected.value!r}, "
-                f"got {entry.item.value!r}"
+                entry.item.value,
+                expected.value,
+                f"Entry #{i} ({expected.key}) value: expected {expected.value!r}, got {entry.item.value!r}",
             )

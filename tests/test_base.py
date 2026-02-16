@@ -1,37 +1,35 @@
 """Unified test base classes for all tree types."""
 
-from typing import Tuple, Optional, List, Union
-import unittest
 import hashlib
+import logging
+import unittest
 from dataclasses import asdict
 
-from gplus_trees.utils import count_trailing_zero_bits, calc_rank_from_digest
-from gplus_trees.base import LeafItem, InternalItem, ItemData, Entry
+from gplus_trees.base import Entry, InternalItem, ItemData, LeafItem
 from gplus_trees.factory import make_gplustree_classes
-from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
-from gplus_trees.klist_base import KListBase
-from gplus_trees.g_k_plus.utils import get_group_size
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-
+from gplus_trees.g_k_plus.utils import get_group_size
+from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.invariants import check_leaf_keys_and_values
+from gplus_trees.klist_base import KListBase
+from gplus_trees.utils import calc_rank_from_digest, count_trailing_zero_bits
 from tests.utils import assert_tree_invariants_tc
-
-import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BaseTestCase(unittest.TestCase):
     """Base class for all tests with common functionality."""
-    
+
     def make_item(self, key: int, value: str = "val") -> LeafItem:
         item_data = ItemData(key, value)
         return LeafItem(item_data)
-    
+
     def get_replica_from_key(self, key: int) -> InternalItem:
         item_data = ItemData(key, value="val")
         return InternalItem(item_data)
-    
+
     def make_dummy_item(self, key: int) -> InternalItem:
         item_data = ItemData(key, value="dummy")
         return InternalItem(item_data)
@@ -39,8 +37,8 @@ class BaseTestCase(unittest.TestCase):
     def validate_klist(
         self,
         klist: KListBase,
-        exp_entries: Optional[List[Entry]] = None,
-        err_msg: Optional[str] = "",
+        exp_entries: list[Entry] | None = None,
+        err_msg: str | None = "",
     ):
         """Validate tree invariants and structure."""
         # Check tree invariants
@@ -52,70 +50,78 @@ class BaseTestCase(unittest.TestCase):
         if exp_entries is not None:
             actual_entries = list(klist)
             self.assertEqual(
-                len(exp_entries), len(actual_entries),
-                f"Expected {len(exp_entries)} entries, got {len(actual_entries)}\n{err_msg}"
+                len(exp_entries),
+                len(actual_entries),
+                f"Expected {len(exp_entries)} entries, got {len(actual_entries)}\n{err_msg}",
             )
-            self.assertEqual(klist.item_count(), len(exp_entries),
-                             f"Expected {len(exp_entries)} items in klist, got {klist.item_count()}\n{err_msg}")
+            self.assertEqual(
+                klist.item_count(),
+                len(exp_entries),
+                f"Expected {len(exp_entries)} items in klist, got {klist.item_count()}\n{err_msg}",
+            )
             for i, entry in enumerate(actual_entries):
                 self.assertIs(entry.item, exp_entries[i].item)
-                self.assertEqual(entry.item.key, exp_entries[i].item.key,
-                                 f"Entry #{i} key mismatch: "
-                                 f"expected {exp_entries[i].item.key}, got {entry.item.key}")
-                self.assertEqual(entry.item.value, exp_entries[i].item.value,
-                                 f"Entry #{i} value mismatch: "
-                                 f"expected {exp_entries[i].item.value}, got {entry.item.value}")
-                self.assertIs(entry.left_subtree, exp_entries[i].left_subtree,
-                                 f"Entry #{i} left subtree mismatch: "
-                                 f"expected {exp_entries[i].left_subtree}, got {entry.left_subtree}")
-                self.assertIs(entry, exp_entries[i],
-                                 f"Entry #{i} mismatch: expected {exp_entries[i]}, got {entry}")
-            
+                self.assertEqual(
+                    entry.item.key,
+                    exp_entries[i].item.key,
+                    f"Entry #{i} key mismatch: expected {exp_entries[i].item.key}, got {entry.item.key}",
+                )
+                self.assertEqual(
+                    entry.item.value,
+                    exp_entries[i].item.value,
+                    f"Entry #{i} value mismatch: expected {exp_entries[i].item.value}, got {entry.item.value}",
+                )
+                self.assertIs(
+                    entry.left_subtree,
+                    exp_entries[i].left_subtree,
+                    f"Entry #{i} left subtree mismatch: "
+                    f"expected {exp_entries[i].left_subtree}, got {entry.left_subtree}",
+                )
+                self.assertIs(entry, exp_entries[i], f"Entry #{i} mismatch: expected {exp_entries[i]}, got {entry}")
 
 
 class BaseTreeTestCase(BaseTestCase):
     """Base class for all tree tests with common functionality."""
-    
+
     def tearDown(self):
         """Common tearDown logic for tree tests."""
         # nothing to do if no tree or it's empty
-        if not getattr(self, 'tree', None) or self.tree.is_empty():
+        if not getattr(self, "tree", None) or self.tree.is_empty():
             return
 
         stats = gtree_stats_(self.tree, {})
         assert_tree_invariants_tc(self, self.tree, stats)
-        
+
         # --- optional invariants ---
-        expected_item_count = getattr(self, 'expected_item_count', None)
+        expected_item_count = getattr(self, "expected_item_count", None)
         if expected_item_count is not None:
             self.assertEqual(
-                stats.item_count, expected_item_count,
+                stats.item_count,
+                expected_item_count,
                 f"Item count {stats.item_count} does not match"
                 f"expected {expected_item_count}\n"
-                f"Tree structure:\n{self.tree.print_structure()}"
+                f"Tree structure:\n{self.tree.print_structure()}",
             )
 
-        expected_root_rank = getattr(self, 'expected_root_rank', None)
+        expected_root_rank = getattr(self, "expected_root_rank", None)
         if expected_root_rank is not None:
             self.assertEqual(
-                self.tree.node.rank, expected_root_rank,
-                f"Root rank {self.tree.node.rank} does not match expected"
-                f"{expected_root_rank}"
+                self.tree.node.rank,
+                expected_root_rank,
+                f"Root rank {self.tree.node.rank} does not match expected{expected_root_rank}",
             )
 
-        expected_gnode_count = getattr(self, 'expected_gnode_count', None)
+        expected_gnode_count = getattr(self, "expected_gnode_count", None)
         if expected_gnode_count is not None:
             self.assertEqual(
-                stats.gnode_count, expected_gnode_count,
-                f"GNode count {stats.gnode_count} does not match expected"
-                f"{expected_gnode_count}"
+                stats.gnode_count,
+                expected_gnode_count,
+                f"GNode count {stats.gnode_count} does not match expected{expected_gnode_count}",
             )
 
         # Leaf invariants
-        expected_keys = getattr(self, 'expected_leaf_keys', None)
-        keys, presence_ok, have_values, order_ok = (
-            check_leaf_keys_and_values(self.tree, expected_keys)
-        )
+        expected_keys = getattr(self, "expected_leaf_keys", None)
+        keys, presence_ok, have_values, order_ok = check_leaf_keys_and_values(self.tree, expected_keys)
 
         # Values and ordering must always hold
         self.assertTrue(have_values, "Leaf items must have non-None values")
@@ -123,21 +129,12 @@ class BaseTreeTestCase(BaseTestCase):
 
         # If expected_leaf_keys was set, also enforce presence
         if expected_keys is not None:
-            self.assertTrue(
-                presence_ok,
-                f"Leaf keys {keys} do not match expected {expected_keys}"
-            )
-        
-
-# Legacy alias for backward compatibility - will inherit all BaseTreeTestCase methods
-class TreeTestCase(BaseTreeTestCase):
-    """Legacy alias for BaseTreeTestCase to maintain backward compatibility."""
-    pass
+            self.assertTrue(presence_ok, f"Leaf keys {keys} do not match expected {expected_keys}")
 
 
 class GPlusTreeTestCase(BaseTreeTestCase):
     """Test case for standard G+-trees - inherits common functionality."""
-    
+
     def setUp(self):
         # Use the factory to create a tree with the test capacity
         self.K = 4  # Default capacity for tests
@@ -147,42 +144,34 @@ class GPlusTreeTestCase(BaseTreeTestCase):
             logger.debug(f"Created GPlusTree test with K={self.K}, using class {self.TreeClass.__name__}")
 
     def _assert_internal_node_properties(
-        self, node, items: List[InternalItem], rank: int
-    ) -> Tuple[Optional[Entry], Optional[Entry]]:
+        self, node, items: list[InternalItem], rank: int
+    ) -> tuple[Entry | None, Entry | None]:
         """Assert properties of internal nodes."""
         # Implementation from tests/gplus/base.py
         expected_len = len(items)
         actual_len = node.set.item_count()  # Use item_count() instead of len()
 
-        self.assertEqual(
-            actual_len, expected_len,
-            f"Expected {expected_len} entries in node.set, found {actual_len}"
-        )
+        self.assertEqual(actual_len, expected_len, f"Expected {expected_len} entries in node.set, found {actual_len}")
 
         # verify each entry's key, value=0 and empty left subtree for min item
-        for i, (entry, expected_item) in enumerate(zip(node.set, items)):
+        for i, (entry, expected_item) in enumerate(zip(node.set, items, strict=False)):
             self.assertEqual(
-                entry.item.key, expected_item.key,
-                f"Entry #{i} key mismatch: "
-                f"expected {expected_item.key}, got {entry.item.key}"
+                entry.item.key,
+                expected_item.key,
+                f"Entry #{i} key mismatch: expected {expected_item.key}, got {entry.item.key}",
             )
             self.assertEqual(
-                entry.item.value, expected_item.value,
-                f"Entry #{i} value for key {entry.item.key} should be None"
+                entry.item.value, expected_item.value, f"Entry #{i} value for key {entry.item.key} should be None"
             )
             if i == 0:
-                self.assertIsNone(
-                    entry.left_subtree,
-                    "Expected first (min) entry's left subtree to be None"
-                )
+                self.assertIsNone(entry.left_subtree, "Expected first (min) entry's left subtree to be None")
             else:
                 self.assertIsNotNone(
-                    entry.left_subtree,
-                    f"Expected Entry #{i}'s ({expected_item.key}) left subtree NOT to be None"
+                    entry.left_subtree, f"Expected Entry #{i}'s ({expected_item.key}) left subtree NOT to be None"
                 )
                 self.assertFalse(
                     entry.left_subtree.is_empty(),
-                    f"Expected Entry #{i}'s ({expected_item.key}) left subtree NOT to be empty"
+                    f"Expected Entry #{i}'s ({expected_item.key}) left subtree NOT to be empty",
                 )
 
         # collect and return the first two entries
@@ -192,36 +181,31 @@ class GPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Union[LeafItem, InternalItem]]
-    ) -> Tuple[Optional[Entry], Optional[Entry]]:
+        self, node, items: list[LeafItem | InternalItem]
+    ) -> tuple[Entry | None, Entry | None]:
         """Assert properties of leaf nodes."""
         # Implementation from tests/gplus/base.py
         expected_len = len(items)
         actual_len = node.set.item_count()  # Use item_count() instead of len()
 
         self.assertEqual(
-            actual_len, expected_len,
-            f"Expected {expected_len} entries in leaf node.set, found {actual_len}"
+            actual_len, expected_len, f"Expected {expected_len} entries in leaf node.set, found {actual_len}"
         )
 
-        self.assertIsNone(node.right_subtree, 
-                          "Expected leaf node's right_subtree to be None")
+        self.assertIsNone(node.right_subtree, "Expected leaf node's right_subtree to be None")
 
         # verify each entry's key/value and left subtree == None
-        for i, (entry, expected) in enumerate(zip(node.set, items)):
+        for i, (entry, expected) in enumerate(zip(node.set, items, strict=False)):
             self.assertEqual(
-                entry.item.key, expected.key,
-                f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
+                entry.item.key, expected.key, f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
             )
             self.assertEqual(
-                entry.item.value, expected.value,
-                f"Entry #{i} ({expected.key}) value: expected "
-                f"{expected.value!r}, "
-                f"got {entry.item.value!r}"
+                entry.item.value,
+                expected.value,
+                f"Entry #{i} ({expected.key}) value: expected {expected.value!r}, got {entry.item.value!r}",
             )
             self.assertIsNone(
-                entry.left_subtree,
-                f"Expected Entry #{i}'s ({expected.key}) left subtree NOT to be empty"
+                entry.left_subtree, f"Expected Entry #{i}'s ({expected.key}) left subtree NOT to be empty"
             )
 
         # collect and return the first two entries
@@ -234,12 +218,13 @@ class GPlusTreeTestCase(BaseTreeTestCase):
 # Legacy alias for backward compatibility with existing G+ tests
 class TreeTestCase(GPlusTreeTestCase):
     """Legacy alias - provides G+ tree functionality by default."""
+
     pass
 
 
 class GKPlusTreeTestCase(BaseTreeTestCase):
     """Test case for GK+-trees with extended functionality."""
-    
+
     def setUp(self):
         # Create trees with different K values for testing
         self.tree_k2 = create_gkplus_tree(K=2)
@@ -257,7 +242,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         # for dim, ranks in enumerate(self.dummy_ranks):
         #     logger.debug(f"Dimension {dim + 1}: {ranks}")
 
-    def get_dummy_count(self, tree: 'GKPlusTreeBase') -> int:
+    def get_dummy_count(self, tree: "GKPlusTreeBase") -> int:
         """Count the number of dummy items in the tree."""
         # Count the number of recursively instantiated trees
         # 1 dummy per tree instance + 1 for the initial tree
@@ -267,11 +252,11 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             logger.debug(f"Expanded leaf count for tree {print_pretty(tree)}: {expanded_leaf_count}")
         return dummy_count
 
-    def get_dummies(self, tree: 'GKPlusTreeBase') -> List[int]:
+    def get_dummies(self, tree: "GKPlusTreeBase") -> list[int]:
         """Collect all dummy keys from a tree."""
         if tree.is_empty():
             return []
-        
+
         if tree.node.right_subtree is None:
             # If the tree is a leaf, return empty list
             return [e.item.key for e in tree if e.item.key < 0]
@@ -287,8 +272,8 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
     def validate_tree(
         self,
         tree,
-        expected_keys: Optional[List[int]] = None,
-        err_msg: Optional[str] = "",
+        expected_keys: list[int] | None = None,
+        err_msg: str | None = "",
     ):
         """Validate tree invariants and structure."""
         # Check tree invariants
@@ -299,37 +284,45 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
                 self.assertIsInstance(entry, Entry, "Tree node set should contain Entry instances")
                 self.assertIsNotNone(entry.item, "Root node item should not be None")
                 if entry.left_subtree is not None:
-                    self.assertIsInstance(entry.left_subtree, GKPlusTreeBase,
-                                          "Left subtree should be a GKPlusTreeBase instance")
+                    self.assertIsInstance(
+                        entry.left_subtree, GKPlusTreeBase, "Left subtree should be a GKPlusTreeBase instance"
+                    )
             if tree.node.right_subtree is not None:
-                self.assertIsInstance(tree.node.right_subtree, GKPlusTreeBase,
-                                  "Right subtree should be a GKPlusTreeBase instance")
-            
+                self.assertIsInstance(
+                    tree.node.right_subtree, GKPlusTreeBase, "Right subtree should be a GKPlusTreeBase instance"
+                )
+
         stats = gtree_stats_(tree, {})
         # add stats to the error message if provided
         err_msg += str(asdict(stats))
         assert_tree_invariants_tc(self, tree, stats, err_msg)
-        
+
         # Verify expected keys if provided
         if expected_keys is not None:
             actual_keys = sorted(self.collect_keys(tree))
-            self.assertEqual(expected_keys, actual_keys, 
-                            f"Expected keys {expected_keys} don't match actual keys {actual_keys}\n{err_msg}")
-            self.assertEqual(len(expected_keys), tree.item_count(),
-                            f"Expected {len(expected_keys)} items in tree, got {tree.item_count()}\n{err_msg}")
+            self.assertEqual(
+                expected_keys,
+                actual_keys,
+                f"Expected keys {expected_keys} don't match actual keys {actual_keys}\n{err_msg}",
+            )
+            self.assertEqual(
+                len(expected_keys),
+                tree.item_count(),
+                f"Expected {len(expected_keys)} items in tree, got {tree.item_count()}\n{err_msg}",
+            )
 
     def collect_keys(self, tree):
         """Collect all keys from a tree."""
         if tree.is_empty():
             return []
-            
+
         keys = []
 
         # Collect keys from leaf nodes
         for leaf_node in tree.iter_leaf_nodes():
             for entry in leaf_node.set:
                 keys.append(entry.item.key)
-        
+
         return sorted(keys)
 
     def verify_subtree_sizes(self, tree):
@@ -339,26 +332,29 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         """
         if tree is None:
             return True
-        
-        if tree.is_empty():
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug("Empty tree: Use None instead of empty tree")
-            
+
+        if tree.is_empty() and logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Empty tree: Use None instead of empty tree")
+
         # For leaf nodes, size should be the count of all items (incl. dummies)
         node = tree.node
         if node.right_subtree is None:
             calculated_size = sum(1 for entry in node.set)
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Leaf node at rank {node.rank} has {calculated_size} items; node set (print_pretty): {print_pretty(node.set)}\n node set (print_structure): {node.set.print_structure()}")
+                logger.debug(
+                    f"Leaf node at rank {node.rank} has {calculated_size} items; node set (print_pretty): {print_pretty(node.set)}\n node set (print_structure): {node.set.print_structure()}"
+                )
             if calculated_size != tree.item_cnt:
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"Leaf node has size {tree.item_cnt} but contains {calculated_size} items, node set: {print_pretty(node.set)}")
+                    logger.debug(
+                        f"Leaf node has size {tree.item_cnt} but contains {calculated_size} items, node set: {print_pretty(node.set)}"
+                    )
                 return False
             return True
-            
+
         # For internal nodes, size should be sum of child sizes
         calculated_size = 0
-        
+
         # Add sizes from left subtrees
         for entry in node.set:
             if entry.left_subtree is not None:
@@ -370,7 +366,7 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
                 # Recursively verify this subtree
                 if not self.verify_subtree_sizes(entry.left_subtree):
                     return False
-        
+
         # Add size from right subtree
         if node.right_subtree is not None:
             if node.right_subtree.item_cnt is None:
@@ -381,32 +377,34 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             # Recursively verify right subtree
             if not self.verify_subtree_sizes(node.right_subtree):
                 return False
-        
+
         # Check if the stored size matches calculated size
         if calculated_size != tree.item_cnt:
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Node at rank {node.rank} has size {tree.item_cnt} but calculated size is {calculated_size}")
+                logger.debug(
+                    f"Node at rank {node.rank} has size {tree.item_cnt} but calculated size is {calculated_size}"
+                )
             return False
-            
+
         return True
 
     def print_hash_info(self, key: int, k: int, num_levels: int = 1):
         """
         Prints the binary representation, trailing zeros, and rank for each hash level of the key.
-        
+
         Parameters:
             key (int): The key to inspect.
             k (int): Group size parameter (must be a power of 2).
             num_levels (int): How many times to re-hash.
         """
         group_size = get_group_size(k)
-        current_hash = hashlib.sha256(key.to_bytes(32, 'big')).digest()
+        current_hash = hashlib.sha256(key.to_bytes(32, "big")).digest()
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Key: {key}")
             logger.debug(f"Group Size: {group_size}")
         for level in range(num_levels):
-            binary_hash = bin(int.from_bytes(current_hash, 'big'))[2:].zfill(256)
+            binary_hash = bin(int.from_bytes(current_hash, "big"))[2:].zfill(256)
             trailing_zeros = count_trailing_zero_bits(current_hash)
             rank = calc_rank_from_digest(current_hash, group_size)
             if logger.isEnabledFor(logging.DEBUG):
@@ -419,29 +417,26 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
     def find_keys_for_rank_lists(self, rank_lists, k, spacing=False):
         """Delegate to the library utility for finding keys matching rank lists."""
         from gplus_trees.utils import find_keys_for_rank_lists as util_find
+
         return util_find(rank_lists, k, spacing)
 
     def validate_key_ranks(self, keys, rank_lists, k):
         """Validate that keys match expected rank lists, using dimension in hash calculation."""
         group_size = get_group_size(k)
         for key_idx, key in enumerate(keys):
-            current_hash = hashlib.sha256(
-                    key.to_bytes(32, 'big') + int(1).to_bytes(32, 'big')
-                ).digest()
+            current_hash = hashlib.sha256(key.to_bytes(32, "big") + (1).to_bytes(32, "big")).digest()
             for dim_idx, rank_list in enumerate(rank_lists):
                 expected_rank = rank_list[key_idx]
                 actual_rank = calc_rank_from_digest(current_hash, group_size)
-                self.assertEqual(actual_rank, expected_rank,
-                               f"Key {key} in dimension {dim_idx+1}: expected rank {expected_rank}, got {actual_rank}")
-                current_hash = hashlib.sha256(
-                    current_hash
-                    + (dim_idx + 2).to_bytes(32, 'big')
-                ).digest()
+                self.assertEqual(
+                    actual_rank,
+                    expected_rank,
+                    f"Key {key} in dimension {dim_idx + 1}: expected rank {expected_rank}, got {actual_rank}",
+                )
+                current_hash = hashlib.sha256(current_hash + (dim_idx + 2).to_bytes(32, "big")).digest()
 
     # Extended assertion methods for GK+ trees
-    def _assert_internal_node_properties(
-        self, node, items: List[InternalItem], rank: int
-    ) -> Optional[Entry]:
+    def _assert_internal_node_properties(self, node, items: list[InternalItem], rank: int) -> Entry | None:
         """Assert properties of internal nodes for GK+ trees."""
         self.assertIsNotNone(node, "Node should not be None")
         self.assertEqual(node.rank, rank, f"Node rank should be {rank}")
@@ -451,36 +446,28 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         expected_len = len(items)
         actual_len = node.set.item_count()
 
-        self.assertEqual(
-            actual_len, expected_len,
-            f"Expected {expected_len} entries in node.set, found {actual_len}"
-        )
-        
+        self.assertEqual(actual_len, expected_len, f"Expected {expected_len} entries in node.set, found {actual_len}")
+
         pivot = node.set.find_pivot()
         # verify each entry's key, value=0 and empty left subtree for min item
-        for i, (entry, expected_item) in enumerate(zip(node.set, items)):
+        for i, (entry, expected_item) in enumerate(zip(node.set, items, strict=False)):
             self.assertEqual(
-                entry.item.key, expected_item.key,
-                f"Entry at pos {i} key mismatch: "
-                f"expected {expected_item.key}, got {entry.item.key}"
+                entry.item.key,
+                expected_item.key,
+                f"Entry at pos {i} key mismatch: expected {expected_item.key}, got {entry.item.key}",
             )
             self.assertEqual(
-                entry.item.value, expected_item.value,
-                f"Entry at pos {i}'s value for key {entry.item.key} should be None"
+                entry.item.value,
+                expected_item.value,
+                f"Entry at pos {i}'s value for key {entry.item.key} should be None",
             )
 
             # verify each entry: key=expected, value is None, empty left subtree for min and pivot
             # all replicas of real items must have a left subtree
             if i == 0:
-                self.assertIsNone(
-                    entry.left_subtree,
-                    "Expected first (min) entry's left subtree to be None"
-                )
+                self.assertIsNone(entry.left_subtree, "Expected first (min) entry's left subtree to be None")
             elif i == pivot:
-                self.assertIsNone(
-                    entry.left_subtree,
-                    "Expected pivot entry's left subtree to be None"
-                )
+                self.assertIsNone(entry.left_subtree, "Expected pivot entry's left subtree to be None")
 
         # collect and return the first two entries
         entries = list(node.set)
@@ -489,36 +476,29 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         return min_entry, next_entry
 
     def _assert_leaf_node_properties(
-        self, node, items: List[Union[LeafItem, InternalItem]]
-    ) -> Tuple[Optional[Entry], Optional[Entry]]:
+        self, node, items: list[LeafItem | InternalItem]
+    ) -> tuple[Entry | None, Entry | None]:
         """Assert properties of leaf nodes for GK+ trees."""
         expected_len = len(items)
         actual_len = node.set.item_count()  # Use item_count() instead of len()
 
         self.assertEqual(
-            actual_len, expected_len,
-            f"Expected {expected_len} entries in leaf node.set, found {actual_len}"
+            actual_len, expected_len, f"Expected {expected_len} entries in leaf node.set, found {actual_len}"
         )
 
-        self.assertIsNone(node.right_subtree, 
-                          "Expected leaf node's right_subtree to be None")
+        self.assertIsNone(node.right_subtree, "Expected leaf node's right_subtree to be None")
 
         # verify each entry's key/value and left subtree == None
-        for i, (entry, expected) in enumerate(zip(node.set, items)):
+        for i, (entry, expected) in enumerate(zip(node.set, items, strict=False)):
             self.assertEqual(
-                entry.item.key, expected.key,
-                f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
+                entry.item.key, expected.key, f"Entry #{i} key: expected {expected.key}, got {entry.item.key}"
             )
             self.assertEqual(
-                entry.item.value, expected.value,
-                f"Entry #{i} ({expected.key}) value: expected "
-                f"{expected.value!r}, "
-                f"got {entry.item.value!r}"
+                entry.item.value,
+                expected.value,
+                f"Entry #{i} ({expected.key}) value: expected {expected.value!r}, got {entry.item.value!r}",
             )
-            self.assertIsNone(
-                entry.left_subtree,
-                f"Expected Entry #{i}'s ({expected.key}) left subtree to be None"
-            )
+            self.assertIsNone(entry.left_subtree, f"Expected Entry #{i}'s ({expected.key}) left subtree to be None")
 
         # collect and return the first two entries
         entries = list(node.set)

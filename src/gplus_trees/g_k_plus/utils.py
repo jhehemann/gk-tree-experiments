@@ -1,8 +1,7 @@
 """Pure utility functions for rank calculation without circular dependencies."""
 
-from typing import List
+from gplus_trees.utils import calc_rank_from_digest, get_digest, get_group_size
 
-from gplus_trees.utils import get_group_size, calc_rank_from_digest, get_digest
 
 def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
     """
@@ -42,7 +41,8 @@ def calc_rank(key: int, k: int, dim: int) -> int:
     group_size = get_group_size(k)
     return calc_rank_from_group_size(key, group_size, dim)
 
-def calc_ranks(keys: List[int], k: int, DIM: int = 1) -> List[int]:
+
+def calc_ranks(keys: list[int], k: int, DIM: int = 1) -> list[int]:
     """
     Calculate ranks for a list of keys for a specific dimension based on repeated hashing.
 
@@ -62,7 +62,7 @@ def calc_ranks(keys: List[int], k: int, DIM: int = 1) -> List[int]:
     return ranks
 
 
-def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
+def calc_ranks_multi_dims(keys: list[int], k: int, dimensions: int = 1) -> list[list[int]]:
     """
     Calculate ranks for a list of keys based on repeated hashing.
 
@@ -76,7 +76,7 @@ def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[
     """
     group_size = get_group_size(k)
     num_keys = len(keys)
-    rank_lists = [[0] * num_keys for _ in range(dimensions)] # Initialize rank_lists[dim][key_idx]
+    rank_lists = [[0] * num_keys for _ in range(dimensions)]  # Initialize rank_lists[dim][key_idx]
 
     for key_idx, key in enumerate(keys):
         current_hash = get_digest(key, 1)

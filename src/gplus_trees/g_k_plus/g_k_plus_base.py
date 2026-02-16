@@ -52,35 +52,34 @@ h = tree height ≈ log n, l = KList nodes per level):
 """
 
 from __future__ import annotations
-from typing import Optional, Type, Tuple
-
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
     DummyItem,
     Entry,
 )
-from gplus_trees.klist_base import KListBase
-from gplus_trees.gplus_tree_base import (
-    GPlusTreeBase, GPlusNodeBase, print_pretty, get_dummy  # noqa: F401
-)
-
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-from gplus_trees.g_k_plus.zip import GKPlusZipMixin
-from gplus_trees.g_k_plus.unzip import GKPlusUnzipMixin
-from gplus_trees.g_k_plus.navigation import GKPlusNavigationMixin
-from gplus_trees.g_k_plus.conversion import GKPlusConversionMixin
-from gplus_trees.g_k_plus.insert import GKPlusInsertMixin
 
 # Re-export bulk-creation and conversion symbols for backward compatibility.
 # External code that does ``from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree``
 # (or _tree_to_klist, _klist_to_tree, RankData) will continue to work.
 from gplus_trees.g_k_plus.bulk_create import (  # noqa: F401
     RankData,
-    bulk_create_gkplus_tree,
-    _tree_to_klist,
     _klist_to_tree,
+    _tree_to_klist,
+    bulk_create_gkplus_tree,
 )
+from gplus_trees.g_k_plus.conversion import GKPlusConversionMixin
+from gplus_trees.g_k_plus.insert import GKPlusInsertMixin
+from gplus_trees.g_k_plus.navigation import GKPlusNavigationMixin
+from gplus_trees.g_k_plus.unzip import GKPlusUnzipMixin
+from gplus_trees.g_k_plus.zip import GKPlusZipMixin
+from gplus_trees.gplus_tree_base import (
+    GPlusNodeBase,
+    GPlusTreeBase,
+    get_dummy,
+)
+from gplus_trees.klist_base import KListBase
 
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
 DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conversion
@@ -92,14 +91,22 @@ class GKPlusNodeBase(GPlusNodeBase):
     """
 
     # These will be injected by the factory
-    SetClass: Type[AbstractSetDataStructure]
-    TreeClass: Type[GKPlusTreeBase]
+    SetClass: type[AbstractSetDataStructure]
+    TreeClass: type[GKPlusTreeBase]
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
 
-class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationMixin, GKPlusZipMixin, GKPlusUnzipMixin, GPlusTreeBase, GKTreeSetDataStructure):
+class GKPlusTreeBase(
+    GKPlusInsertMixin,
+    GKPlusConversionMixin,
+    GKPlusNavigationMixin,
+    GKPlusZipMixin,
+    GKPlusUnzipMixin,
+    GPlusTreeBase,
+    GKTreeSetDataStructure,
+):
     """
     A GK+-tree is an extension of G+-tree with dimension support.
     It can automatically transform between KList and GKPlusTree based on item count.
@@ -109,16 +116,16 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         DIM (int): The dimension of the GK+-tree (class attribute).
         l_factor (float): The threshold factor for conversion between KList and GKPlusTree.
     """
-    __slots__ = GPlusTreeBase.__slots__ + ("l_factor", "item_cnt", "size", "expanded_cnt")  # Add new slots
+
+    __slots__ = (*GPlusTreeBase.__slots__, "l_factor", "item_cnt", "size", "expanded_cnt")  # Add new slots
 
     # Will be set by the factory
     DIM: int = 1  # Default dimension value
-    NodeClass: Type[GKPlusNodeBase]
-    SetClass: Type[AbstractSetDataStructure]
-    KListClass: Type[KListBase]
+    NodeClass: type[GKPlusNodeBase]
+    SetClass: type[AbstractSetDataStructure]
+    KListClass: type[KListBase]
 
-    def __init__(self, node: Optional[GKPlusNodeBase] = None,
-                 l_factor: float = DEFAULT_L_FACTOR) -> None:
+    def __init__(self, node: GKPlusNodeBase | None = None, l_factor: float = DEFAULT_L_FACTOR) -> None:
         """
         Initialize a new GKPlusTree.
 
@@ -141,15 +148,15 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
     __repr__ = __str__
 
     # ── Hook overrides for GPlusTreeBase ────────────────────────────
-    def _get_dummy(self) -> 'DummyItem':
+    def _get_dummy(self) -> DummyItem:
         """Dimension-specific dummy item."""
         return get_dummy(dim=type(self).DIM)
 
-    def _on_node_visited(self, cur: 'GKPlusTreeBase') -> None:
+    def _on_node_visited(self, cur: GKPlusTreeBase) -> None:
         """Invalidate cached size / count info when a node is mutated."""
         cur._invalidate_tree_size()
 
-    def _make_empty_tree(self) -> 'GKPlusTreeBase':
+    def _make_empty_tree(self) -> GKPlusTreeBase:
         """Create an empty tree of the same type, forwarding *l_factor*."""
         return type(self)(l_factor=self.l_factor)
 
@@ -179,8 +186,8 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
 
             When caches are stale only along the mutation path (O(h)
             nodes), recomputation at each node iterates its set
-            (KList → O(k) bounded, GKPlusTree → O(n_inner) flat
-            iteration) and calls ``item_count()`` on each child’s
+            (KList -> O(k) bounded, GKPlusTree -> O(n_inner) flat
+            iteration) and calls ``item_count()`` on each child`s
             ``left_subtree`` which returns in O(1) from cache for
             off-path children.
         """
@@ -194,11 +201,9 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         else:
             count = 0
             for entry in self.node.set:
-                count += (entry.left_subtree.item_count()
-                         if entry.left_subtree is not None else 0)
+                count += entry.left_subtree.item_count() if entry.left_subtree is not None else 0
 
-            count += (self.node.right_subtree.item_count()
-                     if self.node.right_subtree is not None else 0)
+            count += self.node.right_subtree.item_count() if self.node.right_subtree is not None else 0
             self.item_cnt = count
             return self.item_cnt
 
@@ -220,15 +225,13 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         else:
             count = 0
             for entry in node.set:
-                count += (entry.left_subtree.real_item_count()
-                         if entry.left_subtree is not None else 0)
+                count += entry.left_subtree.real_item_count() if entry.left_subtree is not None else 0
 
-            count += (node.right_subtree.real_item_count()
-                     if node.right_subtree is not None else 0)
+            count += node.right_subtree.real_item_count() if node.right_subtree is not None else 0
             self.size = count
             return self.size
 
-    def insert_entry(self, x_entry: Entry, rank: int) -> Tuple['GKPlusTreeBase', bool]:
+    def insert_entry(self, x_entry: Entry, rank: int) -> tuple[GKPlusTreeBase, bool]:
         """
         Insert an entry into the GK+-tree. The rank is calculated automatically
         based on the entry's item key. The entire entry object is preserved to
@@ -398,9 +401,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         last_leaf = self.get_max_leaf()
 
         for node in self.iter_leaf_nodes():
-            for entry in node.set:
-                yield entry
+            yield from node.set
             if node is last_leaf:
                 # Stop iteration after processing the last leaf node
                 break
-

@@ -1,52 +1,56 @@
 """Tests for k-lists with factory pattern"""
 
-import unittest
+import itertools
+import logging
 import random
+import unittest
 
 # Import factory function instead of concrete classes
 from gplus_trees.base import Entry
 from gplus_trees.factory import make_gplustree_classes
 from tests.test_base import BaseTestCase
-import logging
 
 logger = logging.getLogger(__name__)
 
 # Test with different capacities to ensure factory works correctly
 TEST_CAPACITIES = [4, 8, 16]
 
+
 class TestKListFactory(BaseTestCase):
     """Test the factory pattern itself with various capacities"""
-    
+
     def test_factory_creates_different_classes(self):
         """Verify that factory creates different class types for different K values"""
         classes = {}
         for K in TEST_CAPACITIES:
             tree_class, node_class, klist_class, knode_class = make_gplustree_classes(K)
             classes[K] = (tree_class, node_class, klist_class, knode_class)
-            
+
             # Check class names contain K value
             self.assertIn(str(K), tree_class.__name__)
             self.assertIn(str(K), klist_class.__name__)
             self.assertIn(str(K), knode_class.__name__)
-            
+
             # Check that capacity is correctly set
             self.assertEqual(knode_class.CAPACITY, K)
-            
+
             # Verify proper class relationships
             self.assertEqual(tree_class.SetClass, klist_class)
             self.assertEqual(node_class.SetClass, klist_class)
             self.assertEqual(klist_class.KListNodeClass, knode_class)
-        
+
         # Different K values should create different classes
         for k1 in TEST_CAPACITIES:
             for k2 in TEST_CAPACITIES:
                 if k1 != k2:
-                    self.assertNotEqual(classes[k1][2], classes[k2][2], 
-                                       f"KList classes for K={k1} and K={k2} should be different")
+                    self.assertNotEqual(
+                        classes[k1][2], classes[k2][2], f"KList classes for K={k1} and K={k2} should be different"
+                    )
 
 
 class TestKListBase(BaseTestCase):
     """Base class for all KList factory tests"""
+
     K = 4  # Default capacity; override in subclasses
 
     def setUp(self):
@@ -145,7 +149,7 @@ class TestKListInsert(TestKListBase):
         self.assertEqual(sum(counts), total)
 
     def test_duplicate_keys(self):
-        # Insert duplicate keys – they all should appear in order
+        # Insert duplicate keys - they all should appear in order
         _, inserted, _ = self.klist.insert_entry(Entry(self.make_item(7, "duplicate"), None))
         self.assertTrue(inserted, "First insert should succeed")
         for _ in range(3):
@@ -182,7 +186,7 @@ class TestKListDelete(TestKListBase):
     def test_delete_on_empty_list(self):
         # deleting from an empty KList should do nothing
         before = self.extract_all_keys()
-        self.klist.delete(999)           # nonexistent int
+        self.klist.delete(999)  # nonexistent int
         after = self.extract_all_keys()
         self.assertEqual(before, after)
         self.assertIsNone(self.klist.head)
@@ -366,7 +370,7 @@ class TestKListRetrieve(TestKListBase):
         keys = list(range(1, self.cap * 2 + 1))  # generate enough to overflow
         self.insert_sequence(keys)
         for idx, k in enumerate(keys):
-            expected_next = keys[idx+1] if idx+1 < len(keys) else None
+            expected_next = keys[idx + 1] if idx + 1 < len(keys) else None
             self.assertRetrieval(k, k, expected_next)
 
     def test_random_nonexistent(self):
@@ -387,10 +391,10 @@ class TestKListRetrieve(TestKListBase):
             self.assertRetrieval(x, None, nxt)
 
 
-class TestKlistGetMinMax(TestKListBase):   
+class TestKlistGetMinMax(TestKListBase):
     def test_empty(self):
         # empty list should return None
-        with self.subTest("max"): 
+        with self.subTest("max"):
             found_entry, next_entry = self.klist.get_max()
             self.assertIsNone(found_entry)
             self.assertIsNone(next_entry)
@@ -404,8 +408,8 @@ class TestKlistGetMinMax(TestKListBase):
         # fill one node with a single entry
         keys = [10]
         self.insert_sequence(keys)
-        
-        with self.subTest("max"):    
+
+        with self.subTest("max"):
             found_entry, next_entry = self.klist.get_max()
             self.assertEqual(found_entry.item.key, 10)
             self.assertIsNone(next_entry)
@@ -419,8 +423,8 @@ class TestKlistGetMinMax(TestKListBase):
         # fill one node up to capacity
         keys = list(range(self.cap))
         self.insert_sequence(keys)
-        
-        with self.subTest("max"):    
+
+        with self.subTest("max"):
             found_entry, next_entry = self.klist.get_max()
             self.assertEqual(found_entry.item.key, self.cap - 1)
             self.assertIsNone(next_entry)
@@ -445,6 +449,7 @@ class TestKlistGetMinMax(TestKListBase):
             self.assertEqual(found_entry.item.key, 0)
             self.assertEqual(next_entry.item.key, 1)
 
+
 class TestKListIndex(TestKListBase):
     def test_empty_index(self):
         # Before any operations, index lists should exist and be empty
@@ -468,7 +473,7 @@ class TestKListIndex(TestKListBase):
         # Still one node, prefix_counts = [len(keys)]
         self.assertEqual(len(self.klist._nodes), 1)
         self.assertEqual(self.klist._prefix_counts_tot, [len(keys)])
-    
+
     def test_index_after_overflow(self):
         # Insert exactly CAPACITY + 2 items → 2 nodes
         total = self.cap + 2
@@ -480,7 +485,7 @@ class TestKListIndex(TestKListBase):
         self.assertEqual(self.klist._prefix_counts_tot, expected)
         # Check that _nodes entries match actual chain
         node = self.klist.head
-        for idx, n in enumerate(self.klist._nodes):
+        for _idx, n in enumerate(self.klist._nodes):
             self.assertIs(n, node)
             node = node.next
 
@@ -501,7 +506,7 @@ class TestKListIndex(TestKListBase):
             node = node.next
         self.assertEqual(self.klist._prefix_counts_tot, expected)
         # Ensure strictly increasing
-        for a, b in zip(expected, expected[1:]):
+        for a, b in itertools.pairwise(expected):
             self.assertLess(a, b)
 
     def test_index_after_bulk_deletes(self):
@@ -510,16 +515,13 @@ class TestKListIndex(TestKListBase):
         self.insert_sequence(range(total))
         # delete all keys in the middle node
         middle_start = self.cap
-        middle_end   = 2 * self.cap - 1
+        middle_end = 2 * self.cap - 1
         for k in range(middle_start, middle_end + 1):
             self.klist.delete(k)
         # Now exactly two nodes remain (the head and the tail)
         self.assertEqual(len(self.klist._nodes), 2)
         # And the prefix sums should be [CAPACITY, 3*CAPACITY]
-        self.assertEqual(
-            self.klist._prefix_counts_tot,
-            [self.cap, 2 * self.cap]
-        )
+        self.assertEqual(self.klist._prefix_counts_tot, [self.cap, 2 * self.cap])
 
 
 class TestSplitInplace(TestKListBase):
@@ -670,9 +672,9 @@ class TestSplitInplace(TestKListBase):
             self.klist.split_inplace("not-int")
 
 
-
 class TestKListCompactionInvariant(TestKListBase):
     """Tests specifically for the compaction invariant that only the last node should have fewer than K items"""
+
     K = 16
 
     def test_compaction_after_single_deletion(self):
@@ -683,23 +685,23 @@ class TestKListCompactionInvariant(TestKListBase):
 
         # Delete an item from the first node
         self.klist.delete(0)
-        
+
         # Check compaction invariant
         self.klist.check_invariant()
-    
+
     def test_compaction_after_middle_deletion(self):
         """Test compaction after deleting an item from the middle of the list"""
         # Create a klist with 3 nodes (full capacity)
-        total_items = 3 * self.cap 
+        total_items = 3 * self.cap
         self.insert_sequence(range(total_items))
 
         # Delete an item from the middle node
-        middle_key = self.cap + self.cap//2
+        middle_key = self.cap + self.cap // 2
         self.klist.delete(middle_key)
-        
+
         # Check compaction invariant
         self.klist.check_invariant()
-    
+
     def test_compaction_after_multiple_deletions(self):
         """Test compaction after multiple deletions from different nodes"""
         # Create a klist with multiple nodes
@@ -708,17 +710,17 @@ class TestKListCompactionInvariant(TestKListBase):
 
         # Delete items from various positions
         delete_keys = [
-            1,                      # First node
-            self.cap + 1,           # Second node
-            2 * self.cap + 1,       # Third node
-            3 * self.cap - 1        # Fourth node 
+            1,  # First node
+            self.cap + 1,  # Second node
+            2 * self.cap + 1,  # Third node
+            3 * self.cap - 1,  # Fourth node
         ]
-        
+
         # Check invariant after each deletion
         for key in delete_keys:
             self.klist.delete(key)
             self.klist.check_invariant()
-    
+
     def test_compaction_after_sparse_deletions(self):
         """Test compaction when many deletions create sparse nodes that need redistribution"""
         # Create a klist with exactly 3 full nodes
@@ -728,25 +730,25 @@ class TestKListCompactionInvariant(TestKListBase):
         # Delete every other item in the first two nodes
         for i in range(0, 2 * self.cap, 2):
             self.klist.delete(i)
-        
+
         # Check compaction invariant
         self.klist.check_invariant()
-    
+
     def test_mixed_operations(self):
         """Test compaction invariant with mixed insert/delete operations"""
         # Start with some initial data
         self.insert_sequence(range(2 * self.cap))
 
         operations = [
-            ("delete", 0),           # Delete first item
-            ("insert", 100),         # Insert new item
-            ("delete", self.cap),    # Delete from second node
-            ("delete", self.cap+1),  # Delete another from second node
-            ("insert", 101),         # Insert new item
-            ("delete", 2),           # Delete from first node again
-            ("delete", 3),           # Delete from first node again
+            ("delete", 0),  # Delete first item
+            ("insert", 100),  # Insert new item
+            ("delete", self.cap),  # Delete from second node
+            ("delete", self.cap + 1),  # Delete another from second node
+            ("insert", 101),  # Insert new item
+            ("delete", 2),  # Delete from first node again
+            ("delete", 3),  # Delete from first node again
         ]
-        
+
         # Execute operations and check invariant after each
         for op, key in operations:
             if op == "delete":
@@ -754,7 +756,7 @@ class TestKListCompactionInvariant(TestKListBase):
             else:
                 self.klist.insert_entry(Entry(self.make_item(key, f"val_{key}"), None))
             self.klist.check_invariant()
-    
+
     def test_delete_entire_middle_node(self):
         """Test compaction when an entire node's contents are deleted"""
         # Create 3 nodes
@@ -763,18 +765,18 @@ class TestKListCompactionInvariant(TestKListBase):
         # Delete all items from the middle node
         for key in range(self.cap, 2 * self.cap):
             self.klist.delete(key)
-            
+
         # Check compaction invariant
         self.klist.check_invariant()
-            
+
     def test_split_inplace_maintains_compaction(self):
         """Test that split_inplace operation maintains the compaction invariant"""
         # Create a multi-node klist
         self.insert_sequence(range(3 * self.cap))
 
         # Split at different points and verify compaction
-        split_points = [self.cap//2, self.cap, self.cap + self.cap//2, 2*self.cap]
-        
+        split_points = [self.cap // 2, self.cap, self.cap + self.cap // 2, 2 * self.cap]
+
         for split_key in split_points:
             # Create a fresh klist for each test
             test_klist = self.KListClass()
@@ -782,8 +784,8 @@ class TestKListCompactionInvariant(TestKListBase):
                 test_klist.insert_entry(Entry(self.make_item(i, f"val_{i}"), None))
 
             # Perform split
-            left, subtree, right, next_entry = test_klist.split_inplace(split_key)
-            
+            left, _subtree, right, _next_entry = test_klist.split_inplace(split_key)
+
             # Check both resulting klists
             left.check_invariant()
             right.check_invariant()

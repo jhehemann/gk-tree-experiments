@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import struct
-from typing import Optional, Union
 
 from gplus_trees.base import InternalItem, LeafItem
 from gplus_trees.logging_config import get_logger
@@ -35,46 +34,43 @@ class MerkleNodeMixin:
         h = hashlib.sha256()
 
         has_children = any(
-            (entry.left_subtree is not None and not entry.left_subtree.is_empty())
-            for entry in self.set
-        ) or (
-            self.right_subtree is not None and not self.right_subtree.is_empty()
-        )
+            (entry.left_subtree is not None and not entry.left_subtree.is_empty()) for entry in self.set
+        ) or (self.right_subtree is not None and not self.right_subtree.is_empty())
 
         # 0x00 for leaf, 0x01 for internal
-        h.update(b'\x00' if not has_children else b'\x01')
+        h.update(b"\x00" if not has_children else b"\x01")
 
         # Pack the rank and item count
-        h.update(struct.pack('>I', self.rank))
+        h.update(struct.pack(">I", self.rank))
         num_entries = self.set.item_count()
-        h.update(struct.pack('>I', num_entries))
+        h.update(struct.pack(">I", num_entries))
 
         for entry in self.set:
             # Left-subtree hash (if any)
             left = entry.left_subtree
             if left is not None and not left.is_empty():
                 lh = left.node.get_hash()
-                h.update(b'\x02')                     # left-child tag
-                h.update(struct.pack('>I', len(lh)))
+                h.update(b"\x02")  # left-child tag
+                h.update(struct.pack(">I", len(lh)))
                 h.update(lh)
 
             # Entry key
             key_b = str(entry.item.key).encode()
-            h.update(struct.pack('>I', len(key_b)))
+            h.update(struct.pack(">I", len(key_b)))
             h.update(key_b)
 
             # Entry value (if present)
             if entry.item.value is not None:
                 val_b = str(entry.item.value).encode()
-                h.update(struct.pack('>I', len(val_b)))
+                h.update(struct.pack(">I", len(val_b)))
                 h.update(val_b)
 
         # Right-subtree hash
         right = self.right_subtree
         if right is not None and not right.is_empty():
             rh = right.node.get_hash()
-            h.update(b'\x03')                     # right-child tag
-            h.update(struct.pack('>I', len(rh)))
+            h.update(b"\x03")  # right-child tag
+            h.update(struct.pack(">I", len(rh)))
             h.update(rh)
 
         self.merkle_hash = h.digest()
@@ -99,7 +95,7 @@ class MerkleTreeMixin:
     available.
     """
 
-    def get_root_hash(self) -> Optional[bytes]:
+    def get_root_hash(self) -> bytes | None:
         """Get the Merkle root hash of the tree."""
         if self.is_empty():
             return None
@@ -123,12 +119,18 @@ class MerkleTreeMixin:
         if isinstance(self.node, MerkleNodeMixin):
             self.node.invalidate_hash()
         for entry in self.node.set:
-            if entry.left_subtree and not entry.left_subtree.is_empty():
-                if isinstance(entry.left_subtree, MerkleTreeMixin):
-                    entry.left_subtree._invalidate_all_hashes()
-        if self.node.right_subtree and not self.node.right_subtree.is_empty():
-            if isinstance(self.node.right_subtree, MerkleTreeMixin):
-                self.node.right_subtree._invalidate_all_hashes()
+            if (
+                entry.left_subtree
+                and not entry.left_subtree.is_empty()
+                and isinstance(entry.left_subtree, MerkleTreeMixin)
+            ):
+                entry.left_subtree._invalidate_all_hashes()
+        if (
+            self.node.right_subtree
+            and not self.node.right_subtree.is_empty()
+            and isinstance(self.node.right_subtree, MerkleTreeMixin)
+        ):
+            self.node.right_subtree._invalidate_all_hashes()
 
     def _invalidate_path_hashes(self, key: int) -> None:
         """Invalidate the hashes along the path to a specific key."""
@@ -145,7 +147,7 @@ class MerkleTreeMixin:
             else:
                 cur = cur.right_subtree.node
 
-    def insert(self, x: Union[LeafItem, InternalItem], rank: int, *args, **kwargs):
+    def insert(self, x: LeafItem | InternalItem, rank: int, *args, **kwargs):
         """Insert an item with the given rank, then invalidate Merkle hashes."""
         result = super().insert(x, rank, *args, **kwargs)
         self._invalidate_path_hashes(x.key)
@@ -171,13 +173,19 @@ class MerkleTreeMixin:
         for entry in node.set:
             if res[0] and entry.item.key == res[0].item.key:
                 continue
-            if entry.left_subtree and not entry.left_subtree.is_empty():
-                if isinstance(entry.left_subtree.node, MerkleNodeMixin):
-                    proof.append(entry.left_subtree.node.get_hash())
+            if (
+                entry.left_subtree
+                and not entry.left_subtree.is_empty()
+                and isinstance(entry.left_subtree.node, MerkleNodeMixin)
+            ):
+                proof.append(entry.left_subtree.node.get_hash())
 
         next_subtree = res[1].left_subtree if res[1] else node.right_subtree
-        if node.right_subtree != next_subtree and not node.right_subtree.is_empty():
-            if isinstance(node.right_subtree.node, MerkleNodeMixin):
-                proof.append(node.right_subtree.node.get_hash())
+        if (
+            node.right_subtree != next_subtree
+            and not node.right_subtree.is_empty()
+            and isinstance(node.right_subtree.node, MerkleNodeMixin)
+        ):
+            proof.append(node.right_subtree.node.get_hash())
 
         return next_subtree._build_inclusion_proof(key, proof)
