@@ -19,8 +19,9 @@ k = KList capacity, l = KList nodes):
 
 When node sets are inner GK+-trees, the ``split_inplace`` / ``unzip``
 call on ``node.set`` recurses into dimension d+1. The
-``check_and_convert_set`` calls after splitting may trigger collapse
-(``_tree_to_klist``), adding O(n_{d+1}) per conversion.
+``check_and_convert_set`` calls after splitting use early-exit
+counting (O(k) per call) and only trigger collapse when the split
+half is small enough (≤ threshold items).
 """
 
 from __future__ import annotations

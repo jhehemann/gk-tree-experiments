@@ -9,7 +9,8 @@ Conversions are triggered when a KList exceeds ``k · l_factor`` items
 These conversions are what create recursive dimensional nesting:
 an expanded KList becomes a GK+-tree of the next dimension.
 
-Complexity summary (n = items in set, k = KList capacity):
+Complexity summary (n = items in set, k = KList capacity,
+threshold = k · l_factor):
 
 +-----------------------------+--------------------------------------------+
 | Operation                   | Time                                       |
@@ -17,8 +18,9 @@ Complexity summary (n = items in set, k = KList capacity):
 | ``check_and_convert_set``   | O(1) dispatch                              |
 | ``check_and_expand_klist``  | O(n · h_{d+1}) when conversion triggers    |
 |                             | (bulk-creates a GK+-tree of dim d+1)       |
-| ``check_and_collapse_tree`` | O(n_{d+1}) when conversion triggers        |
-|                             | (iterates inner tree to build KList)       |
+| ``check_and_collapse_tree`` | O(threshold) early-exit counting;          |
+|                             | O(n_{d+1}) only when collapse happens      |
+|                             | (n_{d+1} ≤ threshold, so bounded by O(k))  |
 +-----------------------------+--------------------------------------------+
 """
 
@@ -98,24 +100,20 @@ class GKPlusConversionMixin:
             If conversion occurs, caller must call _invalidate_tree_size() on the parent tree.
 
         Implementation note:
-            During a recursive unzip, inner-tree halves may lack their
-            dimension dummy or have expanded leaves whose sub-trees also
-            lack dummies.  The old formula
-            ``item_count - 1 - expanded_count`` relied on every level
-            having its dummy present, which is not guaranteed for unzip
-            artifacts.
+            An early-exit loop counts real items (key ≥ 0) and aborts as
+            soon as the count exceeds the collapse threshold.  This is
+            O(threshold) = O(k) instead of O(n), because we stop after
+            seeing threshold + 1 real items.
 
-            Instead we use ``real_item_count`` (items with key >= 0) as a
-            **fast-reject guard**: since the resulting KList always
-            contains at least the real items, ``real_item_count > threshold``
-            means the tree definitely cannot be collapsed.
-
-            When ``real_item_count <= threshold`` the tree is small enough
-            to speculatively convert via ``_tree_to_klist`` and verify the
+            When the count stays ≤ threshold the tree is small enough to
+            speculatively convert via ``_tree_to_klist`` and verify the
             actual KList size (which may be slightly larger due to
-            lower-dimension dummies that are preserved).  This avoids
-            relying on ``expanded_count`` caches that can be stale after
-            recursive unzip/collapse operations.
+            lower-dimension dummies that are preserved).
+
+            Empty GKPlusTree sets (artifacts of unzip splits) are
+            converted to empty KLists unconditionally, since an empty
+            GKPlusTree would violate the ``set_thresholds_met`` invariant
+            (every GKPlusTree inner set must have item_count > threshold).
         """
         k = self.KListClass.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
