@@ -148,7 +148,9 @@ class GKPlusUnzipMixin:
                                                next_entry, right_subtree, rank)
 
         # Cases 2: Unified handling for left set with multiple items or single/empty
-        left_count = left_set.item_count()
+        # O(1) check: after conversion, GKPlusTree has > threshold > 1 items;
+        # for KList, item_count() is O(1).  Sentinel value 2 means "multiple".
+        left_count = left_set.item_count() if isinstance(left_set, KListBase) else 2
         return self._handle_no_key_subtree_case(key, left_set, left_count, right_set,
                                               next_entry, right_subtree, rank)
 
@@ -156,7 +158,9 @@ class GKPlusUnzipMixin:
         """Handle the case where the split key has a left subtree."""
 
         # Update current node based on left set size
-        if left_set.item_count() > 1:
+        # O(1) check: after conversion, GKPlusTree has > threshold > 1
+        # items; for KList, item_count() is O(1).
+        if not isinstance(left_set, KListBase) or left_set.item_count() > 1:
             self.node.right_subtree = left_subtree_of_key
         else:
             self.node = left_subtree_of_key.node

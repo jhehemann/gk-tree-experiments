@@ -378,13 +378,16 @@ class GKPlusInsertMixin:
 
         left_split = check_and_convert_set(left_split)
 
-        # Cache item counts early to avoid repeated method calls in conditionals
-        right_item_count = right_split.item_count()
-        left_item_count = left_split.item_count()
+        # O(1) emptiness / multiplicity checks replacing expensive O(n)
+        # tree traversals.  After conversion, a GKPlusTree was not
+        # collapsed so it has more than `threshold` items (> 1);
+        # for KList, item_count() is O(1).
+        right_has_items = not right_split.is_empty()
+        left_has_multiple = not isinstance(left_split, KListBase) or left_split.item_count() > 1
 
         # Handle right side creation
         new_tree = None
-        if right_item_count > 0 or is_leaf:
+        if right_has_items or is_leaf:
             insert_entry = x_entry if is_leaf else Entry(replica, None)
             if isinstance(right_split, GKPlusTreeBase):
                 digest = x_item.get_digest_for_dim(self.DIM + 1)
@@ -418,7 +421,7 @@ class GKPlusInsertMixin:
         right_entry = next_right_entry
 
         # Handle left side with optimized control flow
-        if left_item_count > 1 or is_leaf:
+        if left_has_multiple or is_leaf:
             cur.node.set = left_split
             if next_entry:
                 cur.node.right_subtree = next_entry.left_subtree
