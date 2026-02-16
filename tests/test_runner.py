@@ -12,6 +12,7 @@ import logging
 
 # Test files to run - Add or remove files as needed
 TEST_FILES = [
+    'gplus/test_gplus_tree_base.py',
     'gplus/test_insert.py',
     'gplus/test_retrieve.py',
     'merkle/test_gp_mkl_tree.py',
