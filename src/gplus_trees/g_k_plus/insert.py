@@ -28,7 +28,6 @@ h_{d+1} small.
 """
 
 from __future__ import annotations
-import logging
 from typing import Optional, Tuple, TYPE_CHECKING
 
 from gplus_trees.utils import calc_rank_from_digest_k
@@ -38,19 +37,11 @@ from gplus_trees.base import (
     _get_replica,
 )
 from gplus_trees.klist_base import KListBase
-from gplus_trees.gplus_tree_base import print_pretty, get_dummy
-from gplus_trees.logging_config import get_logger
+from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
 
 if TYPE_CHECKING:
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, GKPlusNodeBase
-
-logger = get_logger(__name__)
-
-
-def IS_DEBUG():
-    """Check if debug logging is enabled."""
-    return logger.isEnabledFor(logging.DEBUG)
 
 
 class GKPlusInsertMixin:
@@ -117,8 +108,6 @@ class GKPlusInsertMixin:
 
     def _insert_empty(self, x_entry: Entry, rank: int) -> 'GKPlusTreeBase':
         """Build the initial tree structure depending on rank."""
-        if IS_DEBUG():
-            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into empty tree with rank {rank}")
         # Single-level leaf
         inserted = True
         if rank == 1:
@@ -135,8 +124,6 @@ class GKPlusInsertMixin:
 
     def _insert_non_empty(self, x_entry: Entry, rank: int) -> 'GKPlusTreeBase':
         """Optimized version for inserting into a non-empty tree."""
-        if IS_DEBUG():
-            logger.debug(f"[DIM {self.DIM}] Inserting {x_entry.item.key} into non-empty tree with rank {rank}: {print_pretty(self)}")
         x_item = x_entry.item
         x_key = x_item.key
 
@@ -339,8 +326,6 @@ class GKPlusInsertMixin:
             node.set, inserted, next_entry = res[0], res[1], res[2]
             if not inserted:
                 return self.update(cur, x_entry)
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into node set at rank {node.rank}: {print_pretty(node.set)}")
             node.set = check_and_convert_set(node.set)  # only KLists can be extended
         else:
             digest = x_item.get_digest_for_dim(self.DIM + 1)
@@ -349,8 +334,6 @@ class GKPlusInsertMixin:
             node.set, inserted, next_entry = res[0], res[1], res[2]
             if not inserted:
                 return self.update(cur, x_entry)
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into node set at rank {node.rank}: {print_pretty(node.set)}")
 
         subtree = next_entry.left_subtree if next_entry else node.right_subtree
         insert_entry.left_subtree = subtree if not is_leaf else insert_entry.left_subtree
@@ -386,8 +369,6 @@ class GKPlusInsertMixin:
         continuation sentinel ``("_continue", right_parent, right_entry,
         left_parent, left_x_entry, cur)`` so the caller loops again.
         """
-        if IS_DEBUG():
-            logger.debug(f"[DIM {self.DIM}] Subsequent iteration: Splitting node set at rank {node.rank} for key {x_item.key} and inserting key to the right split; node set: {print_pretty(node.set)}")
 
         # Perform split operation and cache converted results
         if isinstance(node.set, KListBase):
@@ -395,9 +376,6 @@ class GKPlusInsertMixin:
         else:
             left_split, _, right_split, next_entry = node.set.unzip(x_key)
 
-        if IS_DEBUG():
-            logger.debug(f"[DIM {self.DIM}] Left split (item_count: {left_split.item_count()}, real_item_count: {left_split.real_item_count()}): {print_pretty(left_split)}")
-            logger.debug(f"[DIM {self.DIM}] Right split (item_count: {right_split.item_count()}, real_item_count: {right_split.real_item_count()}): {print_pretty(right_split)}")
         left_split = check_and_convert_set(left_split)
 
         # Cache item counts early to avoid repeated method calls in conditionals
@@ -414,8 +392,6 @@ class GKPlusInsertMixin:
                 tree_insert = bulk_create_gkplus_tree([insert_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass)
 
                 right_split, r_pivot, r_pivot_next = tree_insert.zip(tree_insert, right_split)
-                if IS_DEBUG():
-                    logger.debug(f"[DIM {self.DIM}] Inserted {insert_entry.item.key} | {insert_entry.item.value} into right split with rank {new_rank} item count {right_split.item_count()} and real_item_count {right_split.real_item_count()}: {print_pretty(right_split)}")
                 right_split._invalidate_tree_size()
             else:
                 right_split, _, _ = right_split.insert_entry(insert_entry)
@@ -423,13 +399,8 @@ class GKPlusInsertMixin:
             # Create new tree node
             right_split = check_and_convert_set(right_split)
             new_tree = TreeClass(l_factor=l_factor)
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Creating new right tree with rank {node.rank} and item count {right_split.item_count()}: {print_pretty(right_split)} and right subtree {print_pretty(node.right_subtree)}")
-                logger.debug(f"[DIM {self.DIM}] Right split items: {[e.item.key for e in right_split]}")
 
             new_tree.node = NodeClass(node.rank, right_split, node.right_subtree)
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Created new right tree with rank {node.rank} and item count {right_split.item_count()}: {print_pretty(new_tree)}")
 
         # Optimized parent reference updates with minimal branching
         if new_tree:
@@ -500,16 +471,16 @@ class GKPlusInsertMixin:
     # ------------------------------------------------------------------
 
     def _create_dummy_singleton_tree(self, rank: int, dim: int, l_factor: float, KListClass) -> 'GKPlusTreeBase':
-        """
-        Create a dummy singleton tree with a single entry containing the dummy item.
+        """Create a dummy singleton tree with a single entry containing the dummy item.
 
         Args:
-            dim: The dimension of the tree
-            l_factor: The load factor for the tree
-            set_type: The type of the set to use
+            rank: The rank for the new tree node.
+            dim: The dimension of the tree.
+            l_factor: The load factor for the tree.
+            KListClass: The KList class to use for creating the leaf set.
 
         Returns:
-            A GKPlusTreeBase instance with a single dummy entry
+            A GKPlusTreeBase instance with a single dummy entry.
         """
         TreeK = type(self)
         NodeK = self.NodeClass

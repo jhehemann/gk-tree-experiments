@@ -54,7 +54,6 @@ def gtree_stats_(
     from gplus_trees.gplus_tree_base import GPlusTreeBase, DUMMY_KEY, get_dummy
     from gplus_trees.klist_base import KListBase
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-    from gplus_trees.display import print_pretty
 
     if rank_hist is None:
         rank_hist = collections.Counter()
@@ -191,12 +190,8 @@ def gtree_stats_(
             if stats.set_thresholds_met:
                 if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
                     stats.set_thresholds_met = False
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.warning(f"  Current node KList violation: item_count()={node_set.item_count()}, threshold={threshold}")
                 elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
                     stats.set_thresholds_met = False
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.warning(f"  Current node GPlusTree violation: item_count()={node_set.item_count()}, threshold={threshold}")
 
             stats.internal_has_replicas &= cs.internal_has_replicas
             stats.internal_packed &= cs.internal_packed
@@ -230,24 +225,12 @@ def gtree_stats_(
 
     # Check right subtree first
     if not right_stats.set_thresholds_met:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Right subtree <set_thresholds_met>: {right_stats.set_thresholds_met}")
         stats.set_thresholds_met = False
 
     # Check current node violations (always check, regardless of current state)
     if isinstance(node_set, KListBase) and node_set.item_count() > threshold:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                f"[DIM {t.DIM if hasattr(t, 'DIM') else 'N/A'}] Node set is KList and item_count > threshold: "
-                f"{node_set.item_count()} > {threshold}, KList: {print_pretty(node_set)}, tree: {print_pretty(t)}"
-            )
         stats.set_thresholds_met = False
     elif not isinstance(node_set, KListBase) and node_set.item_count() <= threshold:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                f"[DIM {t.DIM if hasattr(t, 'DIM') else 'N/A'}] Node set is {type(node_set)} and item_count <= threshold: "
-                f"{node_set.item_count()} <= {threshold}, GPlusTree: {print_pretty(node_set)}, tree: {print_pretty(t)})"
-            )
         stats.set_thresholds_met = False
 
     if stats.is_search_tree:

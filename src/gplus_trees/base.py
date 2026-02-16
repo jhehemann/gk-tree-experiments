@@ -207,7 +207,3 @@ def _get_replica(item: Union[LeafItem, InternalItem]) -> InternalItem:
     data = item._item
     return InternalItem(data)
 
-def debug_log(message, *args, **kwargs):
-    """Log a debug message only if debug logging is enabled"""
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(message, *args, **kwargs)

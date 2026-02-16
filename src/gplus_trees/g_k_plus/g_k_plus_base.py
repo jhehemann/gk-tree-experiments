@@ -60,11 +60,9 @@ from gplus_trees.base import (
     DummyItem,
     Entry,
 )
-import logging
-
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import (
-    GPlusTreeBase, GPlusNodeBase, print_pretty, get_dummy
+    GPlusTreeBase, GPlusNodeBase, print_pretty, get_dummy  # noqa: F401
 )
 
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
@@ -73,7 +71,6 @@ from gplus_trees.g_k_plus.unzip import GKPlusUnzipMixin
 from gplus_trees.g_k_plus.navigation import GKPlusNavigationMixin
 from gplus_trees.g_k_plus.conversion import GKPlusConversionMixin
 from gplus_trees.g_k_plus.insert import GKPlusInsertMixin
-from gplus_trees.logging_config import get_logger
 
 # Re-export bulk-creation and conversion symbols for backward compatibility.
 # External code that does ``from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree``
@@ -87,14 +84,6 @@ from gplus_trees.g_k_plus.bulk_create import (  # noqa: F401
 
 DEFAULT_DIMENSION = 1  # Default dimension for GKPlusTree
 DEFAULT_L_FACTOR = 1.0  # Default threshold factor for KList to GKPlusTree conversion
-
-logger = get_logger(__name__)
-
-
-def IS_DEBUG():
-    """Check if debug logging is enabled. Evaluated at call time so it
-    reflects the current logging configuration (unlike a module-level constant)."""
-    return logger.isEnabledFor(logging.DEBUG)
 
 
 class GKPlusNodeBase(GPlusNodeBase):
@@ -173,7 +162,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         if self.item_cnt is None:
             return self.get_tree_item_count()
         return self.item_cnt
-    
+
     def real_item_count(self) -> int:
         if self.size is None:
             return self.get_size()
@@ -191,7 +180,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         if self.is_empty():
             self.item_cnt = 0
             return self.item_cnt
-        
+
         if self.node.rank == 1:  # indicates a leaf in current dim
             self.item_cnt = self.node.set.item_count()
             return self.item_cnt
@@ -239,14 +228,14 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         Insert an entry into the GK+-tree. The rank is calculated automatically
         based on the entry's item key. The entire entry object is preserved to
         maintain external references.
-        
+
         Args:
             x_entry (Entry): The entry to be inserted, containing an item and left_subtree.
             rank (int): The rank of the entry's item key.
 
         Returns:
             Tuple[GKPlusTreeBase, bool]: The updated tree and whether insertion was successful.
-            
+
         Raises:
             TypeError: If entry is not an Entry object.
 
@@ -294,7 +283,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         for entry in self.node.set:
             if entry.left_subtree is not None:
                 max_dim = max(max_dim, entry.left_subtree.get_max_dim())
-        
+
         # Get the max dimension of the right subtree
         max_dim = max(max_dim, self.node.right_subtree.get_max_dim() if self.node.right_subtree else max_dim)
 
@@ -322,7 +311,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
 
         count = 0
         node = self.node
-        
+
         # Base case: The node is a leaf node (rank 1)
         if node.rank == 1:
             if isinstance(node.set, GKPlusTreeBase):
@@ -330,7 +319,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
                 count += node.set.expanded_count()  # recurse
             self.expanded_cnt = count
             return count
-        
+
         # Recursive case: The node is not a leaf (rank > 1)
         for entry in node.set:
             if entry.left_subtree is not None:
@@ -350,8 +339,6 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
             inner GK+-trees when sets have been expanded.
         """
         if self.is_empty():
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] item_slot_count: Tree is empty, returning 0")
             return 0
 
         node = self.node

@@ -1,3 +1,5 @@
+"""Abstract base class for GK+-tree set data structures."""
+
 from abc import abstractmethod
 
 from typing import Optional, Tuple, Iterator
@@ -6,9 +8,7 @@ from gplus_trees.base import (
     AbstractSetDataStructure,
     Entry
 )
-from gplus_trees.logging_config import get_logger
 
-logger = get_logger(__name__)
 
 class GKTreeSetDataStructure(AbstractSetDataStructure):
     """
@@ -52,7 +52,7 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
             int: The number of item slots in the set.
         """
         pass
-    
+
     @abstractmethod
     def physical_height(self) -> int:
         """
@@ -66,7 +66,7 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
     def __iter__(self) -> Iterator['Entry']:
         """
         Iterate over the entries in the set data structure.
-        
+
         Returns:
             Iterator[Entry]: An iterator over the entries in the set.
         """

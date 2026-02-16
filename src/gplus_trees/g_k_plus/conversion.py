@@ -23,24 +23,14 @@ Complexity summary (n = items in set, k = KList capacity):
 """
 
 from __future__ import annotations
-import logging
 from typing import TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
 from gplus_trees.klist_base import KListBase
-from gplus_trees.gplus_tree_base import print_pretty
-from gplus_trees.logging_config import get_logger
 from gplus_trees.g_k_plus.bulk_create import _klist_to_tree, _tree_to_klist
 
 if TYPE_CHECKING:
     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-
-logger = get_logger(__name__)
-
-
-def IS_DEBUG():
-    """Check if debug logging is enabled."""
-    return logger.isEnabledFor(logging.DEBUG)
 
 
 class GKPlusConversionMixin:
@@ -85,13 +75,9 @@ class GKPlusConversionMixin:
         k = klist.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
         if klist.item_count() > threshold:
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Klist with item count {klist.item_count()} exceeds threshold {threshold}, converting to GKPlusTree; KList: {print_pretty(klist)}")
             # Convert to GKPlusTree with increased dimension
             new_dim = type(self).DIM + 1
             new_tree = _klist_to_tree(klist, k, new_dim, self.l_factor)
-            if IS_DEBUG():
-                logger.debug(f"[DIM {self.DIM}] Converted KList to GKPlusTree: {print_pretty(new_tree)}")
             return new_tree
 
         return klist
@@ -155,14 +141,6 @@ class GKPlusConversionMixin:
         klist_size = new_klist.item_count()
 
         if klist_size <= threshold:
-            if IS_DEBUG():
-                logger.debug(
-                    f"[DIM {self.DIM}] GKPlusTree (DIM {tree.DIM}) with "
-                    f"real_item_count {real_count} collapsed to KList with "
-                    f"{klist_size} items (threshold {threshold}): "
-                    f"{print_pretty(tree)}"
-                )
-                logger.debug(f"[DIM {self.DIM}] Converted GKPlusTree to KList: {print_pretty(new_klist)}")
             return new_klist
 
         # Resulting KList exceeds the threshold (due to preserved
