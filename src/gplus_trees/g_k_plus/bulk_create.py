@@ -25,7 +25,7 @@ Complexity summary (n = entries, k = KList capacity, h = resulting height):
 """
 
 from __future__ import annotations
-from typing import Optional, Type, Union
+from typing import Optional, Union
 from itertools import islice
 
 from gplus_trees.utils import calc_rank_from_digest_k
