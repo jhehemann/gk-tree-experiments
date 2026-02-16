@@ -39,11 +39,12 @@ This system implements benchmarking for the G+Trees project. All benchmarks run 
 
 ### Deterministic Benchmarking
 
-All benchmarks use deterministic random number generation by default to ensure reproducible results:
+All benchmarks use deterministic random number generation to ensure reproducible results across machines and Python invocations:
 
 - **Default Seed**: Benchmarks use seed `42` by default
 - **Configurable**: Override via `BENCHMARK_SEED` environment variable
-- **Consistent**: Same seed + same parameters = identical test data
+- **Consistent**: Same seed + same parameters = identical test data across runs
+- **Process-Independent**: Uses stable hashing (SHA-256) for seed offsets, not Python's randomized `hash()`
 
 ```bash
 # Run with custom seed for reproducibility testing
