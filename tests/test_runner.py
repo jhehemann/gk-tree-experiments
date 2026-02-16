@@ -10,15 +10,13 @@ import unittest
 import argparse
 import logging
 
-# Add the src directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 # Test files to run - Add or remove files as needed
 TEST_FILES = [
+    'gplus/test_gplus_tree_base.py',
     'gplus/test_insert.py',
     'gplus/test_retrieve.py',
     'merkle/test_gp_mkl_tree.py',
-    
+
     'gk_plus/test_counts_and_sizes.py',
     'gk_plus/test_expanded_count.py',
     'gk_plus/test_get_max_dim.py',
@@ -27,17 +25,13 @@ TEST_FILES = [
     'gk_plus/test_item_count.py',
     'gk_plus/test_set_conversion.py',
     'gk_plus/test_gk_plus_zip.py',
-    'gk_plus/test_gk_plus_unzip.py',   
-    # 'gk_plus/test_gk_plus_tree.py',
-    # 'gk_plus/test_split_inplace.py',
+    'gk_plus/test_gk_plus_unzip.py',
 
     'test_klist.py',
     'test_insert_result.py',
     'test_rank_hash_consistency.py',
+    'test_stats_gpltree.py',
     'test_utility_functions.py',
-
-    # 'test_stats_gpltree.py',
-    
 ]
 
 

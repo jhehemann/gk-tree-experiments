@@ -139,12 +139,12 @@ class TestGKPlusTreeInsertResult(GKPlusTreeTestCase):
 
         # Insert same key with different value - GKPlusTree doesn't support updates
         updated_item = self.make_item(5, "updated_value")
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(NotImplementedError) as context:
             tree.insert(updated_item, 1)
         
         # Verify the error message
         self.assertIn("Entry with key 5 already exists", str(context.exception))
-        self.assertIn("No updates allowed", str(context.exception))
+        self.assertIn("Updates are not yet implemented", str(context.exception))
     
     def test_insert_with_dimensional_expansion_returns_correct_result(self):
         """Test insert that triggers dimensional expansion returns correct InsertResult."""
@@ -433,8 +433,8 @@ class TestGKPlusTreeNextEntryCorrectness(GKPlusTreeTestCase):
         tree = create_gkplus_tree(K=4, dimension=1, l_factor=1)
         for key in self.keys:
             tree.insert(self.make_item(key, f"value_{key}"), 1)
-        # GKPlusTree should raise ValueError for duplicate keys
-        with self.assertRaises(ValueError) as context:
+        # GKPlusTree should raise NotImplementedError for duplicate keys
+        with self.assertRaises(NotImplementedError) as context:
             tree.insert(self.make_item(30, "updated_value"), 1)
 
         self.assertIn("Entry with key 30 already exists", str(context.exception))

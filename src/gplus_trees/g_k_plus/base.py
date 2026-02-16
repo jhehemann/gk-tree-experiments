@@ -1,16 +1,14 @@
+"""Abstract base class for GK+-tree set data structures."""
+
 from abc import abstractmethod
 
-from typing import Optional, Tuple, TypeVar, Iterator
+from typing import Optional, Tuple, Iterator
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
     Entry
 )
-from gplus_trees.logging_config import get_logger
 
-logger = get_logger("GKPlusTree")
-
-T = TypeVar("T", bound="GKTreeSetDataStructure")
 
 class GKTreeSetDataStructure(AbstractSetDataStructure):
     """
@@ -54,7 +52,7 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
             int: The number of item slots in the set.
         """
         pass
-    
+
     @abstractmethod
     def physical_height(self) -> int:
         """
@@ -64,33 +62,11 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
         """
         pass
 
-    # @abstractmethod
-    # def split_inplace(
-    #         self, key: int
-    # ) -> Tuple[T, Optional[T], T]:
-    #     """
-    #     Split the set into two parts based on the provided key.
-        
-    #     The first part contains all items less than or equal to the key,
-    #     and the second part contains all items greater than the key.
-        
-    #     Parameters:
-    #         key (int): The key to split the set by.
-        
-    #     Returns:
-    #         Tuple[AbstractSetDataStructure, Optional[AbstractSetDataStructure], AbstractSetDataStructure]:
-    #             A tuple containing:
-    #                 - The left set (items < key).
-    #                 - The left subtree of the item (item = key).
-    #                 - The right subtree (items > key).
-    #     """
-    #     pass
-
     @abstractmethod
     def __iter__(self) -> Iterator['Entry']:
         """
         Iterate over the entries in the set data structure.
-        
+
         Returns:
             Iterator[Entry]: An iterator over the entries in the set.
         """

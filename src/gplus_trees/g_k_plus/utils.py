@@ -1,7 +1,7 @@
 """Pure utility functions for rank calculation without circular dependencies."""
 
-import hashlib
-from typing import List, Union
+from typing import List
+
 from gplus_trees.utils import get_group_size, calc_rank_from_digest, get_digest
 
 def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
@@ -19,18 +19,18 @@ def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
     # Use keys' absolute value to hash to account for dummy keys (in testing)
     # Start with dimension 1: hash(abs(key) + 1)
     digest = get_digest(key, 1)
-    
+
     # For subsequent dimensions, hash(prev_digest + dim)
     for d in range(2, dim + 1):
         digest = get_digest(digest, d)
-    
+
     return calc_rank_from_digest(digest, group_size)
 
 
 def calc_rank(key: int, k: int, dim: int) -> int:
     """
     Calculate the rank for a key for a specific dimension based on repeated hashing.
-    
+
     Args:
         key (int): The key to calculate rank for.
         k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
@@ -45,7 +45,7 @@ def calc_rank(key: int, k: int, dim: int) -> int:
 def calc_ranks(keys: List[int], k: int, DIM: int = 1) -> List[int]:
     """
     Calculate ranks for a list of keys for a specific dimension based on repeated hashing.
-    
+
     Args:
         keys (List[int]): List of integer keys to calculate ranks for.
         k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
@@ -64,8 +64,8 @@ def calc_ranks(keys: List[int], k: int, DIM: int = 1) -> List[int]:
 
 def calc_ranks_multi_dims(keys: List[int], k: int, dimensions: int = 1) -> List[List[int]]:
     """
-    Calculate ranks for a list of keys based on repeated hashing. 
-    
+    Calculate ranks for a list of keys based on repeated hashing.
+
     Args:
         keys (List[int]): List of integer keys to calculate ranks for.
         k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).

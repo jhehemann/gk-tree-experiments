@@ -11,7 +11,7 @@ import gc
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_ranks
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED, stable_seed_offset
 
 
 class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
@@ -36,7 +36,7 @@ class GKPlusTreeBatchInsertBenchmarks(BaseBenchmark):
         self.tree_class, _, _, _ = make_gkplustree_classes(capacity)
         
         # Generate deterministic test data using combined parameter hash for seed variation
-        seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
+        seed_offset = stable_seed_offset(capacity, size, distribution, l_factor)
         self.keys = BenchmarkUtils.generate_deterministic_keys(
             size=size,
             seed=DEFAULT_BENCHMARK_SEED + seed_offset,
@@ -101,7 +101,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
             _, _, klist_class, _ = make_gkplustree_classes(capacity)
             
             # Generate and insert test data with deterministic seed
-            seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
+            seed_offset = stable_seed_offset(capacity, size, distribution, l_factor)
             base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
             insert_keys = BenchmarkUtils.generate_deterministic_keys(
                 size=size,
@@ -121,7 +121,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
         
         # Generate lookup keys with specified hit ratio (this is fast and hit_ratio specific)
-        seed_offset = hash((capacity, size, distribution, l_factor)) % 1000
+        seed_offset = stable_seed_offset(capacity, size, distribution, l_factor)
         base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,

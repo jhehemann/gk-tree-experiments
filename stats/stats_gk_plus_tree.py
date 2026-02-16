@@ -1,5 +1,4 @@
-"""Statistics for gplus trees."""
-# pylint: skip-file
+"""Statistics for GK⁺-trees."""
 
 import os
 import logging
@@ -10,32 +9,17 @@ from statistics import mean
 from typing import List, Optional, Tuple
 from datetime import datetime
 import numpy as np
-import sys
 import argparse
 
-
-
-# Add the project root to the Python path so we can import from tests
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# random.seed(42)  # For reproducibility
-# np.random.seed(42)  # For reproducibility
-
 from gplus_trees.base import ItemData, LeafItem
-from gplus_trees.gplus_tree_base import (
-    gtree_stats_,
-)
+from gplus_trees.tree_stats import gtree_stats_
+from gplus_trees.invariants import assert_tree_invariants_raise, check_leaf_keys_and_values
 
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
-
-from tests.utils import (
-    assert_tree_invariants_raise,
-)
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from benchmarks.benchmark_gkplus_tree_adversarial import load_adversarial_keys_from_file
 
-from gplus_trees.g_k_plus.base import logger
-IS_DEBUG = logger.isEnabledFor(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Assume create_gtree(items) builds a GKPlusTree from a list of (LeafItem, rank) pairs.
 def create_gtree(items, K=16, l_factor=1.0) -> GKPlusTreeBase:
@@ -88,64 +72,6 @@ def random_gkplus_tree_of_size(n: int, target_node_size: int, l_factor: float) -
 # The function random_klist_tree just wraps random_gtree_of_size with a given K.
 def random_klist_tree(n: int, K: int, l_factor: float) -> GKPlusTreeBase:
     return random_gkplus_tree_of_size(n, K, l_factor=l_factor)
-
-def check_leaf_keys_and_values(
-    tree: GKPlusTreeBase,
-    expected_keys: Optional[List[int]] = None
-) -> Tuple[List[int], bool, bool, bool]:
-    """
-    Traverse all leaf nodes exactly once, gathering their real items (key, value),
-    then compute three invariants:
-      1. presence_ok: if `expected_keys` is provided, do we have exactly that set of keys?
-                      otherwise always True.
-      2. all_have_values: are all those items’ values not None?
-      3. order_ok: are the keys in strictly sorted order?
-    
-    Parameters:
-        tree:           The GKPlusTreeBase to examine.
-        expected_keys:  Optional list of keys that must match exactly. If None, skip presence test.
-    
-    Returns:
-        (keys, presence_ok, all_have_values, order_ok)
-    """
-    dummy = get_dummy(dim=tree.__class__.DIM)
-    keys = []
-    all_have_values = True
-    order_ok = True
-    
-    # Traverse leaf nodes and collect keys
-    prev_key = None
-    for leaf in tree.iter_leaf_nodes():
-        leaf_set = leaf.set
-        for entry in leaf_set:
-            item = entry.item
-            key = item.key
-            if prev_key is None:
-
-                if not item is dummy:
-                    order_ok = False
-            else:
-                keys.append(key)
-
-                # Check if value is non-None
-                if item.value is None:
-                    all_have_values = False
-
-                # Check if keys are in sorted order
-                if key < prev_key:
-                    order_ok = False
-            prev_key = key
-
-    # Check presence only if expected_keys is provided
-    presence_ok = True
-    if expected_keys is not None:
-        if len(keys) != len(expected_keys):
-            presence_ok = False
-        else:
-            # Use a single pass to check presence equivalence
-            presence_ok = set(keys) == set(expected_keys)
-
-    return keys, presence_ok, all_have_values, order_ok
 
 def repeated_experiment(
         size: int,
@@ -277,15 +203,15 @@ def repeated_experiment(
     sep_line = "-" * len(header)
 
     # logging.info(f"n = {size}; K = {K}; {repetitions} repetitions")
-    logging.info(header)
-    logging.info(sep_line)
+    logger.info(header)
+    logger.info(sep_line)
     for name, avg, var in rows:
         if var is None:
-            logging.info(f"{name:<20} {avg:>15}")
+            logger.info(f"{name:<20} {avg:>15}")
         else:
             var_str = f"({var:.2f})"
             avg_fmt = f"{avg:15.2f}"
-            logging.info(f"{name:<20} {avg_fmt} {var_str:>15}")
+            logger.info(f"{name:<20} {avg_fmt} {var_str:>15}")
     
     # Performance metrics
     sum_build = sum(times_build)
@@ -311,12 +237,12 @@ def repeated_experiment(
     header = f"{'Metric':<20}{'Avg(s)':>13}{'Var(s)':>13}{'Total(s)':>13}{'%Total':>10}"
     sep    = "-" * len(header)
 
-    logging.info("")  # blank line for separation
-    logging.info("Performance summary:")
-    logging.info(header)
-    logging.info(sep)
+    logger.info("")  # blank line for separation
+    logger.info("Performance summary:")
+    logger.info(header)
+    logger.info(sep)
     for name, avg, var, total, pct in perf_rows:
-        logging.info(
+        logger.info(
             f"{name:<20}"
             f"{avg:13.6f}"
             f"{var:13.6f}"
@@ -324,9 +250,9 @@ def repeated_experiment(
             f"{pct:10.2f}%"
         )
 
-    logging.info(sep)
+    logger.info(sep)
     t_all_1 = time.perf_counter() - t_all_0
-    logging.info("Execution time: %.3f seconds", t_all_1)
+    logger.info("Execution time: %.3f seconds", t_all_1)
 
 if __name__ == "__main__":
     # --- Argument Parsing ---
@@ -348,6 +274,10 @@ if __name__ == "__main__":
                             "using --adversarial_dim       gives 1, "
                             "using --adversarial_dim N gives N."
                         ))
+    parser.add_argument('--log-level',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        default='INFO',
+                        help='Set the logging level (default: INFO)')
     
     args = parser.parse_args()
 
@@ -363,14 +293,20 @@ if __name__ == "__main__":
     log_path = os.path.join(log_dir, f"run_{ts}.log")
 
     # 3) Configure logging to write to that file (and still print to console, if you like)
+    log_level = getattr(logging, args.log_level)
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler(log_path, mode="w"),
             logging.StreamHandler()         # comment this out if you don't want console output
-        ]
+        ],
+        force=True  # Override any existing logging configuration
     )
+
+    # Also apply the chosen level to the library logger so that
+    # log records from gplus_trees.* are emitted at the requested level.
+    logging.getLogger("gplus_trees").setLevel(log_level)
 
     # List of tree sizes to test.
     sizes = args.sizes
@@ -382,11 +318,11 @@ if __name__ == "__main__":
 
     for n in sizes:
         for K in Ks:
-            logging.info("")
-            logging.info("")
-            logging.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor}, repetitions = {repetitions}, adversarial_dim = {adversarial_dim} ----------------")
+            logger.info("")
+            logger.info("")
+            logger.info(f"---------------- NOW RUNNING EXPERIMENT: n = {n}, K = {K}, l_factor: {l_factor}, repetitions = {repetitions}, adversarial_dim = {adversarial_dim} ----------------")
             t0 = time.perf_counter()
             # If you want to use adversarial or dim, you need to modify repeated_experiment and tree creation accordingly.
             repeated_experiment(size=n, repetitions=repetitions, K=K, l_factor=l_factor, adversarial_dim=adversarial_dim)
             elapsed = time.perf_counter() - t0
-            logging.info(f"Total experiment time: {elapsed:.3f} seconds")
+            logger.info(f"Total experiment time: {elapsed:.3f} seconds")

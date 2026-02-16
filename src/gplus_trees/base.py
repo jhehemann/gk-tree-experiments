@@ -2,15 +2,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import hashlib
-from typing import Optional, TypeVar, Generic, Tuple, Union
 import logging
+from typing import NamedTuple, Optional, TypeVar, Generic, Tuple, Union
 
 # from gplus_trees.klist_base import KListBase
 from gplus_trees.utils import get_digest
 from gplus_trees.logging_config import get_logger
 
-# Get logger for this module
-logger = get_logger("GPlusTree")
+logger = get_logger(__name__)
 
 class ItemData:
     __slots__ = ("key", "value", "dim_hash_map")
@@ -188,6 +187,17 @@ class Entry:
     item: Union[InternalItem, LeafItem]
     left_subtree: T
 
+class InsertResult(NamedTuple):
+    """Result of an insert operation on a G⁺-tree or set data structure.
+
+    Backward-compatible with the legacy ``(tree, inserted, next_entry)`` tuple
+    — existing ``tree, inserted, next_entry = t.insert(…)`` unpacking still works.
+    """
+    tree: 'AbstractSetDataStructure'
+    inserted: bool
+    next_entry: Optional[Entry] = None
+
+
 def _create_replica(key):
     """Create a replica item with given key and no value."""
     return InternalItem(ItemData(key=key))
@@ -197,7 +207,3 @@ def _get_replica(item: Union[LeafItem, InternalItem]) -> InternalItem:
     data = item._item
     return InternalItem(data)
 
-def debug_log(message, *args, **kwargs):
-    """Log a debug message only if debug logging is enabled"""
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(message, *args, **kwargs)

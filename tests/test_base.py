@@ -14,14 +14,12 @@ from gplus_trees.g_k_plus.utils import get_group_size
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 
-from stats.stats_gplus_tree import check_leaf_keys_and_values
+from gplus_trees.invariants import check_leaf_keys_and_values
 from tests.utils import assert_tree_invariants_tc
-# from gplus_trees.base import logger
-
-from gplus_trees.logging_config import get_test_logger
 
 import logging
-logger = get_test_logger("TestBase")
+
+logger = logging.getLogger(__name__)
 
 class BaseTestCase(unittest.TestCase):
     """Base class for all tests with common functionality."""

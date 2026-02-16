@@ -1,4 +1,9 @@
-"""K-list implementation"""
+"""K-list -- a cache-friendly sorted linked list of fixed-capacity node segments.
+
+Provides :class:`KListNodeBase` (a single segment) and :class:`KListBase`
+(the linked list over those segments), both parameterised via factory-created
+subclasses.
+"""
 from typing import TYPE_CHECKING, Optional, Tuple, Type
 from bisect import bisect_left, insort_left
 
@@ -10,16 +15,28 @@ if TYPE_CHECKING:
     from gplus_trees.gplus_tree_base import GPlusTreeBase
 
 from gplus_trees.logging_config import get_logger
-logger = get_logger("KList")
+
+logger = get_logger(__name__)
+
+_LINEAR_SEARCH_THRESHOLD = 8
+
 
 class KListNodeBase:
     """
-    A node in the k-list.
+    A single segment of a k-list, storing up to ``CAPACITY`` :class:`Entry` objects.
 
-    Each node stores up to CAPACITY entries.
-    Each entry is a tuple of the form:
-        (item, left_subtree)
-    where `left_subtree` is a G-tree associated with this entry.
+    Three parallel sorted lists are maintained for performance:
+
+    - ``entries`` -- the :class:`Entry` objects themselves.
+    - ``keys``    -- ``[e.item.key for e in entries]``, enabling O(log k)
+      binary search via :func:`bisect_left`.
+    - ``real_keys`` -- the subset of ``keys`` with non-negative values
+      (excludes dummy sentinel keys).
+
+    All mutations go through helper methods (``_append_entry``,
+    ``_insert_entry_at``, ``_pop_last_entry``, ``_pop_first_entry``,
+    ``_remove_entry_at``, ``_transfer_first_n_from``) so the three lists
+    stay in sync.
     """
     __slots__ = ("entries", "keys", "real_keys", "next")
     
@@ -31,98 +48,134 @@ class KListNodeBase:
         self.keys: list[int] = []       # Sorted list of keys for fast binary search
         self.real_keys: list[int] = []  # Sorted list of real keys (excluding dummy keys)
         self.next: Optional['KListNodeBase'] = None
-        
+
+    def _append_entry(self, entry: Entry) -> None:
+        """Append entry at the end (assumes key > all existing keys)."""
+        x_key = entry.item.key
+        self.entries.append(entry)
+        self.keys.append(x_key)
+        if x_key >= 0:
+            self.real_keys.append(x_key)
+
+    def _insert_entry_at(self, i: int, entry: Entry) -> None:
+        """Insert entry at position i, maintaining all parallel lists."""
+        x_key = entry.item.key
+        self.entries.insert(i, entry)
+        self.keys.insert(i, x_key)
+        if x_key >= 0:
+            insort_left(self.real_keys, x_key)
+
+    def _pop_last_entry(self) -> Entry:
+        """Remove and return the last entry, updating all parallel lists."""
+        entry = self.entries.pop()
+        self.keys.pop()
+        if entry.item.key >= 0:
+            self.real_keys.pop()
+        return entry
+
+    def _pop_first_entry(self) -> Entry:
+        """Remove and return the first entry, updating all parallel lists."""
+        entry = self.entries.pop(0)
+        key = self.keys.pop(0)
+        if key >= 0 and self.real_keys and self.real_keys[0] == key:
+            self.real_keys.pop(0)
+        return entry
+
+    def _remove_entry_at(self, i: int) -> Entry:
+        """Remove and return entry at position i, updating all parallel lists."""
+        entry = self.entries.pop(i)
+        key = self.keys.pop(i)
+        if key >= 0:
+            j = bisect_left(self.real_keys, key)
+            if j < len(self.real_keys) and self.real_keys[j] == key:
+                del self.real_keys[j]
+        return entry
+
+    def _transfer_first_n_from(self, source: 'KListNodeBase', n: int) -> None:
+        """Move the first *n* entries from *source* to the end of *self*.
+
+        Assumes sorted order is maintained (last key in *self* < first key
+        in *source*).  Uses list slicing for **O(k)** total work instead of
+        O(n * k) individual ``pop(0)`` calls.
+        """
+        if n <= 0:
+            return
+
+        # Determine how many real_keys belong to the transferred range.
+        # All transferred keys are < source.keys[n] (the first key NOT moved).
+        if n < len(source.keys):
+            boundary = source.keys[n]
+            real_count = bisect_left(source.real_keys, boundary)
+        else:
+            real_count = len(source.real_keys)  # moving everything
+
+        # Batch move entries and keys
+        self.entries.extend(source.entries[:n])
+        self.keys.extend(source.keys[:n])
+        del source.entries[:n]
+        del source.keys[:n]
+
+        # Batch move real_keys
+        if real_count > 0:
+            self.real_keys.extend(source.real_keys[:real_count])
+            del source.real_keys[:real_count]
+
     def insert_entry(
             self, 
             entry: Entry,
-    ) -> Optional[Entry]:
+    ) -> Tuple[Optional[Entry], bool, Optional[Entry]]:
         """
         Inserts an entry into a sorted KListNode by key.
         If capacity exceeds, last entry is returned for further processing.
         
-        Attributes:
+        Args:
             entry (Entry): The entry to insert into the KListNode.
         Returns:
-            Optional[Entry]: The last entry if the node overflows; otherwise, None.
+            Tuple[Optional[Entry], bool, Optional[Entry]]:
+                (overflow_entry, was_inserted, next_entry)
         """
-        
         entries = self.entries
         keys = self.keys
-        real_keys = self.real_keys
         x_key = entry.item.key
-        is_dummy = x_key < 0
         next_entry = None
 
         # Empty list case
         if not entries:
-            entries.append(entry)
-            keys.append(x_key)
-            if not is_dummy:
-                real_keys.append(x_key)
+            self._append_entry(entry)
             return None, True, next_entry
 
         # Fast path: Append at end
-        if x_key > entries[-1].item.key:
-            entries.append(entry)
-            keys.append(x_key)
-            if not is_dummy:
-                real_keys.append(x_key)
+        if x_key > keys[-1]:
+            self._append_entry(entry)
         # Fast path: Insert at beginning
-        elif x_key < entries[0].item.key:
-            entries.insert(0, entry)
-            keys.insert(0, x_key)
-            if not is_dummy:
-                real_keys.insert(0, x_key)
+        elif x_key < keys[0]:
+            self._insert_entry_at(0, entry)
             next_entry = entries[1]
         else:
-            # Choose algorithm based on list length
+            # Find insertion position
             entries_len = len(entries)
-            if entries_len < 8:
+            if entries_len < _LINEAR_SEARCH_THRESHOLD:
                 # Linear search for very small lists
-                # inserted_at = None
                 for i in range(entries_len):
-                    if x_key < entries[i].item.key:
-                        entries.insert(i, entry)
-                        keys.insert(i, x_key)
-                        # After insertion, the next entry is at position i+1
-                        next_entry = entries[i+1]
-                        # inserted_at = i
+                    if x_key < keys[i]:
+                        self._insert_entry_at(i, entry)
+                        next_entry = entries[i + 1]
                         break
-                    elif x_key == entries[i].item.key:
-                        # If we find an exact match, we can choose to replace or ignore
-                        # Here we choose to ignore the insertion if the key already exists
-                        next_entry = entries[i+1] if i+1 < len(entries) else None
+                    elif x_key == keys[i]:
+                        next_entry = entries[i + 1] if i + 1 < entries_len else None
                         return None, False, next_entry
             else:
-                # Binary search for larger lists - more efficient with higher capacities
+                # Binary search for larger lists
                 i = bisect_left(keys, x_key)
-                if i < len(entries) and keys[i] == x_key:
-                    next_entry = entries[i+1] if i+1 < len(entries) else None
+                if i < entries_len and keys[i] == x_key:
+                    next_entry = entries[i + 1] if i + 1 < entries_len else None
                     return None, False, next_entry
-                entries.insert(i, entry)
-                keys.insert(i, x_key)
-                # After insertion, the next entry is at position i+1
-                next_entry = entries[i+1]
-
-            if not is_dummy:
-                # Insert into real_keys only if it's not a dummy key
-                real_keys_len = len(real_keys)
-                if real_keys_len < 8:
-                    # Linear search for very small lists
-                    for i in range(real_keys_len):
-                        if x_key < real_keys[i]:
-                            real_keys.insert(i, x_key)
-                            break
-                else:
-                    # Binary search for larger lists
-                    insort_left(real_keys, x_key)
+                self._insert_entry_at(i, entry)
+                next_entry = entries[i + 1]
 
         # Handle overflow
         if len(entries) > self.__class__.CAPACITY:
-            pop_entry = entries.pop()
-            keys.pop()
-            if pop_entry.item.key >= 0:
-                real_keys.pop()
+            pop_entry = self._pop_last_entry()
             return pop_entry, True, next_entry
         return None, True, next_entry
 
@@ -173,10 +226,27 @@ class KListNodeBase:
 
 class KListBase(AbstractSetDataStructure):
     """
-    A k-list implemented as a linked list of nodes.
-    Each node holds up to CAPACITY sorted entries.
-    An entry is of the form (item, left_subtree), where left_subtree is a G+-tree (or None).
-    The overall order is maintained lexicographically by key.
+    A k-list: a sorted linked list of :class:`KListNodeBase` segments.
+
+    Each node holds up to *k* (``CAPACITY``) sorted :class:`Entry` objects.
+    An auxiliary index (``_nodes``, ``_bounds``, ``_prefix_counts_tot``,
+    ``_prefix_counts_real``) is rebuilt after every mutation for fast lookups.
+
+    Complexity summary (l = number of nodes, k = ``CAPACITY``):
+
+    +-----------------------+----------------------------+
+    | Operation             | Time                       |
+    +=======================+============================+
+    | ``insert_entry``      | O(log l + k) amortised     |
+    | ``delete``            | O(log l + k)               |
+    | ``retrieve``          | O(log l + log k)           |
+    | ``split_inplace``     | O(log l + k)               |
+    | ``item_count``        | O(1)                       |
+    | ``real_item_count``   | O(1)                       |
+    | ``item_slot_count``   | O(1)                       |
+    | ``physical_height``   | O(1)                       |
+    | ``get_min / get_max`` | O(1)                       |
+    +-----------------------+----------------------------+
     """
     __slots__ = ("head", "tail", "_nodes", "_prefix_counts_tot", "_prefix_counts_real", "_bounds")
 
@@ -238,45 +308,31 @@ class KListBase(AbstractSetDataStructure):
         return self._prefix_counts_real[-1]
 
     def item_slot_count(self) -> int:
-        """
-        Returns the total number of slots available
-        in the k-list, which is the sum of the capacities of all nodes.
-        """
-        count = 0
-        current = self.head
-        while current is not None:
-            count += self.KListNodeClass.CAPACITY
-            current = current.next
-        return count
+        """Returns the total number of slots available in the k-list in O(1) time."""
+        return len(self._nodes) * self.KListNodeClass.CAPACITY
     
     def physical_height(self) -> int:
-        """
-        Returns the number of KListNode segments in this k-list.
-        (i.e. how many times you must follow `next` before you reach None).
-        """
-        height = 0
-        node = self.head
-        # print(f"\nKList Item Count: {self.item_count()}")
-        while node is not None:
-            # print(f"Node Item Count: {len(node.entries)}")
-            height += 1
-            node = node.next
-        # print(f"Klist Height: {height}")
-        return height
+        """Returns the number of KListNode segments in this k-list in O(1) time."""
+        return len(self._nodes)
 
-    def insert_entry(self, entry: Entry, rank: Optional[int] = None) -> 'KListBase':
-        """
-        Inserts an existing Entry object into the k-list, preserving the Entry object's identity.
+    def insert_entry(
+        self, entry: Entry, rank: Optional[int] = None
+    ) -> Tuple['KListBase', bool, Optional[Entry]]:
+        """Insert an Entry into the k-list, maintaining sorted order.
 
-        The insertion ensures that the keys are kept in lexicographic order.
-        If a node overflows (more than k entries), the extra entry is recursively inserted into the next node.
+        O(log l) node lookup, O(k) in-node insert.  Overflows cascade to
+        successor nodes; the index is rebuilt afterwards.
 
         Parameters:
-            entry (Entry): The Entry object to insert (containing item and left_subtree).
-            rank (Optional[int]): The rank of the entry, if applicable. Not used in this implementation. Only for compatibility with the G+-tree interface.
-            
+            entry (Entry): The Entry object to insert.
+            rank (Optional[int]): Unused -- accepted for interface
+                compatibility with the G+-tree.
+
         Returns:
-            KListBase: The updated k-list.
+            Tuple[KListBase, bool, Optional[Entry]]:
+                ``(self, was_inserted, next_entry)`` where *was_inserted* is
+                False when the key already exists, and *next_entry* is the
+                in-order successor of the inserted key (or None).
         """
         if not isinstance(entry, Entry):
             raise TypeError(f"insert_entry(): expected Entry, got {type(entry).__name__}")
@@ -296,10 +352,8 @@ class KListBase(AbstractSetDataStructure):
                 # Using bisect_left to find the insertion node (key >= split key)
                 node_idx = bisect_left(self._bounds, key)
                 node = self._nodes[node_idx]
-        
-        # overflow, inserted = node.insert_entry(entry)
-        res = node.insert_entry(entry)
-        overflow, inserted, next_entry = res[0], res[1], res[2]
+
+        overflow, inserted, next_entry = node.insert_entry(entry)
 
         if inserted:
             # Preserve the original next_entry from the first insertion
@@ -329,102 +383,77 @@ class KListBase(AbstractSetDataStructure):
         return self, False, next_entry
 
     def delete(self, key: int) -> "KListBase":
-        node = self.head
-        prev = None
-        found = False
+        """Delete the entry with the given key from the k-list.
 
-        # 1) Find and remove the entry.
-        while node:
-            for i, entry in enumerate(node.entries):
-                if entry.item.key == key:
-                    del node.entries[i]
-                    # Also remove from keys and real_keys lists
-                    del node.keys[i]
-                    if key >= 0:  # Only remove from real_keys if it's not a dummy key
-                        # Find the key in real_keys and remove it
-                        try:
-                            real_key_idx = node.real_keys.index(key)
-                            del node.real_keys[real_key_idx]
-                        except ValueError:
-                            pass  # Key not in real_keys (shouldn't happen but be safe)
-                    found = True
-                    break
-            if found:
-                break
-            prev, node = node, node.next
+        Uses the index for O(log l) node lookup and O(log k) binary search
+        within the node, then rebalances to maintain the compaction invariant.
+        Overall: **O(log l + k)** -- dominated by the rebalance step.
 
-        if not found:
-            self._rebuild_index()
+        Parameters:
+            key (int): The key to delete.
+
+        Returns:
+            KListBase: The updated k-list (self).
+        """
+        # Empty list -> O(1) early return
+        if not self._bounds:
             return self
 
-        # 2) If head is now empty, advance head.
+        # O(log l) node lookup using the index
+        node_idx = bisect_left(self._bounds, key)
+        if node_idx >= len(self._nodes):
+            return self  # key > max, not found
+
+        node = self._nodes[node_idx]
+        prev = self._nodes[node_idx - 1] if node_idx > 0 else None
+
+        # O(log k) search within the node
+        keys = node.keys
+        i = bisect_left(keys, key)
+        if i >= len(keys) or keys[i] != key:
+            return self  # not found
+
+        node._remove_entry_at(i)
+
+        # If head is now empty, advance head.
         if node is self.head and not node.entries:
             self.head = node.next
             if self.head is None:
-                # list became empty
                 self.tail = None
                 self._rebuild_index()
                 return self
-            # reset for possible rebalance, but prev stays None
             node = self.head
 
-        # 3) If *any other* node is now empty, splice it out immediately.
+        # If any other node is now empty, splice it out.
         elif not node.entries:
-            # remove node from chain
             prev.next = node.next
-            # if we removed the tail, update it
             if prev.next is None:
                 self.tail = prev
             self._rebuild_index()
             return self
 
-        # 4) Start a rebalancing pass through the entire list
-        current = node
-        capacity = self.KListNodeClass.CAPACITY
-        
-        # Rebalance all nodes starting from the node where deletion occurred
-        while current and current.next:
-            next_node = current.next
-            
-            # Continue moving items from next_node to current until current is at capacity
-            # or next_node is empty
+        # Rebalance starting from the affected node
+        self._rebalance_for_compaction(self, start_node=node)
 
-            while len(current.entries) < capacity and next_node.entries:
-                # Move an item from next_node to current
-                shifted = next_node.entries.pop(0)
-                current.entries.append(shifted)
-                
-                # Also move the corresponding key from next_node to current
-                shifted_key = next_node.keys.pop(0)
-                current.keys.append(shifted_key)
-                
-                # Move from real_keys if it's not a dummy key
-                if shifted_key >= 0 and next_node.real_keys and next_node.real_keys[0] == shifted_key:
-                    shifted_real_key = next_node.real_keys.pop(0)
-                    current.real_keys.append(shifted_real_key)
-                
-                # If next_node became empty, splice it out and update tail if needed
-                if not next_node.entries:
-                    current.next = next_node.next
-                    if current.next is None:
-                        self.tail = current
-                    # Exit inner loop as we've emptied next_node
-                    break
-            
-            # Move to next node for the next iteration
-            current = current.next
-        
         self._rebuild_index()
         return self
 
     def retrieve(self, key: int, with_next: bool = True) -> Tuple[Optional[Entry], Optional[Entry]]:
-        """
-        Search for `key` using linear search on the list or binary search O(log l + log k) on the index, based on the number of entries in the node.
-        
+        """Search for *key* in the k-list.
+
+        O(log l) node lookup via ``_bounds``, then O(log k) binary search
+        (or linear scan for small nodes) within the target node.
+        Overall: **O(log l + log k)**.
+
+        Parameters:
+            key (int): The key to search for.
+            with_next (bool): If True (default), also return the successor.
+
         Returns:
-            Tuple[Optional[Entry], Optional[Entry]]: A tuple of (found_entry, next_entry) where:
-                - found_entry: The entry with the matching key if found, otherwise None
-                - next_entry: The subsequent entry in sorted order, or None if no next entry exists
+            Tuple[Optional[Entry], Optional[Entry]]:
+                ``(found_entry, next_entry)`` -- found_entry is the Entry
+                with the matching key (or None); next_entry is the in-order
+                successor (or None).
         """
         if not isinstance(key, int):
             raise TypeError(f"key must be int, got {type(key).__name__!r}")
@@ -453,7 +482,7 @@ class KListBase(AbstractSetDataStructure):
         if key < entries[0].item.key:
             return None, entries[0]
         
-        if len(entries) < 8:
+        if len(entries) < _LINEAR_SEARCH_THRESHOLD:
             # Linear search for very small lists
             for i, entry in enumerate(entries):
                 if key <= entry.item.key:
@@ -537,33 +566,35 @@ class KListBase(AbstractSetDataStructure):
 
         return entry, in_node_succ
 
-    def split_inplace(
+    def _locate_split_node(
         self, key: int
-    ) -> Tuple["KListBase", Optional["GPlusTreeBase"], "KListBase"]:
+    ) -> Optional[Tuple[KListNodeBase, Optional[KListNodeBase], Optional[KListNodeBase]]]:
+        """Locate the node containing the split key using the index.
 
-        if not isinstance(key, int):
-            raise TypeError(f"key must be int, got {type(key).__name__!r}")
+        O(log l) via binary search on ``_bounds``.
 
-        if self.head is None:                        # ··· (1) empty
-            self = type(self)()  # Create new instances of the same class
-            right = type(self)()
-            return self, None, right, None
-
-        # --- locate split node ------------------------------------------------
-        # Using bisect_left to find the first node that contains a key >= split key
+        Returns:
+            ``(split_node, prev_node, original_next)`` or ``None`` if
+            key > max key in the list.
+        """
         node_idx = bisect_left(self._bounds, key)
-        
-        # If key is greater than any key in the list
-        if node_idx >= len(self._nodes):             # ··· (2) key > max
-            right = type(self)()
-            return self, None, right, None
-
+        if node_idx >= len(self._nodes):
+            return None
         split_node = self._nodes[node_idx]
         prev_node = self._nodes[node_idx - 1] if node_idx else None
         original_next = split_node.next
-        next_entry = None
+        return split_node, prev_node, original_next
 
-        # --- bisect inside that node -----------------------------------------
+    def _bisect_node_entries(self, split_node: KListNodeBase, key: int) -> tuple:
+        """Split a node's parallel lists at *key* using binary search.
+
+        O(log k) for the bisect, plus O(k) for the list slices.
+
+        Returns:
+            ``(left_entries, left_keys, left_real_keys,
+            right_entries, right_keys, right_real_keys,
+            left_subtree)``
+        """
         node_entries = split_node.entries
         node_keys = split_node.keys
 
@@ -582,6 +613,36 @@ class KListBase(AbstractSetDataStructure):
         exact_in_real = j < len(real_keys) and real_keys[j] == key
         left_real_keys = real_keys[:j]
         right_real_keys = real_keys[j + 1 if exact_in_real else j :]
+
+        return (left_entries, left_keys, left_real_keys,
+                right_entries, right_keys, right_real_keys,
+                left_subtree)
+
+    def split_inplace(
+        self, key: int
+    ) -> Tuple["KListBase", Optional["GPlusTreeBase"], "KListBase", Optional[Entry]]:
+
+        if not isinstance(key, int):
+            raise TypeError(f"key must be int, got {type(key).__name__!r}")
+
+        if self.head is None:                        # (1) empty
+            self = type(self)()
+            right = type(self)()
+            return self, None, right, None
+
+        # --- locate split node ------------------------------------------------
+        loc = self._locate_split_node(key)
+        if loc is None:                              # key > max
+            right = type(self)()
+            return self, None, right, None
+
+        split_node, prev_node, original_next = loc
+        next_entry = None
+
+        # --- bisect inside that node -----------------------------------------
+        (left_entries, left_keys, left_real_keys,
+         right_entries, right_keys, right_real_keys,
+         left_subtree) = self._bisect_node_entries(split_node, key)
 
         # ------------- build LEFT --------------------------------------------
         # left = type(self)()
@@ -637,42 +698,34 @@ class KListBase(AbstractSetDataStructure):
 
         return self, left_subtree, right, next_entry
         
-    def _rebalance_for_compaction(self, klist: 'KListBase') -> None:
-        """
-        Helper method to ensure the compaction invariant is maintained in a klist.
-        Redistributes entries to ensure all non-tail nodes are at full capacity.
-        
+    def _rebalance_for_compaction(self, klist: 'KListBase', start_node: Optional[KListNodeBase] = None) -> None:
+        """Ensure the compaction invariant: all non-tail nodes at full capacity.
+
+        Redistributes entries by batch-transferring from successor nodes using
+        ``_transfer_first_n_from`` for **O(k)** per node pair rather than
+        individual pops which would be O(k²).
+
         Parameters:
-            klist: The KList to rebalance
+            klist: The KList to rebalance.
+            start_node: Node to start rebalancing from (defaults to ``klist.head``).
         """
-        current = klist.head
+        current = start_node if start_node is not None else klist.head
         capacity = klist.KListNodeClass.CAPACITY
-        
-        # Rebalance all nodes
+
         while current and current.next:
             next_node = current.next
-            
-            # Continue moving items from next_node to current until current is at capacity
-            # or next_node is empty
-            while len(current.entries) < capacity and next_node.entries:
-                # Move an item from next_node to current
-                shifted = next_node.entries.pop(0)
-                shifted_key = next_node.keys.pop(0)
-                current.entries.append(shifted)
-                current.keys.append(shifted_key)
-                if shifted_key >= 0:  # Only update real_keys if it's not a dummy key
-                    shifted_real_key = next_node.real_keys.pop(0)
-                    current.real_keys.append(shifted_real_key)
-                
-                # If next_node became empty, splice it out and update tail if needed
+            deficit = capacity - len(current.entries)
+
+            if deficit > 0 and next_node.entries:
+                to_move = min(deficit, len(next_node.entries))
+                current._transfer_first_n_from(next_node, to_move)
+
+                # If next_node became empty, splice it out
                 if not next_node.entries:
                     current.next = next_node.next
                     if current.next is None:
                         klist.tail = current
-                    # Exit inner loop as we've emptied next_node
-                    break
-            
-            # Move to next node for the next iteration
+
             current = current.next
 
     def print_structure(self, indent: int = 0, depth: int = 0, max_depth: int = 2):
@@ -730,16 +783,16 @@ class KListBase(AbstractSetDataStructure):
         return "\n".join(result)
     
     def check_invariant(self) -> None:
-        """
-        Verifies that:
-          1) Each KListNode.entries is internally sorted by item.key.
-          2) For each consecutive pair of nodes, 
-             last_key(node_i) < first_key(node_{i+1}).
-          3) self.tail.next is always None (tail really is the last node).
-          4) All nodes except the last one must be at full capacity (have k items).
+        """Verify structural invariants of the k-list.
+
+          1) ``self.tail.next`` is ``None`` (tail is truly the last node).
+          2a) Entries within each node are sorted by ``item.key``.
+          2b) Parallel lists ``keys`` and ``real_keys`` mirror ``entries``.
+          2c) Consecutive nodes satisfy ``last_key(node_i) < first_key(node_{i+1})``.
+          2d) All non-tail nodes are at full capacity (compaction invariant).
 
         Raises:
-            AssertionError: if any of these conditions fails.
+            AssertionError: if any condition fails.
         """
         # 1) Tail pointer must point to the true last node
         assert (self.head is None and self.tail is None) or (
@@ -767,7 +820,19 @@ class KListBase(AbstractSetDataStructure):
                     f"{k0} > {k1}"
                 )
 
-            # 2b) Boundary with the previous node
+            # 2b) Parallel lists mirror entries
+            expected_keys = [e.item.key for e in node.entries]
+            assert node.keys == expected_keys, (
+                f"keys list out of sync in node {nodes_seen}: "
+                f"keys={node.keys}, expected={expected_keys}"
+            )
+            expected_real = [k for k in expected_keys if k >= 0]
+            assert node.real_keys == expected_real, (
+                f"real_keys list out of sync in node {nodes_seen}: "
+                f"real_keys={node.real_keys}, expected={expected_real}"
+            )
+
+            # 2c) Boundary with the previous node
             if previous_last_key is not None and node.entries:
                 first_key = node.entries[0].item.key
                 assert previous_last_key < first_key, (
@@ -775,7 +840,7 @@ class KListBase(AbstractSetDataStructure):
                     f"{previous_last_key} >= {first_key}"
                 )
                 
-            # 2c) All non-tail nodes must be at full capacity
+            # 2d) All non-tail nodes must be at full capacity
             if not is_last_node:  # Only check non-tail nodes
                 assert len(node.entries) == node.__class__.CAPACITY, (
                     f"Non-tail node at position {nodes_seen} has {len(node.entries)} entries, "
@@ -788,110 +853,3 @@ class KListBase(AbstractSetDataStructure):
 
             node = node.next
 
-    def count_ge(self, key: int) -> int:
-        """
-        Return the count of items with keys greater than or equal to the input key.
-        
-        This method leverages the existing index system for O(log l + log k) performance,
-        where l is the number of nodes and k is the capacity per node.
-        
-        Args:
-            key (int): The key threshold
-            
-        Returns:
-            int: Number of items with keys >= key
-            
-        Raises:
-            TypeError: If key is not an integer
-        """
-        if not isinstance(key, int):
-            raise TypeError(f"key must be int, got {type(key).__name__!r}")
-        
-        # Empty list case
-        if not self._prefix_counts_tot:
-            return 0
-        
-        total_items = self._prefix_counts_tot[-1]
-        
-        # If key is greater than the maximum key, return 0
-        if key > self._bounds[-1]:
-            return 0
-            
-        # If key is less than or equal to the minimum key, return total count
-        if self.head and key <= self.head.entries[0].item.key:
-            return total_items
-        
-        # Find the first node that might contain keys >= key
-        # Use binary search on _bounds to find the node
-        node_idx = bisect_left(self._bounds, key)
-        
-        # If all bounds are less than key, no items >= key
-        if node_idx >= len(self._nodes):
-            return 0
-            
-        count = 0
-        
-        # Count items in the target node and all subsequent nodes
-        for i in range(node_idx, len(self._nodes)):
-            node = self._nodes[i]
-            
-            if i == node_idx:
-                # For the first node, we need to find the first key >= target key
-                node_keys = node.keys
-                if not node_keys:
-                    continue
-                    
-                # Binary search within the node to find first position >= key
-                first_ge_idx = bisect_left(node_keys, key)
-                items_in_node = len(node_keys) - first_ge_idx
-                count += items_in_node
-            else:
-                # For subsequent nodes, all items are >= key (since nodes are sorted)
-                count += len(node.entries)
-        
-        return count
-
-    # def get_entry(self, index: int) -> RetrievalResult:
-    #         """
-    #         Returns the entry at the given overall index in the sorted KList along with the next entry. O(log l) node-lookup plus O(1) in-node offset.
-
-    #         Parameters:
-    #             index (int): Zero-based index to retrieve.
-
-    #         Returns:
-    #             RetrievalResult: A structured result containing:
-    #                 - found_entry: The requested Entry if present, otherwise None.
-    #                 - next_entry: The subsequent Entry, or None if no next entry exists.
-    #         """
-    #         # 0) validate
-    #         if not isinstance(index, int):
-    #             raise TypeError(f"index must be int, got {type(index).__name__!r}")
-
-    #         # 1) empty list?
-    #         if not self._prefix_counts_tot:
-    #             return RetrievalResult(found_entry=None, next_entry=None)
-
-    #         total_items = self._prefix_counts_tot[-1]
-    #         # 2) out‐of‐bounds?
-    #         if index < 0 or index >= total_items:
-    #             return RetrievalResult(found_entry=None, next_entry=None)
-
-    #         # 3) find the node in O(log l)
-    #         node_idx = bisect_right(self._prefix_counts_tot, index)
-    #         node = self._nodes[node_idx]
-
-    #         # 4) compute offset within that node
-    #         prev_count = self._prefix_counts_tot[node_idx - 1] if node_idx else 0
-    #         offset = index - prev_count
-
-    #         # 5) delegate to node
-    #         entry, in_node_succ, needs_next = node.get_by_offset(offset)
-
-    #         # 6) if we hit the end of this node, pull the true successor
-    #         if needs_next:
-    #             if node.next and node.next.entries:
-    #                 next_entry = node.next.entries[0]
-    #             else:
-    #                 next_entry = None
-    #         else:
-    #             next_entry = in_node_succ

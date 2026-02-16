@@ -1,5 +1,4 @@
 """Tests for G+-trees retrieve method"""
-# pylint: skip-file
 
 import unittest
 import logging
@@ -8,8 +7,6 @@ import logging
 from gplus_trees.gplus_tree_base import collect_leaf_keys
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
 
-# Configure logging for test
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

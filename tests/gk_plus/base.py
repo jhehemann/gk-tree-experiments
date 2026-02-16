@@ -4,9 +4,9 @@ from typing import List, Tuple, Optional
 from gplus_trees.base import Entry, LeafItem
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
 from tests.test_base import GKPlusTreeTestCase
-from gplus_trees.logging_config import get_test_logger
+import logging
 
-logger = get_test_logger("GKPlusTree")
+logger = logging.getLogger(__name__)
 
 # Inherit from the unified base class but keep backward compatibility
 class TreeTestCase(GKPlusTreeTestCase):

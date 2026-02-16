@@ -5,21 +5,15 @@ The real_item_count() method should return the number of real items in leaf node
 excluding dummy items (which have negative keys).
 """
 
-import sys
-import os
 import logging
-
-# Add the src directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import get_dummy
 from gplus_trees.gplus_tree_base import print_pretty
 from tests.test_base import GKPlusTreeTestCase
-from gplus_trees.logging_config import get_test_logger
 
-logger = get_test_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class TestGKPlusTreeRealItemCount(GKPlusTreeTestCase):

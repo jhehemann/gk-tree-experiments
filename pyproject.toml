@@ -6,7 +6,8 @@ authors = ["Jannik Hehemann <jannik@hehemann-melle.de>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-  { include = "gplus_trees", from = "src" }
+  { include = "gplus_trees", from = "src" },
+  { include = "tests" }
 ]
 
 [tool.poetry.dependencies]
@@ -19,7 +20,56 @@ tqdm = "^4.67.1"
 asv = "^0.6.4"
 build = "^1.0.0"
 wheel = "^0.44.0"
+ruff = ">=0.8"
+mypy = ">=1.13"
+pre-commit = ">=4.0"
+pytest = ">=8.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+# ── Ruff (linter + formatter) ──────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["src", "tests", "stats", "scripts"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "SIM",  # flake8-simplify
+  "RUF",  # ruff-specific rules
+]
+ignore = [
+  "E501",   # line too long — handled by formatter
+  "SIM108", # ternary operator — readability preference
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gplus_trees", "tests"]
+
+# ── Mypy (type checker) ────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false       # start permissive, tighten later
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# ── Pytest ─────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"

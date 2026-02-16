@@ -1,9 +1,4 @@
-import sys
-import os
 import copy
-
-# Add the src directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_rank
@@ -13,8 +8,9 @@ from tests.test_base import (
     GKPlusTreeTestCase as TreeTestCase,
 )
 
-from tests.logconfig import logger
 import logging
+
+logger = logging.getLogger(__name__)
 
 class TestInsertMultipleDimensions(TreeTestCase):
     ASSERTION_MESSAGE_TEMPLATE = (

@@ -6,7 +6,7 @@ import gc
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_ranks
-from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED
+from benchmarks.benchmark_utils import BaseBenchmark, BenchmarkUtils, DEFAULT_BENCHMARK_SEED, stable_seed_offset
 import os
 import pickle
 
@@ -94,12 +94,12 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         [1.0, 2.0, 4.0],  # l_factor values
         [1.0] # hit ratio
     ]
-    param_names = ['capacity', 'dim_limit', 'hit_ratio', 'l_factor']
+    param_names = ['capacity', 'dim_limit', 'l_factor', 'hit_ratio']
     min_run_count = 3
     _tree_cache = {}
 
-    def setup(self, capacity, dim_limit, hit_ratio, l_factor):
-        super().setup(capacity, dim_limit, hit_ratio, l_factor)
+    def setup(self, capacity, dim_limit, l_factor, hit_ratio):
+        super().setup(capacity, dim_limit, l_factor, hit_ratio)
         size = 1000
 
         tree_cache_key = (capacity, size, dim_limit, l_factor)
@@ -117,7 +117,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
 
         # Generate lookup keys with specified hit ratio
-        seed_offset = hash((size, capacity, dim_limit, hit_ratio)) % 1000
+        seed_offset = stable_seed_offset(size, capacity, dim_limit, hit_ratio)
         base_seed = DEFAULT_BENCHMARK_SEED + seed_offset
         self.lookup_keys = BenchmarkUtils.create_lookup_keys(
             insert_keys=self.insert_keys,
@@ -137,7 +137,7 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         cls._tree_cache.clear()
         gc.collect()
 
-    def time_adversarial_retrieve(self, capacity, dim_limit, hit_ratio, l_factor):
+    def time_adversarial_retrieve(self, capacity, dim_limit, l_factor, hit_ratio):
         """Benchmark sequential retrieval of adversarial keys."""
         for key in self.lookup_keys:
             self.tree.retrieve(key)

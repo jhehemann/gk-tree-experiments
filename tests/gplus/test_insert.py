@@ -1,19 +1,14 @@
-"""Tests for G+-trees with factory pattern"""
-# pylint: skip-file
+"""Tests for G+-tree insert operations."""
 
 import unittest
 import logging
 import copy
 
-# Import factory function instead of concrete classes
-from gplus_trees.gplus_tree_base import (
-    DUMMY_ITEM,
-    print_pretty,
-)
+from gplus_trees.gplus_tree_base import DUMMY_ITEM, print_pretty
 from gplus_trees.base import Entry
-
 from tests.test_base import GPlusTreeTestCase as TreeTestCase
-from tests.logconfig import logger
+
+logger = logging.getLogger(__name__)
 
 
 class TestInsertInTree(TreeTestCase):

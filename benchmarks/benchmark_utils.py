@@ -15,6 +15,7 @@ Logging:
 
 import random
 import gc
+import hashlib
 import os
 import logging
 import warnings
@@ -28,6 +29,17 @@ DEFAULT_BENCHMARK_SEED = int(os.environ.get('BENCHMARK_SEED', '42'))
 
 # Logger for benchmark utilities
 _logger = logging.getLogger(__name__)
+
+
+def stable_seed_offset(*params) -> int:
+    """Return a deterministic seed offset from arbitrary parameters.
+
+    Unlike Python's built-in ``hash()``, this is **not** randomised across
+    interpreter invocations (``PYTHONHASHSEED``), so benchmark seeds stay
+    reproducible across ASV worker processes.
+    """
+    h = hashlib.sha256(repr(params).encode()).digest()
+    return int.from_bytes(h[:4], "little") % 10_000
 
 
 

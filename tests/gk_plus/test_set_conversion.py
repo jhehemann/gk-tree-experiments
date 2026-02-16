@@ -1,14 +1,9 @@
 """Tests for GK+ tree utility functions"""
-import sys
-import os
 import unittest
 import random
 from typing import List, Optional
 
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
-
-# Add the src directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
@@ -18,10 +13,9 @@ from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy, _tree_
 from gplus_trees.g_k_plus.g_k_plus_base import print_pretty
 from gplus_trees.g_k_plus.utils import calc_rank
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
+import logging
 
-from gplus_trees.logging_config import get_test_logger
-
-logger = get_test_logger("SetConversion")
+logger = logging.getLogger(__name__)
 
 class TestSetConversion(GKPlusTreeTestCase):
     def create_entries(self, keys: List[int], with_subtrees: Optional[bool] = False) -> List[Entry]:
@@ -705,6 +699,93 @@ class TestTreeToKList(TestSetConversion):
         # Check that original entries are present in new tree
         # Note: We compare the original entries (not sorted) with the new tree
         self.assert_entries_present_same_instance(entries, list(new_tree))
+
+
+# ─── check_and_collapse_tree unit tests ────────────────────────────
+
+class TestCheckAndCollapseTree(TestSetConversion):
+    """Direct unit tests for ``check_and_collapse_tree``.
+
+    The method is called indirectly during insert/unzip, but these tests
+    verify the two edge cases that previously caused a
+    ``set_thresholds_met`` invariant violation:
+
+    1. Empty GKPlusTree must be collapsed to an empty KList.
+    2. A tree with few items (≤ threshold) must be collapsed regardless
+       of its root rank (unzip artifacts can have high rank + few items).
+    """
+
+    def setUp(self):
+        self.k = 4
+
+    def _make_dim2_tree(self, keys, ranks):
+        """Build a small GKPlusTree at dimension 2 (the dimension where
+        collapse is relevant — DIM 1 trees are never collapsed)."""
+        tree = create_gkplus_tree(K=self.k, dimension=2, l_factor=1.0)
+        for key, rank in zip(keys, ranks):
+            item = self.make_item(key)
+            tree, _, _ = tree.insert_entry(Entry(item, None), rank)
+        return tree
+
+    def _make_caller(self):
+        """Create a DIM-1 GKPlusTree instance to call check_and_collapse_tree on."""
+        return create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
+
+    def test_empty_tree_collapses_to_klist(self):
+        """An empty GKPlusTree (DIM > 1) must be collapsed to an empty KList."""
+        caller = self._make_caller()
+        empty_tree = create_gkplus_tree(K=self.k, dimension=2, l_factor=1.0)
+
+        result = caller.check_and_collapse_tree(empty_tree)
+
+        self.assertIsInstance(result, KListBase,
+                              "Empty GKPlusTree should be collapsed to a KList")
+        self.assertTrue(result.is_empty())
+
+    def test_dim1_tree_never_collapses(self):
+        """DIM-1 trees are never collapsed, even when empty."""
+        caller = self._make_caller()
+        dim1_tree = create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
+
+        result = caller.check_and_collapse_tree(dim1_tree)
+
+        self.assertIsInstance(result, GKPlusTreeBase,
+                              "DIM-1 tree should never be collapsed")
+
+    def test_small_tree_collapses(self):
+        """A tree with item_count ≤ threshold should collapse to KList."""
+        caller = self._make_caller()
+        threshold = int(self.k * 1.0)  # k * l_factor = 4
+
+        # Insert fewer real items than threshold (2 items + 1 dummy = 3 ≤ 4)
+        tree = self._make_dim2_tree([10, 20], [1, 1])
+        self.assertIsInstance(tree, GKPlusTreeBase)
+        self.assertLessEqual(tree.item_count(), threshold,
+                             "Precondition: tree must have ≤ threshold items")
+
+        result = caller.check_and_collapse_tree(tree)
+
+        self.assertIsInstance(result, KListBase,
+                              "Small tree should be collapsed to a KList")
+        # All real items should be present
+        real_keys = {e.item.key for e in result if e.item.key >= 0}
+        self.assertEqual(real_keys, {10, 20})
+
+    def test_large_tree_stays(self):
+        """A tree with real_item_count > threshold must not be collapsed."""
+        caller = self._make_caller()
+        threshold = int(self.k * 1.0)  # 4
+
+        # Insert more items than threshold
+        keys = list(range(10, 10 * (threshold + 3), 10))
+        ranks = [1] * len(keys)
+        tree = self._make_dim2_tree(keys, ranks)
+
+        result = caller.check_and_collapse_tree(tree)
+
+        self.assertIsInstance(result, GKPlusTreeBase,
+                              "Large tree should remain a GKPlusTree")
+
 
 if __name__ == '__main__':
     unittest.main()
