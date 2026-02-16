@@ -3,6 +3,28 @@
 Provides :class:`GKPlusInsertMixin`, a mixin class that adds the core
 insertion helpers (``_insert_empty``, ``_insert_non_empty``,
 ``_insert_new_item``, etc.) to :class:`GKPlusTreeBase`.
+
+Single-dimension complexity (n = items, k = KList capacity,
+h = height ≈ log n, l = KList nodes):
+
++---------------------------+----------------------------------------------+
+| Operation                 | Time (per dimension)                         |
++===========================+==============================================+
+| ``_insert_empty``         | O(k)  (builds leaf KList)                    |
+| ``_insert_non_empty``     | O(h · (log l + k))  amortised                |
+| ``_insert_new_item``      | O(h · (log l + k))  amortised                |
+| ``_insert_first_iteration``| O(log l + k) per node                       |
+| ``_insert_with_split``    | O(log l + k) per node                        |
+| ``_handle_rank_mismatch`` | O(k)  (set creation)                         |
++---------------------------+----------------------------------------------+
+
+When a leaf's ``node.set`` is a GK+-tree of dimension d+1 (after KList
+expansion), set-level operations (``insert_entry``, ``split_inplace`` /
+``unzip``) recurse into that inner tree. The total worst-case cost
+across D active dimensions is
+O(h_1 · h_2 · … · h_D · (log l + k)).
+In practice, inner trees are bounded by ~k · l_factor items, keeping
+h_{d+1} small.
 """
 
 from __future__ import annotations

@@ -3,6 +3,23 @@
 Provides :class:`GKPlusConversionMixin`, a mixin class that adds
 ``check_and_convert_set``, ``check_and_expand_klist`` and
 ``check_and_collapse_tree`` to :class:`GKPlusTreeBase`.
+
+Conversions are triggered when a KList exceeds ``k · l_factor`` items
+(expand) or a GKPlusTree shrinks below that threshold (collapse).
+These conversions are what create recursive dimensional nesting:
+an expanded KList becomes a GK+-tree of the next dimension.
+
+Complexity summary (n = items in set, k = KList capacity):
+
++-----------------------------+--------------------------------------------+
+| Operation                   | Time                                       |
++=============================+============================================+
+| ``check_and_convert_set``   | O(1) dispatch                              |
+| ``check_and_expand_klist``  | O(n · h_{d+1}) when conversion triggers    |
+|                             | (bulk-creates a GK+-tree of dim d+1)       |
+| ``check_and_collapse_tree`` | O(n_{d+1}) when conversion triggers        |
+|                             | (iterates inner tree to build KList)       |
++-----------------------------+--------------------------------------------+
 """
 
 from __future__ import annotations

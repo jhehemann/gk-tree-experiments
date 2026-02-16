@@ -1,4 +1,55 @@
-"""GKPlusTree base implementation"""
+"""GKPlusTree base implementation.
+
+Defines :class:`GKPlusNodeBase` (a single tree node) and
+:class:`GKPlusTreeBase` (the recursively-defined tree) for GK+-trees —
+an extension of G+-trees with dimensional support.
+
+Most algorithmic methods live in dedicated mixin modules:
+
+- **insert.py** — insertion logic
+- **navigation.py** — ``find_pivot``, ``get_min``, ``get_max``
+- **conversion.py** — KList ↔ GKPlusTree threshold conversions
+- **zip.py** — merge (zip) of two trees
+- **unzip.py** — split (unzip) at a key
+- **bulk_create.py** — bottom-up bulk creation
+
+This file contains the class definitions, ``__init__``, counting / stats
+methods, the public ``insert_entry`` API, and iteration.
+
+Multi-dimensional complexity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GK+-trees support recursive nesting: when a leaf's KList exceeds
+``k · l_factor`` items, it is promoted to a GK+-tree of the next higher
+dimension. Hence ``node.set`` can itself be a ``GKPlusTreeBase``.
+
+All complexities below are stated **per dimension** (single level of
+nesting). When inner sets are GK+-trees of dimension *d+1*, every
+set-level operation (insert, split, iterate) recurses into that inner
+tree, so the true cost compounds across all *D* active dimensions.
+
+Let h_d denote the height at dimension *d*. The worst-case total cost
+of a per-dimension O(h_d · C_set) operation is
+O(h_1 · h_2 · … · h_D · (log l + k)), where the innermost set is a
+KList. In practice, inner trees are bounded by the conversion threshold
+(~k · l_factor items), so h_{d+1} ≈ log(k · l_factor) is small.
+
+Single-dimension complexity (n = items, k = KList capacity,
+h = tree height ≈ log n, l = KList nodes per level):
+
++-----------------------+-------------------------------------------+
+| Operation             | Time (per dimension)                      |
++=======================+===========================================+
+| ``insert_entry``      | O(h · (log l + k))  amortised             |
+| ``item_count``        | O(1) cached / O(n) first call             |
+| ``real_item_count``   | O(1) cached / O(n) first call             |
+| ``expanded_count``    | O(1) cached / O(n) first call (recurses)  |
+| ``get_max_dim``       | O(n) (recursive across all dimensions)    |
+| ``item_slot_count``   | O(n) (recursive across all dimensions)    |
+| ``iter_real_entries`` | O(n), plus inner-tree iteration if nested |
+| ``__iter__``          | O(n) total, O(h) setup; recurses into     |
+|                       | inner-tree ``__iter__`` at each leaf       |
++-----------------------+-------------------------------------------+
+"""
 
 from __future__ import annotations
 from typing import Optional, Type, Tuple
@@ -128,7 +179,14 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         return self.size
 
     def get_tree_item_count(self) -> int:
-        """Get the number of items in the tree (only leafs), including all dummy items in all expanded dimensions."""
+        """Get the number of items in the tree (only leafs), including all dummy items in all expanded dimensions.
+
+        Complexity:
+            O(n) — visits every subtree.  Result is cached in ``self.item_cnt``;
+            subsequent calls return in O(1) until ``_invalidate_tree_size()``.
+            When leaf sets are inner GK+-trees, their ``item_count`` may also
+            recurse into the next dimension.
+        """
         if self.is_empty():
             self.item_cnt = 0
             return self.item_cnt
@@ -148,7 +206,14 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
             return self.item_cnt
 
     def get_size(self) -> int:
-        """Get the number of real items in the tree, excluding dummy items."""
+        """Get the number of real items in the tree, excluding dummy items.
+
+        Complexity:
+            O(n) — visits every subtree.  Result is cached in ``self.size``;
+            subsequent calls return in O(1) until ``_invalidate_tree_size()``.
+            When leaf sets are inner GK+-trees, their ``real_item_count`` may
+            also recurse into the next dimension.
+        """
         if self.is_empty():
             self.size = 0
             return self.size
@@ -175,7 +240,7 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         maintain external references.
         
         Args:
-            entry (Entry): The entry to be inserted, containing an item and left_subtree.
+            x_entry (Entry): The entry to be inserted, containing an item and left_subtree.
             rank (int): The rank of the entry's item key.
 
         Returns:
@@ -183,6 +248,13 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
             
         Raises:
             TypeError: If entry is not an Entry object.
+
+        Complexity:
+            O(h · (log l + k)) amortised per dimension. When leaf sets
+            are inner GK+-trees (expanded via ``check_and_convert_set``),
+            set-level operations (insert, split) recurse into dimension
+            d+1.  Total worst-case across D dimensions:
+            O(h_1 · h_2 · … · h_D · (log l + k)).
         """
         if not isinstance(x_entry, Entry):
             raise TypeError(f"insert_entry(): expected Entry, got {type(x_entry).__name__}")
@@ -204,6 +276,10 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
 
         Returns:
             int: The maximum dimension of the tree.
+
+        Complexity:
+            O(N_total) — visits every node across all dimensions, including
+            recursion into inner GK+-tree sets.
         """
         if self.is_empty():
             return self.DIM
@@ -265,7 +341,13 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
         return count
 
     def item_slot_count(self):
-        """Count the number of item slots in the tree."""
+        """Count the number of item slots in the tree.
+
+        Complexity:
+            O(N_total) — visits every subtree recursively across all dimensions.
+            Calls ``item_slot_count`` on each ``node.set``, which recurses into
+            inner GK+-trees when sets have been expanded.
+        """
         if self.is_empty():
             if IS_DEBUG():
                 logger.debug(f"[DIM {self.DIM}] item_slot_count: Tree is empty, returning 0")
@@ -280,15 +362,18 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
             if entry.left_subtree is not None:
                 count += entry.left_subtree.item_slot_count()
 
-        if node.rank != 1:
-            count += node.right_subtree.item_slot_count()
+        count += node.right_subtree.item_slot_count()
         count += node.set.item_slot_count()
 
         return count
 
     def iter_real_entries(self):
-        """
-        Iterate over all real entries (excluding dummies) in the gk-plus-tree.
+        """Iterate over all real entries (excluding dummies) in the gk-plus-tree.
+
+        Complexity:
+            O(n) in the current dimension, filtering by key >= 0.
+            When leaf sets are inner GK+-trees, ``__iter__`` on those sets
+            recurses into the next dimension (see ``__iter__`` docs).
 
         Yields:
             Entry: Each entry in the tree, excluding dummy entries.
@@ -301,7 +386,17 @@ class GKPlusTreeBase(GKPlusInsertMixin, GKPlusConversionMixin, GKPlusNavigationM
                 yield entry
 
     def __iter__(self):
-        """Yields each entry of the gk-plus-tree in order. including all dummy entries."""
+        """Yields each entry of the gk-plus-tree in order, including all dummy entries.
+
+        Complexity:
+            Setup: O(h) for ``get_max_leaf`` + ``iter_leaf_nodes`` in the
+            current dimension.  Total iteration: O(n) entries.
+
+            When leaf node sets are inner GK+-trees (dimension d+1), the
+            inner ``for entry in node.set`` triggers ``__iter__`` on that
+            tree, which itself pays O(h_{d+1}) setup and O(n_{d+1}) per
+            leaf.  This recurses through all active dimensions.
+        """
         if self.is_empty():
             return
 

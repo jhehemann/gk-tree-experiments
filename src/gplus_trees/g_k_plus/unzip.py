@@ -1,7 +1,26 @@
 """Unzip (split) operation for GK+-trees.
 
 Provides :class:`GKPlusUnzipMixin`, a mixin class that adds
-``unzip``, ``lift``, and their private helpers to :class:`GKPlusTreeBase`.
+``unzip``, ``lift``, and their private helpers to :class:`GKPlusTreeBase``.
+
+The unzip operation splits a GK+-tree at a given key into a left part
+(keys < key) and a right part (keys ≥ key), preserving search-tree
+invariants and re-linking leaf chains.
+
+Single-dimension complexity (n = items, h = height ≈ log n,
+k = KList capacity, l = KList nodes):
+
++-------------------------------+------------------------------------------+
+| Operation                     | Time (per dimension)                     |
++===============================+==========================================+
+| ``unzip``                     | O(h · (log l + k))                       |
+| ``lift``                      | O(1) (node construction)                 |
++-------------------------------+------------------------------------------+
+
+When node sets are inner GK+-trees, the ``split_inplace`` / ``unzip``
+call on ``node.set`` recurses into dimension d+1. The
+``check_and_convert_set`` calls after splitting may trigger collapse
+(``_tree_to_klist``), adding O(n_{d+1}) per conversion.
 """
 
 from __future__ import annotations

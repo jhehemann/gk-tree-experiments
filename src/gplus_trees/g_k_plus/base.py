@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from typing import Optional, Tuple, TypeVar, Iterator
+from typing import Optional, Tuple, Iterator
 
 from gplus_trees.base import (
     AbstractSetDataStructure,
@@ -9,8 +9,6 @@ from gplus_trees.base import (
 from gplus_trees.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-T = TypeVar("T", bound="GKTreeSetDataStructure")
 
 class GKTreeSetDataStructure(AbstractSetDataStructure):
     """
@@ -63,28 +61,6 @@ class GKTreeSetDataStructure(AbstractSetDataStructure):
             int: The physical height of the set.
         """
         pass
-
-    # @abstractmethod
-    # def split_inplace(
-    #         self, key: int
-    # ) -> Tuple[T, Optional[T], T]:
-    #     """
-    #     Split the set into two parts based on the provided key.
-        
-    #     The first part contains all items less than or equal to the key,
-    #     and the second part contains all items greater than the key.
-        
-    #     Parameters:
-    #         key (int): The key to split the set by.
-        
-    #     Returns:
-    #         Tuple[AbstractSetDataStructure, Optional[AbstractSetDataStructure], AbstractSetDataStructure]:
-    #             A tuple containing:
-    #                 - The left set (items < key).
-    #                 - The left subtree of the item (item = key).
-    #                 - The right subtree (items > key).
-    #     """
-    #     pass
 
     @abstractmethod
     def __iter__(self) -> Iterator['Entry']:

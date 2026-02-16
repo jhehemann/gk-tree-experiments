@@ -2,6 +2,23 @@
 
 Provides :class:`GKPlusZipMixin`, a mixin class that adds
 ``check_convert_same_sets`` and ``zip`` to :class:`GKPlusTreeBase`.
+
+The zip operation merges two GK+-trees that cover disjoint key ranges
+into a single tree, preserving search-tree invariants and leaf-chain
+linkage.
+
+Single-dimension complexity (n = items in both trees, h = height ≈ log n):
+
++-------------------------------+------------------------------------------+
+| Operation                     | Time (per dimension)                     |
++===============================+==========================================+
+| ``zip``                       | O(h · (log l + k))  amortised            |
+| ``check_convert_same_sets``   | O(n) when type conversion needed         |
++-------------------------------+------------------------------------------+
+
+When node sets are inner GK+-trees, ``zip`` recurses into dimension d+1
+for set merging. The ``find_pivot`` calls at each level also pay the
+inner-tree traversal cost (see navigation.py).
 """
 
 from __future__ import annotations
@@ -212,9 +229,6 @@ class GKPlusZipMixin:
         
         # Case 2: Left rank > other rank - recursively zip into right subtree
         elif left.node.rank > other.node.rank:
-            # if other.node.rank == 1:
-            # new_right = type(left)(l_factor=left.l_factor)
-
             left.node.right_subtree, r_pivot, r_pivot_next = left.node.right_subtree.zip(left.node.right_subtree, other, is_root=False)
 
             if IS_DEBUG():
@@ -247,15 +261,13 @@ class GKPlusZipMixin:
                 # TODO(#1): Add left._invalidate_tree_size() after set conversion
                 left._invalidate_tree_size()
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
-                
+
                 if IS_DEBUG():
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}. Pivot left subtree: {print_pretty(r_pivot.left_subtree) if r_pivot and r_pivot.left_subtree else None}")
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot_next: {r_pivot_next.item.key if r_pivot_next else None}. Pivot next left subtree: {print_pretty(r_pivot_next.left_subtree) if r_pivot_next and r_pivot_next.left_subtree else None}")
                 
             elif isinstance(left.node.set, GKPlusTreeBase) and isinstance(other.node.set, GKPlusTreeBase):
                 # Both are GKPlusTreeBase (after conversion) - recursively zip
-                # if IS_DEBUG():
-                #     logger.debug(f"[DIM {left.DIM}] Merging GKPlusTrees: {print_pretty(left.node.set)} and {print_pretty(other.node.set)}")
                 left.node.set, r_pivot, r_pivot_next = left.node.set.zip(left.node.set, other.node.set)
                 if IS_DEBUG():
                     logger.debug(f"[DIM {left.DIM}] Found r_pivot: {r_pivot.item.key if r_pivot else None}. Pivot left subtree: {print_pretty(r_pivot.left_subtree) if r_pivot and r_pivot.left_subtree else None}")
@@ -279,10 +291,8 @@ class GKPlusZipMixin:
                     if IS_DEBUG():
                         logger.debug(f"[DIM {left.DIM}] Updating r_pivot_next from other's successor: {print_pretty(other.node.next)}")
                     r_pivot_next = other.node.next.node.set.find_pivot()[0]
-                # left.node.set = left.check_and_convert_set(left.node.set)
                 return left, r_pivot, r_pivot_next
-            
-            
+
             else:
                 if IS_DEBUG():
                     logger.debug(f"[DIM {left.DIM}] r_pivot.left_subtree: {print_pretty(r_pivot.left_subtree)}")

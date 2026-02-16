@@ -7,6 +7,21 @@ Provides:
 
 Internal helpers ``_build_leaf_level_trees`` and ``_build_internal_levels``
 are used by ``bulk_create_gkplus_tree`` and are not part of the public API.
+
+Complexity summary (n = entries, k = KList capacity, h = resulting height):
+
++-------------------------------+------------------------------------------+
+| Operation                     | Time                                     |
++===============================+==========================================+
+| ``bulk_create_gkplus_tree``   | O(n · h) amortised; leaf sets that       |
+|                               | exceed the threshold are recursively     |
+|                               | bulk-created at dimension d+1.           |
+| ``_tree_to_klist``            | O(n_{d+1}) at dimension d+1; iterates    |
+|                               | the inner tree via ``__iter__`` which    |
+|                               | recurses through all nested dimensions.  |
+| ``_klist_to_tree``            | O(n · h_{d+1}) (delegates to bulk)       |
+| ``_bulk_create_klist``        | O(n) (sorted inserts → appends)          |
++-------------------------------+------------------------------------------+
 """
 
 from __future__ import annotations
@@ -91,9 +106,9 @@ def _tree_to_klist(tree) -> KListBase:
     # within the tree to collapse.  These are dropped.
     # Larger dummy keys are from lower dimensions and must be preserved.
     # Note: dummy key of DIM j is -j.
+    tree_dummy_key = get_dummy(tree.DIM).key
     for entry in tree:
-        tree_dummy = get_dummy(tree.DIM)
-        if entry.item.key > tree_dummy.key:
+        if entry.item.key > tree_dummy_key:
             klist, _, _ = klist.insert_entry(entry)
     return klist
 
