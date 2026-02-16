@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from gplus_trees.base import AbstractSetDataStructure
+from gplus_trees.base import AbstractSetDataStructure, Entry
 from gplus_trees.klist_base import KListBase
 from gplus_trees.gplus_tree_base import print_pretty, get_dummy
 from gplus_trees.logging_config import get_logger
