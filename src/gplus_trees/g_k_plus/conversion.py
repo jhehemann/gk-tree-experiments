@@ -125,14 +125,21 @@ class GKPlusConversionMixin:
             return tree
 
         if tree.is_empty():
-            return tree
+            # Convert to an empty KList rather than keeping an empty
+            # GKPlusTree, which would violate the set_thresholds_met
+            # invariant (a GKPlusTree set must have item_count > threshold).
+            return _tree_to_klist(tree)
 
-        # Fast path: if the tree has more real items than the threshold,
-        # the resulting KList would have at least that many entries, so
-        # collapsing is impossible.
-        real_count = tree.real_item_count()
-        if real_count > threshold:
-            return tree
+        # Early-exit real-item count: iterate the tree's entries and
+        # count items with key >= 0, stopping as soon as the count
+        # exceeds the collapse threshold.  This is O(threshold) instead
+        # of O(n) because we abort after seeing threshold+1 real items.
+        real_count = 0
+        for entry in tree:
+            if entry.item.key >= 0:
+                real_count += 1
+                if real_count > threshold:
+                    return tree
 
         # The tree has few enough real items that it may fit in a KList.
         # Convert and verify the resulting size (which also includes
