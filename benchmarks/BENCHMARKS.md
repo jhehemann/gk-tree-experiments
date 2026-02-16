@@ -54,18 +54,6 @@ BENCHMARK_SEED=12345 ./benchmark run 'HEAD^!'
 BENCHMARK_SEED=12345 ./benchmark run 'HEAD^!'
 ```
 
-### Logging Requirements
-
-**Critical**: Benchmarks must run with logging at INFO level or higher to avoid timing contamination.
-
-```bash
-# Check your logging configuration
-# File: src/gplus_trees/logging_config.py
-# Recommended: logging.INFO or logging.WARNING
-```
-
-Benchmarks will issue a warning if DEBUG or TRACE logging is detected, as verbose logging I/O can dominate measurement time and produce invalid results.
-
 ### Timing Methodology
 
 Benchmarks use ASV's built-in timing mechanisms which:
@@ -180,21 +168,6 @@ All benchmark executions are logged:
 
 ## Troubleshooting
 
-### Logging Level Issues
-
-If you see warnings about logging levels:
-
-```bash
-# Check logging configuration
-# File: src/gplus_trees/logging_config.py
-
-# Ensure level is INFO or higher:
-# logging.basicConfig(level=logging.INFO)  # Good
-# logging.basicConfig(level=logging.DEBUG)  # Bad - will contaminate results
-```
-
-**Why this matters**: DEBUG logging can add significant I/O overhead that dominates the actual operation being measured, producing invalid benchmark results.
-
 ### Reproducibility Testing
 
 To verify benchmarks are reproducible:
@@ -253,9 +226,9 @@ ls -la ../.isolated-benchmarks/
 
 ## Best Practices
 
-1. **Always use INFO logging** or higher when running benchmarks
-2. **Use deterministic seeds** for reproducible comparisons
-3. **Run with `--quick` first** to catch errors before long benchmark runs
-4. **Document your seed** when sharing results
-5. **Verify reproducibility** by running with same seed multiple times
-6. **Monitor for warnings** about logging levels during setup
+
+1. **Use deterministic seeds** for reproducible comparisons
+2. **Run with `--quick` first** to catch errors before long benchmark runs
+3. **Document your seed** when sharing results
+4. **Verify reproducibility** by running with same seed multiple times
+5. **Monitor for warnings** about logging levels during setup
