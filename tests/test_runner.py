@@ -29,6 +29,7 @@ TEST_FILES = [
     'test_klist.py',
     'test_insert_result.py',
     'test_rank_hash_consistency.py',
+    'test_stats_gpltree.py',
     'test_utility_functions.py',
 ]
 
