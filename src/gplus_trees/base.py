@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import hashlib
 import logging
-from typing import Optional, TypeVar, Generic, Tuple, Union
+from typing import NamedTuple, Optional, TypeVar, Generic, Tuple, Union
 
 # from gplus_trees.klist_base import KListBase
 from gplus_trees.utils import get_digest
@@ -186,6 +186,17 @@ class Entry:
 
     item: Union[InternalItem, LeafItem]
     left_subtree: T
+
+class InsertResult(NamedTuple):
+    """Result of an insert operation on a G⁺-tree or set data structure.
+
+    Backward-compatible with the legacy ``(tree, inserted, next_entry)`` tuple
+    — existing ``tree, inserted, next_entry = t.insert(…)`` unpacking still works.
+    """
+    tree: 'AbstractSetDataStructure'
+    inserted: bool
+    next_entry: Optional[Entry] = None
+
 
 def _create_replica(key):
     """Create a replica item with given key and no value."""
