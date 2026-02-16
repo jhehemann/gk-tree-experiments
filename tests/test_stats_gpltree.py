@@ -516,6 +516,72 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
         self.assertTrue(stats.set_thresholds_met)
 
 
+# ─── set_thresholds_met regression (random tree collapse) ─────────
+
+class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
+    """Regression tests for ``set_thresholds_met`` invariant violations
+    that appeared when ``check_and_collapse_tree`` failed to collapse
+    undersized GKPlusTree inner sets back to KLists after unzip splits.
+
+    Two root causes were identified:
+
+    1. Empty GKPlusTree sets were returned as-is instead of being
+       converted to empty KLists.  An empty GKPlusTree has
+       ``item_count() == 0 <= threshold``, violating the invariant
+       that every GKPlusTree inner set has ``item_count > threshold``.
+
+    2. A rank-based fast-reject (``2^(rank-1) > threshold``) incorrectly
+       skipped trees that had high rank but very few items — an artefact
+       of unzip splitting a tree without lowering the root rank.
+
+    These tests build random GK+-trees with deterministic seeds that
+    previously triggered the violation.
+    """
+
+    def _build_random_tree(self, n, K, l_factor, seed):
+        """Build a random GK+-tree replicating the stats script logic."""
+        import random as _random
+        import numpy as _np
+
+        rng = _random.Random(seed)
+        np_rng = _np.random.RandomState(seed)
+
+        space = 1 << 24
+        indices = rng.sample(range(1, space), k=n)
+        p = 1.0 - (1.0 / K)
+        ranks = np_rng.geometric(p, size=n)
+
+        tree = create_gkplus_tree(K=K, l_factor=l_factor)
+        for idx, rank in zip(indices, ranks):
+            item = LeafItem(ItemData(idx, "val"))
+            tree.insert(item, int(rank))
+
+        return tree
+
+    def test_seed42_k4_n200_invariants(self):
+        """Full invariant check on the original failure scenario (seed=42, K=4).
+
+        n=200 is sufficient to trigger dimensional nesting with K=4
+        (threshold=4) and reproduce the collapse bug.
+        """
+        from gplus_trees.invariants import assert_tree_invariants_raise
+        tree = self._build_random_tree(n=200, K=4, l_factor=1.0, seed=42)
+        stats = gtree_stats_(tree)
+        # Should not raise
+        assert_tree_invariants_raise(tree, stats)
+
+    def test_multiple_seeds_k4(self):
+        """Several seeds with K=4, n=200 — broader coverage."""
+        for seed in (42, 43, 100):
+            with self.subTest(seed=seed):
+                tree = self._build_random_tree(n=200, K=4, l_factor=1.0, seed=seed)
+                stats = gtree_stats_(tree)
+                self.assertTrue(
+                    stats.set_thresholds_met,
+                    f"set_thresholds_met violated for seed={seed}"
+                )
+
+
 # ─── _get_capacity helper ──────────────────────────────────────────
 
 class TestGetCapacity(unittest.TestCase):
