@@ -120,6 +120,19 @@ class GKPlusTreeBase(GPlusTreeBase, GKTreeSetDataStructure):
 
     __repr__ = __str__
 
+    # ── Hook overrides for GPlusTreeBase ────────────────────────────
+    def _get_dummy(self) -> 'DummyItem':
+        """Dimension-specific dummy item."""
+        return get_dummy(dim=type(self).DIM)
+
+    def _on_node_visited(self, cur: 'GKPlusTreeBase') -> None:
+        """Invalidate cached size / count info when a node is mutated."""
+        cur._invalidate_tree_size()
+
+    def _make_empty_tree(self) -> 'GKPlusTreeBase':
+        """Create an empty tree of the same type, forwarding *l_factor*."""
+        return type(self)(l_factor=self.l_factor)
+
     def item_count(self, with_dim_dummy: bool = False) -> int:
         if with_dim_dummy:
             if self.item_cnt_ge_dummy is None:
