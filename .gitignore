@@ -50,3 +50,11 @@ BENCHMARK_SUMMARY.md
 benchmarks/README.md
 
 /Pipfile.lock
+
+# ── AI agent tooling (lokal, nicht teilen) ─────────────────────────
+.claude/
+.agents/
+skills-lock.json
+
+# Generator-Output (Beförderung nach adversarial_keys/ nur manuell, siehe PROVENANCE.md)
+benchmarks/adversarial_keys_new/

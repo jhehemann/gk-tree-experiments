@@ -22,8 +22,6 @@
 # if TYPE_CHECKING:
 #     from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 
-# from tests.logconfig import logger
-
 # class TestGKPlusItemSlotCount(TreeTestCase):
 #     """Tests for the item_slot_count method in GKPlusTreeBase."""
 
