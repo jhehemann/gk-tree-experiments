@@ -519,3 +519,43 @@ class TestInternalMethodsWithEntryInsert(TestGKPlusInsert):
     #                         gnode_capacity=k,
     #                         l_factor=l_factor
     #                     )
+
+
+class TestGKPlusNegativeKeyGuard(GKPlusTreeTestCase):
+    """Verify GK+ insert paths reject negative keys reserved for dummies.
+
+    Negative keys are reserved for internal dummy items (key ``-dim``, see
+    :func:`gplus_trees.g_k_plus.g_k_plus_base.get_dummy`).  Without a guard,
+    a negative user key silently collides with a dummy: the real item is
+    swallowed and dropped from the real-item accounting
+    (``real_item_count`` reports 0, ``retrieve`` returns the ``DummyItem``).
+    Both public insert entry points must reject it — the inherited
+    ``insert`` and the GK+-specific ``insert_entry``.
+    """
+
+    def test_insert_negative_key_rejected(self):
+        # Inherited GPlusTreeBase.insert path (item + rank).
+        tree = create_gkplus_tree(K=4)
+        with self.assertRaises(ValueError):
+            tree.insert(self.make_item(-1, "v"), 1)
+
+    def test_insert_entry_negative_key_rejected(self):
+        # GK+-specific insert_entry path (Entry + rank), key -1 == dim-1 dummy.
+        tree = create_gkplus_tree(K=4)
+        with self.assertRaises(ValueError):
+            tree.insert_entry(Entry(self.make_item(-1, "v"), None), 1)
+
+    def test_insert_entry_other_negative_key_rejected(self):
+        # Any negative key is reserved (dummy key is -dim), not just -1.
+        tree = create_gkplus_tree(K=4)
+        with self.assertRaises(ValueError):
+            tree.insert_entry(Entry(self.make_item(-5, "v"), None), 2)
+
+    def test_zero_key_is_allowed(self):
+        # 0 is the smallest valid real key and must remain insertable.
+        tree = create_gkplus_tree(K=4)
+        tree.insert_entry(Entry(self.make_item(0, "v"), None), 1)
+        self.assertEqual(tree.real_item_count(), 1)
+        found, _ = tree.retrieve(0)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.item.value, "v")

@@ -241,6 +241,11 @@ class GKPlusTreeBase(
 
         Raises:
             TypeError: If entry is not an Entry object.
+            ValueError: If the entry's key is a negative integer.  Negative
+                keys are reserved for internal dummy sentinels (key ``-dim``,
+                see :func:`get_dummy`); a negative user key would silently
+                collide with a dummy and be dropped from the real-item
+                accounting (``real_item_count`` etc.).
 
         Complexity:
             O(h · (log l + k)) amortised per dimension. When leaf sets
@@ -251,6 +256,13 @@ class GKPlusTreeBase(
         """
         if not isinstance(x_entry, Entry):
             raise TypeError(f"insert_entry(): expected Entry, got {type(x_entry).__name__}")
+        key = x_entry.item.key
+        if isinstance(key, int) and key < 0:
+            raise ValueError(
+                f"insert_entry(): key must be non-negative, got {key!r}. "
+                "Negative keys are reserved for internal dummy sentinels "
+                "(key -dim, see get_dummy) and would silently collide with a dummy."
+            )
         if self.is_empty():
             return self._insert_empty(x_entry, rank)
         return self._insert_non_empty(x_entry, rank)

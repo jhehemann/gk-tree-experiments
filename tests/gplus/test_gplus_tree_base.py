@@ -385,6 +385,37 @@ class TestInsertTypeErrors(GPlusTreeTestCase):
             self.tree.insert(item, -1)
 
 
+class TestNegativeKeyGuard(GPlusTreeTestCase):
+    """Verify ``insert`` rejects negative keys reserved for dummy sentinels.
+
+    Negative keys are reserved for internal dummy items (key ``-dim``, see
+    :func:`get_dummy`).  Without a guard, inserting a negative key silently
+    collides with a dummy: the real item is swallowed and dropped from the
+    real-item accounting (``real_item_count`` reports 0, ``retrieve``
+    returns the ``DummyItem``).  See the negative-key TODO in
+    ``src/gplus_trees/base.py``.
+    """
+
+    def test_collision_is_now_rejected_key_minus_one(self):
+        # key -1 collides with the dimension-1 dummy (DUMMY_KEY == -1).
+        item = self.make_item(-1, "v")
+        with self.assertRaises(ValueError):
+            self.tree.insert(item, 1)
+
+    def test_other_negative_key_rejected(self):
+        # Any negative key is reserved (dummy key is -dim), not just -1.
+        item = self.make_item(-5, "v")
+        with self.assertRaises(ValueError):
+            self.tree.insert(item, 3)
+
+    def test_zero_key_is_allowed(self):
+        # 0 is the smallest valid real key and must remain insertable.
+        self.tree.insert(self.make_item(0, "v"), 1)
+        found, _ = self.tree.retrieve(0)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.item.value, "v")
+
+
 class TestRetrieveTypeErrors(GPlusTreeTestCase):
     """Verify ``retrieve`` raises TypeError for non-int keys."""
 
