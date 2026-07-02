@@ -4,8 +4,6 @@
 - **`adr/`** — decisions + rationale, append-only (see `adr/README.md`).
 - **`agents/`** — conventions consumed by the installed agent skills (issue tracker,
   triage labels, domain docs).
-- **`repository-audit-*.md`** — point-in-time structural audits.
-- **`audit-fix-plan-*.md`** — implementation plans derived from audits (point-in-time).
 
 Agent invariants live in the repo-root `CLAUDE.md`; the human entrypoint is the
 repo-root `README.md`.
