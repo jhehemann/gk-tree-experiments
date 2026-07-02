@@ -55,3 +55,6 @@ benchmarks/README.md
 .claude/
 .agents/
 skills-lock.json
+
+# Generator-Output (Beförderung nach adversarial_keys/ nur manuell, siehe PROVENANCE.md)
+benchmarks/adversarial_keys_new/
