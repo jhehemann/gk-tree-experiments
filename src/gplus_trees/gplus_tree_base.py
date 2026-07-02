@@ -170,11 +170,22 @@ class GPlusTreeBase(AbstractSetDataStructure):
         Raises:
             TypeError: If *x* is not an ``InternalItem`` / ``LeafItem``
                 or *rank* is not a positive ``int``.
+            ValueError: If ``x.key`` is a negative integer.  Negative keys
+                are reserved for internal dummy sentinels (key ``-dim``,
+                see :func:`get_dummy`); a negative user key would silently
+                collide with a dummy and be dropped from the real-item
+                accounting (``real_item_count`` etc.).
         """
         if not isinstance(x, InternalItem | LeafItem):
             raise TypeError(f"insert(): expected InternalItem or LeafItem, got {type(x).__name__}")
         if not isinstance(rank, int) or rank <= 0:
             raise TypeError(f"insert(): rank must be a positive int, got {rank!r}")
+        if isinstance(x.key, int) and x.key < 0:
+            raise ValueError(
+                f"insert(): key must be non-negative, got {x.key!r}. "
+                "Negative keys are reserved for internal dummy sentinels "
+                "(key -dim, see get_dummy) and would silently collide with a dummy."
+            )
         insert_entry = Entry(x, x_left)
         if self.is_empty():
             return self._insert_empty(insert_entry, rank)
