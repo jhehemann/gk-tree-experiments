@@ -22,13 +22,12 @@ Agent entrypoint: invariants and pointers only. Human documentation lives in
   branches, integrate via PR against `main`. There is no `develop`.
 - CI gates every push to `main` and every PR against `main`.
 - Dormant branches — do NOT build on them: `feat/inverse-node-keys`, `feat/insert-min`.
-  Status: `docs/adr/0002-dormant-feature-branches.md`.
+  Open decision, tracked as a local issue under `.scratch/repo-hygiene/issues/`.
 
 ## Knowledge layer
 
 - Experiment findings: `docs/journal/` (chronological). Decisions + rationale: `docs/adr/`.
 - Fixture provenance: `benchmarks/adversarial_keys/PROVENANCE.md`.
-- Point-in-time audits: `docs/repository-audit-*.md`.
 
 ## Agent scaffolding
 
