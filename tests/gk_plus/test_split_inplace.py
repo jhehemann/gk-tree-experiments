@@ -17,7 +17,6 @@
 # from gplus_trees.g_k_plus.utils import calc_rank
 # from gplus_trees.gplus_tree_base import print_pretty
 # from tests.test_base import BaseTestCase, GKPlusTreeTestCase
-# from tests.logconfig import logger
 # import logging
 
 
