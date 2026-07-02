@@ -160,12 +160,7 @@ class GKPlusTreeBase(
         """Create an empty tree of the same type, forwarding *l_factor*."""
         return type(self)(l_factor=self.l_factor)
 
-    def item_count(self, with_dim_dummy: bool = False) -> int:
-        if with_dim_dummy:
-            if self.item_cnt_ge_dummy is None:
-                return self.get_item_count_ge_dummy()
-            return self.item_cnt_ge_dummy
-
+    def item_count(self) -> int:
         if self.item_cnt is None:
             return self.get_tree_item_count()
         return self.item_cnt
