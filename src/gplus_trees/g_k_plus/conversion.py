@@ -1,7 +1,7 @@
 """KList / GKPlusTree conversion logic for GK+-trees.
 
 Provides :class:`GKPlusConversionMixin`, a mixin class that adds
-``convert_node_set`` and ``check_and_convert_set`` to
+``_convert_node_set`` and ``_check_and_convert_set`` to
 :class:`GKPlusTreeBase`.
 
 Conversions are triggered when a KList exceeds ``k · l_factor`` items
@@ -9,13 +9,18 @@ Conversions are triggered when a KList exceeds ``k · l_factor`` items
 These conversions are what create recursive dimensional nesting:
 an expanded KList becomes a GK+-tree of the next dimension.
 
-The two public entry points split by cache ownership:
+Everything here is an internal seam of the growth path: callers outside
+the ``g_k_plus`` package reach conversions only implicitly, through
+``GKPlusTreeBase.insert_entry`` (and the other tree-level operations
+``unzip`` / ``zip``).
 
-- ``convert_node_set(node)`` converts a set attached to a node of a
+The two package-internal entry points split by cache ownership:
+
+- ``_convert_node_set(node)`` converts a set attached to a node of a
   live tree.  The receiver must be the tree owning *node*; its cached
   counts are invalidated internally, so callers carry no follow-up
   contract.
-- ``check_and_convert_set(set)`` is the pure set→set function for
+- ``_check_and_convert_set(set)`` is the pure set→set function for
   free-standing sets (split halves) that are placed into freshly
   constructed trees, whose caches start empty.
 
@@ -25,8 +30,8 @@ threshold = k · l_factor):
 +------------------------------+--------------------------------------------+
 | Operation                    | Time                                       |
 +==============================+============================================+
-| ``convert_node_set``         | O(1) dispatch + cache invalidation         |
-| ``check_and_convert_set``    | O(1) dispatch                              |
+| ``_convert_node_set``        | O(1) dispatch + cache invalidation         |
+| ``_check_and_convert_set``   | O(1) dispatch                              |
 | ``_check_and_expand_klist``  | O(n · h_{d+1}) when conversion triggers    |
 |                              | (bulk-creates a GK+-tree of dim d+1)       |
 | ``_check_and_collapse_tree`` | O(threshold) early-exit counting;          |
@@ -50,7 +55,7 @@ if TYPE_CHECKING:
 class GKPlusConversionMixin:
     """Mixin that contributes KList↔GKPlusTree conversion methods to *GKPlusTreeBase*."""
 
-    def convert_node_set(self, node: GKPlusNodeBase) -> None:
+    def _convert_node_set(self, node: GKPlusNodeBase) -> None:
         """Convert *node*'s set between KList and GKPlusTree based on thresholds.
 
         The receiver must be the tree that owns *node*: after replacing
@@ -60,16 +65,16 @@ class GKPlusConversionMixin:
         invalidation happens unconditionally — callsites reach this point
         only after mutating the node, so the caches are stale either way.
         """
-        node.set = self.check_and_convert_set(node.set)
+        node.set = self._check_and_convert_set(node.set)
         self._invalidate_tree_size()
 
-    def check_and_convert_set(self, set: AbstractSetDataStructure) -> AbstractSetDataStructure:
+    def _check_and_convert_set(self, set: AbstractSetDataStructure) -> AbstractSetDataStructure:
         """Check and convert a free-standing set between KList and GKPlusTree.
 
         Pure set→set function: no tree cache is touched.  Use this for
         split halves that are placed into freshly constructed trees
         (whose caches start empty).  For a set attached to a node of a
-        live tree, use :meth:`convert_node_set` instead, which also
+        live tree, use :meth:`_convert_node_set` instead, which also
         invalidates the owning tree's cached counts.
         """
         # Avoid circular import at module level

@@ -5,9 +5,7 @@ import random
 import unittest
 from dataclasses import asdict
 
-from gplus_trees.base import Entry
-from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
-from gplus_trees.g_k_plus.factory import create_gkplus_tree, make_gkplustree_classes
+from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from gplus_trees.g_k_plus.utils import calc_rank, calc_ranks
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
@@ -45,29 +43,24 @@ class TestGKPlusTreeZip(TreeTestCase):
         return tree
 
     def _create_tree_via_unzip(self, keys: list[int], ranks: list[int], tree=None, k=4):
-        """Helper to create a tree by first building normally, then unzipping at key -1."""
-        #     if tree is None:
-        #         tree = create_gkplus_tree(K=k, dimension=1)
+        """Helper to create a tree by first building normally, then unzipping at key -1.
 
-        #     # First build the tree normally
-        #     for key, rank in zip(keys, ranks):
-        #         item = self.make_item(key, f"val_{key}")
-        #         tree, inserted, _ = tree.insert(item, rank=rank)
-        #         self.assertTrue(inserted, f"Failed to insert item with key {key}")
-
-        # Bulk create version
-        # Efficiently sort keys and ranks by key, keeping ranks aligned
-        entries = [Entry(self.make_item(key, f"val_{key}"), None) for key in keys]
+        The *ranks* argument is ignored: the tree is built through the
+        public insert interface at the target dimension, using the keys'
+        natural (digest-derived) ranks — the same ranks a bulk build
+        would compute internally.
+        """
         dimension = 1 if tree is None else tree.DIM
         l_factor = tree.l_factor if tree is not None else 1.0
+        capacity = k if tree is None else tree.KListClass.KListNodeClass.CAPACITY
 
-        if tree is None:
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-        else:
-            klist_class = tree.KListClass
-        tree = bulk_create_gkplus_tree(entries, dimension, l_factor=l_factor, KListClass=klist_class)
-        logger.debug(f"Tree built via bulk create before unzip: {print_pretty(tree)}")
+        tree = create_gkplus_tree(K=capacity, dimension=dimension, l_factor=l_factor)
+        natural_ranks = calc_ranks(keys, capacity, DIM=dimension)
+        for key, rank in zip(keys, natural_ranks, strict=True):
+            item = self.make_item(key, f"val_{key}")
+            tree, inserted, _ = tree.insert(item, rank=rank)
+            self.assertTrue(inserted, f"Failed to insert item with key {key}")
+        logger.debug(f"Tree built via inserts before unzip: {print_pretty(tree)}")
 
         # Then unzip at key -1 and return the right tree (which should contain all positive keys)
         _left_tree, _key_subtree, right_tree, _next_entry = tree.unzip(-1)
@@ -78,17 +71,12 @@ class TestGKPlusTreeZip(TreeTestCase):
     def _validate_tree_after_zip(self, tree: GKPlusTreeBase, expected_keys: list[int], k: int = 4):
         """Helper to validate tree structure and contents after zip operation."""
         logger.debug(f"k={k}, Expected keys: {expected_keys}")
-        # control_tree = create_gkplus_tree(K=k, dimension=tree.DIM, l_factor=tree.l_factor)
-        # ranks = calc_ranks(expected_keys, k=k, DIM=tree.DIM)
-        control_tree = bulk_create_gkplus_tree(
-            [Entry(self.make_item(key, f"val_{key}"), None) for key in expected_keys],
-            tree.DIM,
-            tree.l_factor,
-            tree.KListClass,
-        )
-        # for key, rank in zip(expected_keys, ranks):
-        #     item = self.make_item(key, f"val_{key}")
-        #     control_tree, _, _ = control_tree.insert(item, rank=rank)
+        capacity = tree.KListClass.KListNodeClass.CAPACITY
+        control_tree = create_gkplus_tree(K=capacity, dimension=tree.DIM, l_factor=tree.l_factor)
+        ranks = calc_ranks(expected_keys, capacity, DIM=tree.DIM)
+        for key, rank in zip(expected_keys, ranks, strict=True):
+            item = self.make_item(key, f"val_{key}")
+            control_tree, _, _ = control_tree.insert(item, rank=rank)
         logger.debug(f"Control tree: {print_pretty(control_tree)}")
         control_stats = asdict(gtree_stats_(control_tree, {}))
         # Check tree invariants
@@ -946,44 +934,20 @@ class TestGKPlusTreeZip(TreeTestCase):
         ranks_large = list(ranks_large)
 
         if order == "small_first":
-            # prepare entries for bulk creation of tree1
-            entries_small = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_small]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_small, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_small, ranks_small, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_small, ranks_small):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
             expected_keys = sorted(keys_small + keys_large)
         else:
-            # prepare entries for bulk creation of tree1
-            entries_large = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_large]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_large, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_large, ranks_large, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_large, ranks_large):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
             expected_keys = sorted(keys_large + keys_small)
 
         # Log tree structures before zip
@@ -1029,44 +993,20 @@ class TestGKPlusTreeZip(TreeTestCase):
         ranks_large = list(ranks_large)
 
         if order == "small_first":
-            # prepare entries for bulk creation of tree1
-            entries_small = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_small]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_small, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_small, ranks_small, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_small, ranks_small):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
             expected_keys = sorted(keys_small + keys_large)
         else:
-            # prepare entries for bulk creation of tree1
-            entries_large = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_large]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_large, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_large, ranks_large, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_large, ranks_large):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
             expected_keys = sorted(keys_large + keys_small)
 
         # Log tree structures before zip
@@ -1115,44 +1055,20 @@ class TestGKPlusTreeZip(TreeTestCase):
         ranks_large = list(ranks_large)
 
         if order == "small_first":
-            # prepare entries for bulk creation of tree1
-            entries_small = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_small]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_small, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_small, ranks_small, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_small, ranks_small):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_large, ranks_large, k=k)
             expected_keys = sorted(keys_small + keys_large)
         else:
-            # prepare entries for bulk creation of tree1
-            entries_large = [Entry(self.make_item(k_, f"val_{k_}"), None) for k_ in keys_large]
-            dimension = 1
-            l_factor = 1.0
-            _, _, KListClass, _ = make_gkplustree_classes(k, dimension=dimension)
-            klist_class = KListClass
-
-            # Build the first tree normally
-            tree1 = bulk_create_gkplus_tree(entries_large, dimension, l_factor=l_factor, KListClass=klist_class)
+            # Build the first tree through the public insert interface
+            tree1 = self._create_tree(keys_large, ranks_large, k=k)
 
             # Build the second tree via unzip to test different construction paths
             tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
 
-            # tree1 = create_gkplus_tree(K=k, dimension=1)
-            # for key, rank in zip(keys_large, ranks_large):
-            #     tree1, _, _ = tree1.insert(self.make_item(key, f"val_{key}"), rank=rank)
-
-            # tree2 = self._create_tree_via_unzip(keys_small, ranks_small, k=k)
             expected_keys = sorted(keys_large + keys_small)
 
         # Log tree structures before zip

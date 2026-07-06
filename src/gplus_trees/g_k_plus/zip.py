@@ -29,7 +29,7 @@ from gplus_trees.base import (
     Entry,
     _get_replica,
 )
-from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
+from gplus_trees.g_k_plus.bulk_create import _bulk_create_gkplus_tree
 from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.klist_base import KListBase
 
@@ -55,17 +55,24 @@ class GKPlusZipMixin:
         l_set_is_klist = isinstance(left.node.set, KListBase)
         o_set_is_klist = isinstance(other.node.set, KListBase)
 
-        # Convert to same type if needed
+        # Convert to same type if needed.
+        #
+        # This is deliberately NOT the conversion seam
+        # (``_check_and_convert_set``): that seam is threshold-gated and
+        # would leave a KList at or below ``k · l_factor`` items
+        # unconverted — precisely the common case here, where one set
+        # already expanded and its (small) sibling must be lifted to the
+        # same type unconditionally so the sets can be merged.
         if l_set_is_klist != o_set_is_klist:
             if l_set_is_klist:
                 # Convert left from KList to GKPlusTree
-                left.node.set = bulk_create_gkplus_tree(
+                left.node.set = _bulk_create_gkplus_tree(
                     left.node.set, other.node.set.DIM, other.l_factor, type(left.node.set)
                 )
                 left._invalidate_tree_size()
             else:
                 # Convert other from KList to GKPlusTree
-                other.node.set = bulk_create_gkplus_tree(
+                other.node.set = _bulk_create_gkplus_tree(
                     other.node.set, left.node.set.DIM, left.l_factor, type(other.node.set)
                 )
                 _, _, other.node.set, _ = other.node.set.unzip(-1)
@@ -104,7 +111,7 @@ class GKPlusZipMixin:
                 left.node = dummy_tree.node
                 left._invalidate_tree_size()
                 left, r_pivot, r_pivot_next = self.zip(left, other)
-                left.convert_node_set(left.node)
+                left._convert_node_set(left.node)
 
                 return left, r_pivot, r_pivot_next
             r_pivot, r_pivot_next = other.find_pivot()
@@ -129,12 +136,12 @@ class GKPlusZipMixin:
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
                 other.node.set, _, _ = other.node.set.insert_entry(replica_entry, other.node.rank)
             else:
-                singleton_tree = bulk_create_gkplus_tree(
+                singleton_tree = _bulk_create_gkplus_tree(
                     [replica_entry], left.DIM + 1, l_factor=left.l_factor, KListClass=left.SetClass
                 )
                 other.node.set, r_pivot, r_pivot_next = singleton_tree.zip(singleton_tree, other.node.set)
 
-            other.convert_node_set(other.node)
+            other._convert_node_set(other.node)
 
             # Zip r_pivot's left subtree into left
             if r_pivot and r_pivot.left_subtree:
@@ -186,13 +193,13 @@ class GKPlusZipMixin:
                 for entry in other.node.set:
                     if entry.item.key > dummy_lower_dim.key:
                         left.node.set, _, _ = left.node.set.insert_entry(entry)
-                left.convert_node_set(left.node)
+                left._convert_node_set(left.node)
                 r_pivot, r_pivot_next = other.node.set.find_pivot()
 
             elif isinstance(left.node.set, GKPlusTreeBase) and isinstance(other.node.set, GKPlusTreeBase):
                 # Both are GKPlusTreeBase (after conversion) - recursively zip
                 left.node.set, r_pivot, r_pivot_next = left.node.set.zip(left.node.set, other.node.set)
-                left.convert_node_set(left.node)
+                left._convert_node_set(left.node)
             else:
                 raise TypeError(
                     f"Set types should match after conversion, got {type(left.node.set).__name__} and {type(other.node.set).__name__}"

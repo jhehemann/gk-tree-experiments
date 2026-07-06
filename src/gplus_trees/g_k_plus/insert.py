@@ -36,7 +36,7 @@ from gplus_trees.base import (
     Entry,
     _get_replica,
 )
-from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
+from gplus_trees.g_k_plus.bulk_create import _bulk_create_gkplus_tree
 from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.klist_base import KListBase
 from gplus_trees.utils import calc_rank_from_digest_k
@@ -260,7 +260,7 @@ class GKPlusInsertMixin:
         replica = _get_replica(x_item)
         TreeClass = type(self)
         NodeClass = self.NodeClass
-        check_and_convert_set = self.check_and_convert_set
+        check_and_convert_set = self._check_and_convert_set
         l_factor = self.l_factor
         capacity = self.KListClass.KListNodeClass.CAPACITY
 
@@ -345,7 +345,7 @@ class GKPlusInsertMixin:
             node.set, inserted, next_entry = res[0], res[1], res[2]
             if not inserted:
                 return self.update(cur, x_entry)
-            cur.convert_node_set(node)  # only KLists can be extended
+            cur._convert_node_set(node)  # only KLists can be extended
         else:
             digest = x_item.get_digest_for_dim(self.DIM + 1)
             new_rank = calc_rank_from_digest_k(digest, capacity)
@@ -423,7 +423,7 @@ class GKPlusInsertMixin:
             if isinstance(right_split, GKPlusTreeBase):
                 digest = x_item.get_digest_for_dim(self.DIM + 1)
                 calc_rank_from_digest_k(digest, capacity)
-                tree_insert = bulk_create_gkplus_tree(
+                tree_insert = _bulk_create_gkplus_tree(
                     [insert_entry], self.DIM + 1, l_factor=self.l_factor, KListClass=self.SetClass
                 )
 
