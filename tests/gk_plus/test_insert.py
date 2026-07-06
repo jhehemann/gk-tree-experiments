@@ -6,7 +6,9 @@ from typing import ClassVar
 
 from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
-from gplus_trees.gplus_tree_base import print_pretty
+from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
+from gplus_trees.gplus_tree_base import get_dummy, print_pretty
+from gplus_trees.invariants import check_leaf_keys_and_values
 from tests.test_base import GKPlusTreeTestCase
 
 logger = logging.getLogger(__name__)
@@ -559,3 +561,51 @@ class TestGKPlusNegativeKeyGuard(GKPlusTreeTestCase):
         found, _ = tree.retrieve(0)
         self.assertIsNotNone(found)
         self.assertEqual(found.item.value, "v")
+
+
+class TestGKPlusLeafDummyIdentity(GKPlusTreeTestCase):
+    """Leaf-identity contract for GK+-trees: every dummy circulating in leaf
+    sets must be *the* cached sentinel of its dimension, because invariant
+    checks compare by identity (``item is dummy``).
+
+    Regression: ``get_dummy`` was cached with ``@functools.cache`` directly,
+    which keys positional and keyword calls separately.  Leaf construction
+    (positional calls) and :func:`check_leaf_keys_and_values` (keyword call)
+    therefore held two distinct sentinels per dimension, and ``order_ok``
+    was misreported as ``False`` for every GK+-tree.
+    """
+
+    def test_check_leaf_keys_reports_order_ok(self):
+        # Small tree without leaf expansion: the only dummy is the tree's
+        # dim-1 sentinel, so order_ok isolates the identity contract.
+        tree = create_gkplus_tree(K=4)
+        for key, rank in [(3, 1), (7, 2), (12, 1)]:
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), rank)
+        self.assertEqual(tree.get_expanded_leaf_count(), 0, "premise: no expanded leaf sets")
+
+        keys, presence_ok, _, order_ok = check_leaf_keys_and_values(tree, [3, 7, 12])
+        self.assertTrue(order_ok, f"order_ok misreported for sorted leaf keys {keys}")
+        self.assertTrue(presence_ok)
+
+    def test_expanded_leaf_dummies_are_canonical_sentinels(self):
+        # Dimension expansion creates dummies for dims > 1; each must be the
+        # cached sentinel of its dimension, no matter which call style the
+        # constructing code path used.
+        keys = [5, 2, 9, 1, 7, 3, 8, 4, 6, 10, 15, 12, 20]
+        ranks = calc_ranks_multi_dims(keys, 4, dimensions=1)[0]
+        tree = create_gkplus_tree(K=4)
+        for key, rank in zip(keys, ranks, strict=True):
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), rank)
+        self.assertGreater(tree.get_expanded_leaf_count(), 0, "premise: expanded leaf sets exist")
+
+        first_item = next(iter(next(iter(tree.iter_leaf_nodes())).set)).item
+        self.assertIs(first_item, tree._get_dummy(), "first leaf item must be the tree's own sentinel")
+
+        for leaf in tree.iter_leaf_nodes():
+            for entry in leaf.set:
+                if entry.item.key < 0:
+                    self.assertIs(
+                        entry.item,
+                        get_dummy(-entry.item.key),
+                        f"dummy with key {entry.item.key} is not the cached sentinel of its dimension",
+                    )

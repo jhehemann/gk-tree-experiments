@@ -46,14 +46,22 @@ DUMMY_ITEM = DummyItem(ItemData(key=DUMMY_KEY))
 
 
 @functools.cache
+def _get_dummy_cached(dim: int) -> DummyItem:
+    return DummyItem(ItemData(key=-(dim)))
+
+
 def get_dummy(dim: int) -> DummyItem:
     """Return a cached :class:`DummyItem` for the given dimension.
 
     The key is ``-dim`` (e.g. dimension 1 → key ``-1``, dimension 2 → key ``-2``).
     Results are cached so successive calls for the same *dim* return the
-    identical object.
+    identical object — regardless of call style: ``functools.cache`` keys
+    positional and keyword calls separately, so the cache lives on a private
+    helper that this wrapper always calls positionally
+    (``get_dummy(1) is get_dummy(dim=1)`` must hold; identity checks such as
+    ``item is dummy`` in :mod:`gplus_trees.invariants` rely on it).
     """
-    return DummyItem(ItemData(key=-(dim)))
+    return _get_dummy_cached(dim)
 
 
 class _SplitContext:
