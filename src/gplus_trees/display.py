@@ -26,7 +26,7 @@ def print_pretty(set: AbstractSetDataStructure | None) -> str:
       • All columns have the same width, so initial indent and
         inter-node spacing are uniform.
     """
-    from gplus_trees.gplus_tree_base import DUMMY_KEY, GPlusTreeBase, get_dummy
+    from gplus_trees.gplus_tree_base import GPlusTreeBase
     from gplus_trees.klist_base import KListBase
 
     if set is None:
@@ -52,12 +52,7 @@ def print_pretty(set: AbstractSetDataStructure | None) -> str:
         return f"({set_type}): {res_text}"
 
     tree = set
-
-    if hasattr(tree, "DIM"):
-        dim = tree.DIM if hasattr(tree, "DIM") else None
-        dum_key = get_dummy(dim).key
-    else:
-        dum_key = DUMMY_KEY
+    dum_key = tree.dummy_item.key
 
     # 1) First pass: collect each node's text and track max length
     layers_raw = collections.defaultdict(list)  # rank -> list of node-strings
@@ -67,9 +62,8 @@ def print_pretty(set: AbstractSetDataStructure | None) -> str:
         if tree.is_empty():
             return
         nonlocal max_len
-        dim = tree.DIM if hasattr(tree, "DIM") else None
-
-        p_dim = parent.DIM if parent and hasattr(parent, "DIM") else None
+        dim = tree.dimension
+        p_dim = parent.dimension if parent else None
         other_dim = False
         other_dim_processed = False
 
@@ -105,8 +99,7 @@ def print_pretty(set: AbstractSetDataStructure | None) -> str:
             layers_raw[rank].append(text)
             max_len = max(max_len, len(text))
         else:
-            dim_str = str(dim) if dim is not None else "?"
-            new_text = f"(D{dim_str}R{rank}) " + text
+            new_text = f"(D{dim}R{rank}) " + text
             layers_raw[0].append(new_text)
             max_len = max(max_len, len(new_text))
 
@@ -118,9 +111,10 @@ def print_pretty(set: AbstractSetDataStructure | None) -> str:
             if node.right_subtree:
                 collect(node.right_subtree, tree)
 
-        # Special case: if node.set is a tree of different dimension, traverse it
-        if isinstance(node.set, GPlusTreeBase) and not node.set.is_empty() and not other_dim_processed:
-            collect(node.set, tree)
+        # Special case: if node.set is an inner tree of a deeper dimension, traverse it
+        inner_set_tree = tree.inner_tree_of(node.set)
+        if inner_set_tree is not None and not inner_set_tree.is_empty() and not other_dim_processed:
+            collect(inner_set_tree, tree)
 
     collect(tree, None)
 
@@ -195,45 +189,32 @@ def print_structure(
     result = []
     node = tree.node
 
-    kwargs_print = []
-    if hasattr(node, "size"):
-        kwargs_print.append(f", size={node.size}")
-    joined_kwargs = ", ".join(kwargs_print)
-
-    result.append(f"{prefix}{node.__class__.__name__}(rank={node.rank}, set={type(node.set).__name__}{joined_kwargs})")
+    result.append(f"{prefix}{node.__class__.__name__}(rank={node.rank}, set={type(node.set).__name__})")
     result.append(node.set.print_structure(indent + 4))
 
     # Right subtree
     if node.right_subtree is not None:
         right_node = node.right_subtree.node
-        kwargs_print = []
-        if hasattr(right_node, "size"):
-            kwargs_print.append(f", size={right_node.size}")
-        joined_kwargs = ", ".join(kwargs_print)
         result.append(
             f"{prefix}    Right: {right_node.__class__.__name__}(rank={right_node.rank}, "
-            f"set={type(right_node.set).__name__}{joined_kwargs})"
+            f"set={type(right_node.set).__name__})"
         )
         result.append(right_node.set.print_structure(indent + 8))
     else:
         result.append(f"{prefix}    Right: Empty")
 
-    # Linked-list next pointer (leaf nodes only)
-    if node.rank == 1 and hasattr(node, "next") and node.next:
+    # Leaf-chain next pointer (leaf nodes only)
+    if node.rank == 1 and node.next is not None:
         if not node.next.is_empty():
             next_node = node.next.node
-            kwargs_print = []
-            if hasattr(next_node, "size"):
-                kwargs_print.append(f", size={next_node.size}")
-            joined_kwargs = ", ".join(kwargs_print)
             result.append(
                 f"{prefix}    Next: {next_node.__class__.__name__}(rank={next_node.rank}, "
-                f"set={type(next_node.set).__name__}{joined_kwargs})"
+                f"set={type(next_node.set).__name__})"
             )
             result.append(next_node.set.print_structure(indent + 8))
         else:
             result.append(f"{prefix}    Next: Empty")
-    elif node.rank == 1 and hasattr(node, "next") and node.next is None:
+    elif node.rank == 1:
         result.append(f"{prefix}    Next: Empty")
 
     return "\n".join(result)

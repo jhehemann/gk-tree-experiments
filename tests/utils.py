@@ -1,6 +1,5 @@
 """Utility functions for testing GPlusTree invariants."""
 
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from gplus_trees.gplus_tree_base import (
     GPlusTreeBase,
     Stats,
@@ -24,8 +23,8 @@ def assert_tree_invariants_tc(
     for flag in TREE_FLAGS:
         if flag in exclude_checks:
             continue
-        if flag == "set_thresholds_met" and not isinstance(t, GKPlusTreeBase):
-            # this flag is only relevant for GKPlusTreeBase
+        if flag == "set_thresholds_met" and t.set_conversion_threshold is None:
+            # this flag is only relevant for variants with set conversion
             continue
         tc.assertTrue(getattr(stats, flag), f"Invariant failed: {flag} is False\n\n{err_msg}")
 
@@ -54,11 +53,11 @@ def assert_tree_invariants_tc(
             stats.greatest_item, f"Invariant failed: greatest_item is None for non-empty tree\n\n{err_msg}"
         )
 
-        # if t has a method get_size, the result must be equal to stats.real_item_count
-        if hasattr(t, "get_size") and not t.is_empty():
-            size = t.get_size()
+        # if t tracks its own size, it must equal stats.real_item_count
+        size = t.tracked_size()
+        if size is not None:
             tc.assertEqual(
                 size,
                 stats.real_item_count,
-                f"Invariant failed: get_size()={size} ≠ real_item_count={stats.real_item_count}, \n\n{err_msg}",
+                f"Invariant failed: tracked_size()={size} ≠ real_item_count={stats.real_item_count}, \n\n{err_msg}",
             )

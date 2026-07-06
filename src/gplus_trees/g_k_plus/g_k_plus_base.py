@@ -150,6 +150,27 @@ class GKPlusTreeBase(
         """Create an empty tree of the same type, forwarding *l_factor*."""
         return type(self)(l_factor=self.l_factor)
 
+    # ── Observer metadata interface (overrides GPlusTreeBase) ───────
+    @property
+    def dimension(self) -> int:
+        """The nesting depth of this tree (its ``DIM``)."""
+        return type(self).DIM
+
+    @property
+    def set_conversion_threshold(self) -> float:
+        """The node-set item count ``k · l_factor`` above which a set
+        expands into a Gᵏ⁺-tree of the next-deeper dimension.
+        """
+        return self.l_factor * self.SetClass.KListNodeClass.CAPACITY
+
+    def inner_tree_of(self, node_set: AbstractSetDataStructure) -> GKPlusTreeBase | None:
+        """Return *node_set* if it is an expanded inner tree, else ``None``."""
+        return node_set if isinstance(node_set, GKPlusTreeBase) else None
+
+    def tracked_size(self) -> int:
+        """The tree's own (cached) real-item count."""
+        return self.real_item_count()
+
     def item_count(self) -> int:
         if self.item_cnt is None:
             return self.get_tree_item_count()

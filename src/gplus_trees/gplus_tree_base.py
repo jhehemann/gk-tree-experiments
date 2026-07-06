@@ -150,6 +150,56 @@ class GPlusTreeBase(AbstractSetDataStructure):
         """
         return type(self)()
 
+    # ── Observer metadata interface ────────────────────────────────────
+    # Narrow, variant-agnostic surface for the observer modules
+    # (``tree_stats``, ``display``, ``invariants``).  Observers ask these
+    # questions instead of sniffing the tree variant via
+    # ``isinstance``/``hasattr``; a new variant overrides them once
+    # instead of patching every observer.
+
+    @property
+    def dimension(self) -> int:
+        """The nesting depth of this tree.
+
+        G⁺-trees are single-dimension; multi-dimensional variants
+        override this (Gᵏ⁺-trees report their ``DIM``).
+        """
+        return 1
+
+    @property
+    def dummy_item(self) -> DummyItem:
+        """The dummy sentinel item leading this tree.
+
+        Identity-stable: every access returns the same object, so
+        observers may compare items against it with ``is``.
+        """
+        return self._get_dummy()
+
+    @property
+    def set_conversion_threshold(self) -> float | None:
+        """The node-set item count above which a set expands into an
+        inner tree, or ``None`` for variants without set conversion.
+
+        G⁺-tree node sets are always k-lists, so there is no threshold.
+        """
+        return None
+
+    def inner_tree_of(self, node_set: AbstractSetDataStructure) -> GPlusTreeBase | None:
+        """Return *node_set* as an inner (deeper-dimension) tree for
+        observers to descend into, or ``None`` when it is a plain set.
+
+        G⁺-trees never nest, so the default answers ``None``.
+        """
+        return None
+
+    def tracked_size(self) -> int | None:
+        """The number of real items this tree accounts for itself, or
+        ``None`` for variants without their own size accounting.
+
+        Observers cross-check this against independently computed stats.
+        """
+        return None
+
     # ── Public API ───────────────────────────────────────────────────
     def insert(self, x: InternalItem | LeafItem, rank: int, x_left: GPlusTreeBase | None = None) -> InsertResult:
         """Insert an item into the G+-tree (amortised O(log n)).

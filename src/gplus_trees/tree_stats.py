@@ -49,9 +49,7 @@ def gtree_stats_(
     The caller can supply an existing Counter / dict for ``rank_hist``;
     otherwise a fresh Counter is used.
     """
-    # Lazy imports to break circular dependency
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-    from gplus_trees.gplus_tree_base import get_dummy
+    # Lazy import to break circular dependency
     from gplus_trees.klist_base import KListBase
 
     if rank_hist is None:
@@ -81,10 +79,13 @@ def gtree_stats_(
         )
 
     K = t.SetClass.KListNodeClass.CAPACITY
-    if hasattr(t, "l_factor"):
-        threshold = t.l_factor * K
-    else:
+    threshold = t.set_conversion_threshold
+    if threshold is None:
+        # Variant without set conversion: still flag k-lists that outgrow
+        # a single segment's capacity (diagnostic only — invariant
+        # checking skips this flag for such variants).
         threshold = K
+    dummy_key = t.dummy_item.key
 
     node = t.node
     node_set = node.set
@@ -104,8 +105,9 @@ def gtree_stats_(
     # exactly once because the inner call only processes the inner tree's
     # gnodes, not the outer tree's.
     inner_set_stats = None
-    if isinstance(node_set, GKPlusTreeBase) and not node_set.is_empty():
-        inner_set_stats = gtree_stats_(node_set, rank_hist=None, _is_root=True)
+    inner_set_tree = t.inner_tree_of(node_set)
+    if inner_set_tree is not None and not inner_set_tree.is_empty():
+        inner_set_stats = gtree_stats_(inner_set_tree, rank_hist=None, _is_root=True)
 
     # ---------- recurse on children only if rank > 1 ------------------------------------
     right_stats = gtree_stats_(node_right_subtree, rank_hist, False)
@@ -153,13 +155,11 @@ def gtree_stats_(
     for i, entry in enumerate(node_set):
         current_key = entry.item.key
 
-        # Check search tree property within the node
-        if prev_key is not None and prev_key >= current_key:
-            if hasattr(t, "DIM"):
-                if current_key >= get_dummy(t.DIM).key:
-                    stats.is_search_tree = False
-            else:
-                stats.is_search_tree = False
+        # Check search tree property within the node.  Keys below the
+        # tree's own dummy key belong to deeper-dimension dummies and are
+        # exempt from the ordering check.
+        if prev_key is not None and prev_key >= current_key and current_key >= dummy_key:
+            stats.is_search_tree = False
 
         # Process child stats if they exist (will be empty for leaf nodes)
         if i < len(child_stats):
@@ -201,17 +201,10 @@ def gtree_stats_(
                 if not cs.is_search_tree:
                     stats.is_search_tree = False
                 elif cs.least_item and prev_key and cs.least_item.key < prev_key:
-                    if hasattr(t, "DIM"):
-                        if cs.least_item.key >= get_dummy(t.DIM).key:
-                            stats.is_search_tree = False
-                    else:
+                    if cs.least_item.key >= dummy_key:
                         stats.is_search_tree = False
-                elif cs.greatest_item and cs.greatest_item.key >= current_key:
-                    if hasattr(t, "DIM"):
-                        if cs.greatest_item.key >= get_dummy(t.DIM).key:
-                            stats.is_search_tree = False
-                    else:
-                        stats.is_search_tree = False
+                elif cs.greatest_item and cs.greatest_item.key >= current_key and cs.greatest_item.key >= dummy_key:
+                    stats.is_search_tree = False
 
         prev_key = current_key
 
@@ -232,23 +225,20 @@ def gtree_stats_(
     ):
         stats.set_thresholds_met = False
 
-    if stats.is_search_tree:
-        if not right_stats.is_search_tree:
-            stats.is_search_tree = False
-        elif right_stats.least_item and prev_key is not None and right_stats.least_item.key < prev_key:
-            if hasattr(t, "DIM"):
-                if right_stats.least_item.key >= get_dummy(t.DIM).key:
-                    stats.is_search_tree = False
-            else:
-                stats.is_search_tree = False
+    if stats.is_search_tree and (
+        not right_stats.is_search_tree
+        or (
+            right_stats.least_item
+            and prev_key is not None
+            and right_stats.least_item.key < prev_key
+            and right_stats.least_item.key >= dummy_key
+        )
+    ):
+        stats.is_search_tree = False
 
     stats.is_search_tree &= right_stats.is_search_tree
-    if right_stats.least_item and right_stats.least_item.key < prev_key:
-        if hasattr(t, "DIM"):
-            if right_stats.least_item.key >= get_dummy(t.DIM).key:
-                stats.is_search_tree = False
-        else:
-            stats.is_search_tree = False
+    if right_stats.least_item and right_stats.least_item.key < prev_key and right_stats.least_item.key >= dummy_key:
+        stats.is_search_tree = False
 
     stats.internal_has_replicas &= right_stats.internal_has_replicas
     stats.internal_packed &= right_stats.internal_packed
