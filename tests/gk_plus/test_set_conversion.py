@@ -776,11 +776,11 @@ class TestCheckAndCollapseTree(TestSetConversion):
         self.assertIsInstance(result, GKPlusTreeBase, "Large tree should remain a GKPlusTree")
 
 
-# ─── convert_node_set contract tests ───────────────────────────────
+# ─── _convert_node_set contract tests ───────────────────────────────
 
 
 class TestConvertNodeSet(TestSetConversion):
-    """Contract tests for ``convert_node_set``: it replaces ``node.set``
+    """Contract tests for ``_convert_node_set``: it replaces ``node.set``
     AND invalidates the owning tree's cached counts, so callers carry no
     follow-up contract (previously TODO(#1) in conversion.py)."""
 
@@ -815,13 +815,13 @@ class TestConvertNodeSet(TestSetConversion):
         old_count = tree.item_count()
         self.assertEqual(tree.item_cnt, old_count, "cache should be populated before conversion")
 
-        tree.convert_node_set(tree.node)
+        tree._convert_node_set(tree.node)
 
         self.assertIsInstance(tree.node.set, GKPlusTreeBase, "over-threshold KList should expand")
         self.assertEqual(tree.node.set.DIM, 2)
-        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by convert_node_set")
-        self.assertIsNone(tree.size, "size must be invalidated by convert_node_set")
-        self.assertIsNone(tree.expanded_cnt, "expanded_cnt must be invalidated by convert_node_set")
+        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by _convert_node_set")
+        self.assertIsNone(tree.size, "size must be invalidated by _convert_node_set")
+        self.assertIsNone(tree.expanded_cnt, "expanded_cnt must be invalidated by _convert_node_set")
         # The recomputed count sees the new dimension's dummy; a stale
         # cache would still report old_count.
         self.assertEqual(tree.item_count(), old_count + 1)
@@ -834,22 +834,22 @@ class TestConvertNodeSet(TestSetConversion):
         old_count = tree.item_count()
         self.assertEqual(tree.item_cnt, old_count, "cache should be populated before conversion")
 
-        tree.convert_node_set(tree.node)
+        tree._convert_node_set(tree.node)
 
         self.assertIsInstance(tree.node.set, KListBase, "undersized inner tree should collapse")
-        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by convert_node_set")
+        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by _convert_node_set")
         self.assertEqual(tree.item_count(), tree.node.set.item_count(), "recount must match the converted set")
 
     def test_no_op_still_invalidates(self):
         """No conversion needed: the set stays, the caches are still
-        invalidated (callsites reach convert_node_set only after mutating
+        invalidated (callsites reach _convert_node_set only after mutating
         the node, so the caches are stale either way)."""
         tree = self._make_leaf_tree()
         klist = tree.node.set
         tree.item_count()
         self.assertIsNotNone(tree.item_cnt)
 
-        tree.convert_node_set(tree.node)
+        tree._convert_node_set(tree.node)
 
         self.assertIs(tree.node.set, klist, "under-threshold KList must stay untouched")
         self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated even without conversion")

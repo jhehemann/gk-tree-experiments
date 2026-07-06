@@ -1,19 +1,27 @@
 """Bulk creation and conversion utilities for GK+-trees.
 
+Everything in this module is internal to the ``g_k_plus`` package: the
+growth path (insert → conversion → bulk build of the deeper dimension)
+is reachable from outside only through ``GKPlusTreeBase.insert_entry``.
+Code outside the package must not import from here; trees are built
+through the factory (``create_gkplus_tree`` / ``make_gkplustree_classes``)
+plus ``insert_entry`` — GK+-trees are canonical, so an insert-built tree
+is structurally identical to a bulk-built one.
+
 Provides:
-- ``bulk_create_gkplus_tree`` - bottom-up bulk creation from an entry sequence.
+- ``_bulk_create_gkplus_tree`` - bottom-up bulk creation from an entry sequence.
 - ``_tree_to_klist`` / ``_klist_to_tree`` - bidirectional conversions.
 - ``_bulk_create_klist`` - helper to populate a KList from entries.
 
 Internal helpers ``_build_leaf_level_trees`` and ``_build_internal_levels``
-are used by ``bulk_create_gkplus_tree`` and are not part of the public API.
+are used by ``_bulk_create_gkplus_tree`` only.
 
 Complexity summary (n = entries, k = KList capacity, h = resulting height):
 
 +-------------------------------+------------------------------------------+
 | Operation                     | Time                                     |
 +===============================+==========================================+
-| ``bulk_create_gkplus_tree``   | O(n · h) amortised; leaf sets that       |
+| ``_bulk_create_gkplus_tree``  | O(n · h) amortised; leaf sets that       |
 |                               | exceed the threshold are recursively     |
 |                               | bulk-created at dimension d+1.           |
 | ``_tree_to_klist``            | O(n_{d+1}) at dimension d+1; iterates    |
@@ -135,7 +143,7 @@ def _klist_to_tree(klist: KListBase, K: int, DIM: int, l_factor: float = 1.0):
 
     if klist.is_empty():
         return _get_create_gkplus_tree()(K, DIM, l_factor)
-    return bulk_create_gkplus_tree(klist, DIM, l_factor, type(klist))
+    return _bulk_create_gkplus_tree(klist, DIM, l_factor, type(klist))
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +196,7 @@ def _build_leaf_level_trees(
         if len(node_entries) <= threshold:
             node_set = _bulk_create_klist(node_entries, KListClass)
         else:
-            node_set = bulk_create_gkplus_tree(node_entries, TreeClass.DIM + 1, l_factor, KListClass)
+            node_set = _bulk_create_gkplus_tree(node_entries, TreeClass.DIM + 1, l_factor, KListClass)
         leaf_node = NodeClass(1, node_set, None)
         leaf_tree = TreeClass(l_factor=l_factor)
         leaf_tree.node = leaf_node
@@ -230,7 +238,7 @@ def _build_internal_levels(
 
     # Cache frequently accessed functions and values for better performance
     bulk_create_klist_fn = _bulk_create_klist
-    bulk_create_gkplus_tree_fn = bulk_create_gkplus_tree
+    bulk_create_gkplus_tree_fn = _bulk_create_gkplus_tree
     tree_dim_plus_one = TreeClass.DIM + 1
 
     rank = 2
@@ -320,7 +328,7 @@ def _build_internal_levels(
 # ---------------------------------------------------------------------------
 
 
-def bulk_create_gkplus_tree(
+def _bulk_create_gkplus_tree(
     entries: list[Entry] | KListBase,
     DIM: int,
     l_factor: float,

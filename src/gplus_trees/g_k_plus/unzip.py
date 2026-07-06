@@ -19,7 +19,7 @@ k = KList capacity, l = KList nodes):
 
 When node sets are inner GK+-trees, the ``split_inplace`` / ``unzip``
 call on ``node.set`` recurses into dimension d+1. The
-``check_and_convert_set`` calls after splitting use early-exit
+``_check_and_convert_set`` calls after splitting use early-exit
 counting (O(k) per call) and only trigger collapse when the split
 half is small enough (≤ threshold items).
 """
@@ -79,11 +79,11 @@ class GKPlusUnzipMixin:
         # below the collapse threshold.  Re-check both so that undersized
         # GKPlusTrees are converted back to KLists.  For KList splits this
         # is a no-op (a KList never needs expansion right after a split).
-        # Free-standing conversion (not convert_node_set) is safe here:
+        # Free-standing conversion (not _convert_node_set) is safe here:
         # self's caches were invalidated at the top of unzip, and
         # right_set ends up in a freshly constructed tree.
-        left_set = self.check_and_convert_set(left_set)
-        right_set = self.check_and_convert_set(right_set)
+        left_set = self._check_and_convert_set(left_set)
+        right_set = self._check_and_convert_set(right_set)
 
         # Update the current node's set
         node.set = left_set

@@ -239,7 +239,7 @@ class GKPlusTreeBase(
 
         Complexity:
             O(h · (log l + k)) amortised per dimension. When leaf sets
-            are inner GK+-trees (expanded via ``check_and_convert_set``),
+            are inner GK+-trees (expanded via ``_check_and_convert_set``),
             set-level operations (insert, split) recurse into dimension
             d+1.  Total worst-case across D dimensions:
             O(h_1 · h_2 · … · h_D · (log l + k)).
