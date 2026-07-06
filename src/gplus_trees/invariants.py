@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from gplus_trees.gplus_tree_base import get_dummy
 from gplus_trees.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -76,30 +77,55 @@ def check_leaf_keys_and_values(
 
     Works for both :class:`GPlusTreeBase` and :class:`GKPlusTreeBase`.
 
+    For Gᵏ⁺-trees, the leaf stream carries dimension sentinels (negative
+    keys): the tree's own dummy, expansion dummies of deeper dimensions and
+    carried dummies from other dimensions.  An expanded first leaf set may
+    even open the stream with a deeper dimension's sentinel.  Sentinels are
+    validated by identity against the cached sentinel of their dimension
+    (:func:`get_dummy`) instead of being treated as real keys; a sentinel
+    that is not the cached object flips ``order_ok``.  Sentinel *placement*
+    is deliberately not validated — a flat leaf-stream walk cannot know
+    which set may carry which dummy; structural checks live in
+    :func:`gplus_trees.tree_stats.gtree_stats_`.
+
     Returns
     -------
     (keys, presence_ok, all_have_values, order_ok)
     """
     dummy = tree.dummy_item
+    # Only Gᵏ⁺-trees (``DIM`` class attribute) legitimately carry sentinels
+    # in the leaf stream; for G⁺-trees a negative key stays an ordinary
+    # (broken) key so their behaviour is unchanged.
+    expansion_aware = hasattr(tree, "DIM")
 
     keys: list[int] = []
     all_have_values = True
     order_ok = True
 
+    first = True
     prev_key = None
     for leaf in tree.iter_leaf_nodes():
         for entry in leaf.set:
             item = entry.item
             key = item.key
-            if prev_key is None:
+            if expansion_aware and key < 0:
+                # prev_key stays untouched so real-key order is checked
+                # across the sentinel.
+                if item is not get_dummy(-key):
+                    order_ok = False
+                first = False
+                continue
+            if first:
+                first = False
                 if item is not dummy:
                     order_ok = False
-            else:
-                keys.append(key)
-                if item.value is None:
-                    all_have_values = False
-                if key < prev_key:
-                    order_ok = False
+                prev_key = key
+                continue
+            keys.append(key)
+            if item.value is None:
+                all_have_values = False
+            if prev_key is not None and key < prev_key:
+                order_ok = False
             prev_key = key
 
     presence_ok = True
