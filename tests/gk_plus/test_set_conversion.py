@@ -5,11 +5,10 @@ import random
 import unittest
 
 from gplus_trees.base import Entry
+from gplus_trees.g_k_plus.bulk_create import _klist_to_tree, _tree_to_klist
 from gplus_trees.g_k_plus.factory import create_gkplus_tree, make_gkplustree_classes
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, _klist_to_tree, _tree_to_klist, get_dummy
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, get_dummy
 from gplus_trees.g_k_plus.utils import calc_rank
-
-# from gplus_trees.g_k_plus.utils import _tree_to_klist, _klist_to_tree
 from gplus_trees.klist_base import KListBase
 from tests.gk_plus.base import TreeTestCase as GKPlusTreeTestCase
 

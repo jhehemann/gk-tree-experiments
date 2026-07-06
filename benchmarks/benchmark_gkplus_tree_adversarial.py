@@ -8,8 +8,8 @@ import pickle
 from typing import ClassVar
 
 from benchmarks.benchmark_utils import DEFAULT_BENCHMARK_SEED, BaseBenchmark, BenchmarkUtils, stable_seed_offset
+from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
-from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_ranks
 
 

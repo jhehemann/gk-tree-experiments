@@ -59,16 +59,6 @@ from gplus_trees.base import (
     Entry,
 )
 from gplus_trees.g_k_plus.base import GKTreeSetDataStructure
-
-# Re-export bulk-creation and conversion symbols for backward compatibility.
-# External code that does ``from gplus_trees.g_k_plus.g_k_plus_base import bulk_create_gkplus_tree``
-# (or _tree_to_klist, _klist_to_tree, RankData) will continue to work.
-from gplus_trees.g_k_plus.bulk_create import (  # noqa: F401
-    RankData,
-    _klist_to_tree,
-    _tree_to_klist,
-    bulk_create_gkplus_tree,
-)
 from gplus_trees.g_k_plus.conversion import GKPlusConversionMixin
 from gplus_trees.g_k_plus.insert import GKPlusInsertMixin
 from gplus_trees.g_k_plus.navigation import GKPlusNavigationMixin

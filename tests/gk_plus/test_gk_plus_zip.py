@@ -6,8 +6,9 @@ import unittest
 from dataclasses import asdict
 
 from gplus_trees.base import Entry
+from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.factory import create_gkplus_tree, make_gkplustree_classes
-from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase, bulk_create_gkplus_tree
+from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
 from gplus_trees.g_k_plus.utils import calc_rank, calc_ranks
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.klist_base import KListBase
