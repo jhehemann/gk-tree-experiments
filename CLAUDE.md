@@ -18,8 +18,11 @@ Agent entrypoint: invariants and pointers only. Human documentation lives in
 
 ## Branches & CI
 
-- Trunk-based: `main` is the only long-lived branch. Work on short-lived `claude/*`
-  branches, integrate via PR against `main`. There is no `develop`.
+- Trunk-based: `main` is the only long-lived branch. Work on short-lived
+  `<type>/<kebab-slug>` branches, integrate via PR against `main`. There is no
+  `develop`. `<type>` is the conventional-commit type (`feat/`, `fix/`, `docs/`,
+  `refactor/`, `chore/`, …); the slug describes the change (e.g.
+  `docs/domain-glossary-and-adrs`).
 - CI gates every push to `main` and every PR against `main`.
 - Dormant branches — do NOT build on them: `feat/inverse-node-keys`, `feat/insert-min`.
   Open decision, tracked as a local issue under `.scratch/repo-hygiene/issues/`.
