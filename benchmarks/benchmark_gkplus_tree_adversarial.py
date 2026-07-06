@@ -8,8 +8,7 @@ import pickle
 from typing import ClassVar
 
 from benchmarks.benchmark_utils import DEFAULT_BENCHMARK_SEED, BaseBenchmark, BenchmarkUtils, stable_seed_offset
-from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
-from gplus_trees.g_k_plus.factory import make_gkplustree_classes
+from gplus_trees.g_k_plus.factory import create_gkplus_tree, make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_ranks
 
 
@@ -114,8 +113,14 @@ class GKPlusTreeAdversarialRetrieveBenchmarks(BaseBenchmark):
         if tree_cache_key not in self._tree_cache:
             insert_keys = load_adversarial_keys_from_file(key_count=size, capacity=capacity, dim_limit=dim_limit)
             entries = BenchmarkUtils.create_test_entries(insert_keys)
-            _, _, klist_class, _ = make_gkplustree_classes(capacity)
-            tree = bulk_create_gkplus_tree(entries, dim_limit, l_factor, klist_class)
+            # Build the dim_limit-dimension tree through the public insert
+            # interface.  GK+-trees are canonical, so this yields the same
+            # structure as a bulk build; construction happens once per
+            # cache key (setup only).
+            tree = create_gkplus_tree(capacity, dim_limit, l_factor)
+            ranks = calc_ranks(insert_keys, capacity, DIM=dim_limit)
+            for entry, rank in zip(entries, ranks, strict=True):
+                tree, _, _ = tree.insert_entry(entry, rank)
             self._tree_cache[tree_cache_key] = (tree, insert_keys)
         self.tree, self.insert_keys = self._tree_cache[tree_cache_key]
 

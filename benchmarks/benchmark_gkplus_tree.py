@@ -10,7 +10,6 @@ import gc
 from typing import ClassVar
 
 from benchmarks.benchmark_utils import DEFAULT_BENCHMARK_SEED, BaseBenchmark, BenchmarkUtils, stable_seed_offset
-from gplus_trees.g_k_plus.bulk_create import bulk_create_gkplus_tree
 from gplus_trees.g_k_plus.factory import make_gkplustree_classes
 from gplus_trees.g_k_plus.utils import calc_ranks
 
@@ -96,7 +95,7 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
         # Check if we have a cached tree and its data for these parameters
         if tree_cache_key not in self._tree_cache:
             # Create and populate GKPlusTree (only when not cached)
-            _, _, klist_class, _ = make_gkplustree_classes(capacity)
+            tree_class, _, _, _ = make_gkplustree_classes(capacity)
 
             # Generate and insert test data with deterministic seed
             seed_offset = stable_seed_offset(capacity, size, distribution, l_factor)
@@ -107,8 +106,13 @@ class GKPlusTreeRetrieveBenchmarks(BaseBenchmark):
 
             entries = BenchmarkUtils.create_test_entries(insert_keys)
 
-            # Use bulk_create_gkplus_tree for efficient initial tree construction
-            tree = bulk_create_gkplus_tree(entries, DIM=1, l_factor=l_factor, KListClass=klist_class)
+            # Build the tree through the public insert interface.  GK+-trees
+            # are canonical, so this yields the same structure as a bulk
+            # build; construction happens once per cache key (setup only).
+            ranks = calc_ranks(insert_keys, capacity)
+            tree = tree_class(l_factor=l_factor)
+            for entry, rank in zip(entries, ranks, strict=True):
+                tree, _, _ = tree.insert_entry(entry, rank)
 
             # Cache the tree and associated data together
             self._tree_cache[tree_cache_key] = (tree, insert_keys)
