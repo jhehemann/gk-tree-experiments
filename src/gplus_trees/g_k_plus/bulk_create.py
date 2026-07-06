@@ -40,11 +40,11 @@ from gplus_trees.klist_base import KListBase
 from gplus_trees.utils import calc_rank_from_digest_k
 
 # ---------------------------------------------------------------------------
-# RankData - bookkeeping for bulk tree construction
+# _RankData - bookkeeping for bulk tree construction
 # ---------------------------------------------------------------------------
 
 
-class RankData:
+class _RankData:
     """Consolidated data structure for each rank level in bulk tree creation."""
 
     __slots__ = ("boundaries", "child_indices", "entries", "next_child_idx", "pivot_item")
@@ -153,7 +153,7 @@ def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KLi
 
 
 def _build_leaf_level_trees(
-    rank_data_map: dict[int, RankData],
+    rank_data_map: dict[int, _RankData],
     KListClass: type[KListBase],
     NodeClass,
     TreeClass,
@@ -201,7 +201,7 @@ def _build_leaf_level_trees(
 
 
 def _build_internal_levels(
-    rank_data_map: dict[int, RankData],
+    rank_data_map: dict[int, _RankData],
     leaf_trees: list,
     KListClass: type[KListBase],
     TreeClass,
@@ -358,7 +358,7 @@ def bulk_create_gkplus_tree(
     dummy = Entry(get_dummy(DIM), None)
 
     # Consolidated rank data structure
-    rank_data_map: dict[int, RankData] = {}
+    rank_data_map: dict[int, _RankData] = {}
     max_rank = 1
 
     for entry in entries:
@@ -374,7 +374,7 @@ def bulk_create_gkplus_tree(
         for rank in range(insert_rank, 0, -1):
             # Get or create rank data
             if rank not in rank_data_map:
-                rank_data_map[rank] = RankData()
+                rank_data_map[rank] = _RankData()
 
             rank_data = rank_data_map[rank]
 
