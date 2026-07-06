@@ -1,6 +1,5 @@
 # docs/ — knowledge layer
 
-- **`journal/`** — chronological experiment findings ("what did the runs show?").
 - **`adr/`** — decisions + rationale, append-only (see `adr/README.md`).
 - **`agents/`** — conventions consumed by the installed agent skills (issue tracker,
   triage labels, domain docs).

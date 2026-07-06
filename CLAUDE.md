@@ -29,7 +29,8 @@ Agent entrypoint: invariants and pointers only. Human documentation lives in
 
 ## Knowledge layer
 
-- Experiment findings: `docs/journal/` (chronological). Decisions + rationale: `docs/adr/`.
+- Decisions + rationale: `docs/adr/`. Experiment findings are kept machine-local under
+  `.scratch/` (not tracked in git).
 - Fixture provenance: `benchmarks/adversarial_keys/PROVENANCE.md`.
 
 ## Agent scaffolding
