@@ -34,6 +34,7 @@ Complexity summary (n = entries, k = KList capacity, h = resulting height):
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from itertools import islice
 
 from gplus_trees.base import (
@@ -160,6 +161,18 @@ def _bulk_create_klist(entries: list[Entry], KListClass: type[KListBase]) -> KLi
     return klist
 
 
+def _threshold_item_count(entries: Iterable[Entry], own_dummy_key: int) -> int:
+    """Count the entries that weigh against the conversion threshold.
+
+    Real items (key >= 0) and the tree's own dummy (key == own_dummy_key)
+    count; dummies carried in from other dimensions do not.  Carried
+    dummies accumulate by one per expansion level, so counting them can
+    keep a node above the threshold forever even after the real keys have
+    separated — the dimensional recursion would never terminate.
+    """
+    return sum(1 for e in entries if e.item.key >= 0 or e.item.key == own_dummy_key)
+
+
 def _build_leaf_level_trees(
     rank_data_map: dict[int, _RankData],
     KListClass: type[KListBase],
@@ -185,6 +198,7 @@ def _build_leaf_level_trees(
     boundaries_map = rank_1_data.boundaries
 
     threshold = KListClass.KListNodeClass.CAPACITY * l_factor
+    own_dummy_key = get_dummy(TreeClass.DIM).key
     leaf_trees = []
     prev_node = None
 
@@ -193,7 +207,7 @@ def _build_leaf_level_trees(
         end_idx = boundaries_map[i + 1] if i + 1 < len(boundaries_map) else len(entries)
         node_entries = entries[start_idx:end_idx]
 
-        if len(node_entries) <= threshold:
+        if _threshold_item_count(node_entries, own_dummy_key) <= threshold:
             node_set = _bulk_create_klist(node_entries, KListClass)
         else:
             node_set = _bulk_create_gkplus_tree(node_entries, TreeClass.DIM + 1, l_factor, KListClass)
@@ -240,6 +254,7 @@ def _build_internal_levels(
     bulk_create_klist_fn = _bulk_create_klist
     bulk_create_gkplus_tree_fn = _bulk_create_gkplus_tree
     tree_dim_plus_one = TreeClass.DIM + 1
+    own_dummy_key = get_dummy(TreeClass.DIM).key
 
     rank = 2
     sub_trees = leaf_trees
@@ -293,8 +308,7 @@ def _build_internal_levels(
                 prev_child_idx = child_idx
 
             # Create node set
-            node_entries_len = len(node_entries)
-            if node_entries_len <= threshold:
+            if _threshold_item_count(node_entries, own_dummy_key) <= threshold:
                 node_set = bulk_create_klist_fn(node_entries, KListClass)
             else:
                 node_set = bulk_create_gkplus_tree_fn(node_entries, tree_dim_plus_one, l_factor, KListClass)

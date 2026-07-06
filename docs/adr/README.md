@@ -9,6 +9,8 @@ work.
 | # | Title | Status | Date |
 |---|-------|--------|------|
 | [0001](0001-terminology-precedence.md) | Terminology precedence — paper over thesis over repo | Accepted | 2026-07-02 |
+| [0002](0002-hysteresis-free-conversion-threshold.md) | Hysteresis-free conversion threshold | Accepted | 2026-07-02 |
+| [0003](0003-conversion-threshold-counts-own-dimension-entries.md) | Conversion threshold counts only own-dimension entries | Accepted | 2026-07-06 |
 
 ## Format
 

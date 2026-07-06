@@ -94,6 +94,14 @@ def gtree_stats_(
     node_item_count = node_set.item_count()
     rank_hist[node_rank] = rank_hist.get(node_rank, 0) + node_set.item_count()
 
+    # Entries that weigh against the KList↔tree conversion threshold:
+    # real items plus this tree's own dummy.  Dummies carried in from
+    # other dimensions do not count — same rule as the conversion logic
+    # in g_k_plus.conversion / g_k_plus.bulk_create (counting them would
+    # make the threshold unsatisfiable once enough of them share a node).
+    # For variants without carried dummies this equals item_count().
+    node_threshold_count = sum(1 for e in node_set if e.item.key >= 0 or e.item.key == dummy_key)
+
     # ---------- check inner (higher-dimension) tree if node_set is a GKPlusTreeBase ----
     # When a KList overflows, it is replaced by a recursively instantiated
     # GKPlusTreeBase at dimension D+1.  That inner tree has its own structural
@@ -187,8 +195,8 @@ def gtree_stats_(
 
             # Check current node violations (only if no child violations yet)
             if stats.set_thresholds_met and (
-                (isinstance(node_set, KListBase) and node_set.item_count() > threshold)
-                or (not isinstance(node_set, KListBase) and node_set.item_count() <= threshold)
+                (isinstance(node_set, KListBase) and node_threshold_count > threshold)
+                or (not isinstance(node_set, KListBase) and node_threshold_count <= threshold)
             ):
                 stats.set_thresholds_met = False
 
@@ -220,8 +228,8 @@ def gtree_stats_(
         stats.set_thresholds_met = False
 
     # Check current node violations (always check, regardless of current state)
-    if (isinstance(node_set, KListBase) and node_set.item_count() > threshold) or (
-        not isinstance(node_set, KListBase) and node_set.item_count() <= threshold
+    if (isinstance(node_set, KListBase) and node_threshold_count > threshold) or (
+        not isinstance(node_set, KListBase) and node_threshold_count <= threshold
     ):
         stats.set_thresholds_met = False
 
