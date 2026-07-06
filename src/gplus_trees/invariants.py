@@ -38,10 +38,9 @@ def assert_tree_invariants_raise(
     stats: Stats,
 ) -> None:
     """Check all invariants, raising :class:`InvariantError` on the first failure."""
-    from gplus_trees.g_k_plus.g_k_plus_base import GKPlusTreeBase
-
     for flag in TREE_FLAGS:
-        if flag == "set_thresholds_met" and not isinstance(t, GKPlusTreeBase):
+        if flag == "set_thresholds_met" and t.set_conversion_threshold is None:
+            # Only variants with set conversion enforce this flag.
             continue
         if not getattr(stats, flag):
             raise InvariantError(f"Invariant failed: {flag} is False")
@@ -62,22 +61,11 @@ def assert_tree_invariants_raise(
         if stats.greatest_item is None:
             raise InvariantError("Invariant failed: greatest_item is None for non-empty tree")
 
-        if hasattr(t, "get_size"):
-            size = t.real_item_count()
-            if size != stats.real_item_count:
-                raise InvariantError(
-                    f"Invariant failed: t.real_item_count()={size} ≠ stats.real_item_count={stats.real_item_count}"
-                )
-
-
-def _get_dummy_for_tree(tree: GPlusTreeBase):
-    """Return the sentinel dummy item for *tree* (works for both G⁺ and Gᵏ⁺)."""
-    from gplus_trees.gplus_tree_base import DUMMY_ITEM, get_dummy
-
-    dim = getattr(tree.__class__, "DIM", None)
-    if dim is not None:
-        return get_dummy(dim=dim)
-    return DUMMY_ITEM
+        size = t.tracked_size()
+        if size is not None and size != stats.real_item_count:
+            raise InvariantError(
+                f"Invariant failed: t.real_item_count()={size} ≠ stats.real_item_count={stats.real_item_count}"
+            )
 
 
 def check_leaf_keys_and_values(
@@ -92,7 +80,7 @@ def check_leaf_keys_and_values(
     -------
     (keys, presence_ok, all_have_values, order_ok)
     """
-    dummy = _get_dummy_for_tree(tree)
+    dummy = tree.dummy_item
 
     keys: list[int] = []
     all_have_values = True
