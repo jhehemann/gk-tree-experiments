@@ -4,7 +4,7 @@ import random
 from statistics import median_low
 from typing import ClassVar
 
-from gplus_trees.base import Entry
+from gplus_trees.base import DummyItem, Entry, ItemData
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_ranks_multi_dims
 from gplus_trees.gplus_tree_base import get_dummy, print_pretty
@@ -599,7 +599,12 @@ class TestGKPlusLeafDummyIdentity(GKPlusTreeTestCase):
         self.assertGreater(tree.get_expanded_leaf_count(), 0, "premise: expanded leaf sets exist")
 
         first_item = next(iter(next(iter(tree.iter_leaf_nodes())).set)).item
-        self.assertIs(first_item, tree._get_dummy(), "first leaf item must be the tree's own sentinel")
+        self.assertIs(
+            first_item,
+            tree._get_dummy(),
+            "premise of this fixture: stream opens with the tree's own sentinel "
+            "(an expanded first leaf may legitimately open with a deeper dimension's sentinel)",
+        )
 
         for leaf in tree.iter_leaf_nodes():
             for entry in leaf.set:
@@ -609,3 +614,112 @@ class TestGKPlusLeafDummyIdentity(GKPlusTreeTestCase):
                         get_dummy(-entry.item.key),
                         f"dummy with key {entry.item.key} is not the cached sentinel of its dimension",
                     )
+
+
+class TestCheckLeafKeysExpansionAware(GKPlusTreeTestCase):
+    """``check_leaf_keys_and_values`` must treat dimension sentinels in
+    expanded leaf sets as sentinels, not as real keys.
+
+    Regression: every entry after the first was treated as a real key, so
+    each dimension sentinel (key -2, -3, …) broke the monotonicity check
+    and leaked into the returned key list — ``order_ok``, ``presence_ok``
+    and ``all_have_values`` were misreported as ``False`` for every
+    GK+-tree with expanded leaf sets.
+    """
+
+    def _build_expanded_tree(self):
+        keys = [5, 2, 9, 1, 7, 3, 8, 4, 6, 10, 15, 12, 20]
+        ranks = calc_ranks_multi_dims(keys, 4, dimensions=1)[0]
+        tree = create_gkplus_tree(K=4)
+        for key, rank in zip(keys, ranks, strict=True):
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), rank)
+        self.assertGreater(tree.get_expanded_leaf_count(), 0, "premise: expanded leaf sets exist")
+        return tree, keys
+
+    def test_expanded_tree_reports_all_ok(self):
+        tree, keys = self._build_expanded_tree()
+
+        got, presence_ok, all_have_values, order_ok = check_leaf_keys_and_values(tree, keys)
+        self.assertEqual(got, sorted(keys), "sentinels must not leak into the key list")
+        self.assertTrue(presence_ok)
+        self.assertTrue(all_have_values)
+        self.assertTrue(order_ok)
+
+    def test_forged_sentinel_flips_order_ok(self):
+        # A sentinel is only legitimate as the cached per-dimension object;
+        # an equal-keyed impostor must still be reported.
+        tree, keys = self._build_expanded_tree()
+
+        for leaf in tree.iter_leaf_nodes():
+            for entry in leaf.set:
+                if entry.item.key < -1:
+                    entry.item = DummyItem(ItemData(key=entry.item.key))
+                    break
+            else:
+                continue
+            break
+
+        _, _, _, order_ok = check_leaf_keys_and_values(tree, keys)
+        self.assertFalse(order_ok, "forged sentinel must flip order_ok")
+
+    def test_expanded_first_leaf_reports_all_ok(self):
+        # Rank collisions expand the *first* leaf set, so the stream opens
+        # with a deeper dimension's sentinel instead of the tree's own dummy.
+        keys = list(range(1, 11))
+        tree = create_gkplus_tree(K=2)
+        for key in keys:
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), 1)
+        self.assertGreater(tree.get_expanded_leaf_count(), 0, "premise: expanded leaf sets exist")
+        first_item = next(iter(next(iter(tree.iter_leaf_nodes())).set)).item
+        self.assertIsNot(first_item, tree._get_dummy(), "premise: stream opens with a deeper sentinel")
+
+        got, presence_ok, all_have_values, order_ok = check_leaf_keys_and_values(tree, keys)
+        self.assertEqual(got, keys)
+        self.assertTrue(presence_ok)
+        self.assertTrue(all_have_values)
+        self.assertTrue(order_ok)
+
+    def test_disorder_across_sentinel_flips_order_ok(self):
+        # Real-key order must be checked *across* sentinels: a real key that
+        # regresses right after a mid-stream sentinel has to flip order_ok.
+        tree = create_gkplus_tree(K=4)
+        for key in range(1, 31):
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), 1)
+
+        entries = [entry for leaf in tree.iter_leaf_nodes() for entry in leaf.set]
+        target = None
+        last_real = None
+        for i, entry in enumerate(entries):
+            if entry.item.key >= 0:
+                last_real = entry.item.key
+            elif last_real is not None:
+                target = next((e for e in entries[i + 1 :] if e.item.key >= 0), None)
+                break
+        self.assertIsNotNone(target, "premise: a sentinel sits between real keys")
+        self.assertGreater(last_real, 0, "premise: forged key 0 regresses below the key before the sentinel")
+
+        target.item = self.make_item(0, "forged")
+        _, _, _, order_ok = check_leaf_keys_and_values(tree, None)
+        self.assertFalse(order_ok, "disorder across a sentinel must flip order_ok")
+
+    def test_mid_chain_leaf_opening_with_sentinel_reports_all_ok(self):
+        # Rank-2 separators split the leaf chain; rank-1 collisions between
+        # them expand mid-chain leaf sets, whose streams then *open* with
+        # higher-dimension sentinels (structurally distinct from a single
+        # expanded leaf: sentinel placement varies per leaf node).
+        keys = list(range(1, 25))
+        tree = create_gkplus_tree(K=2)
+        for key in keys:
+            rank = 2 if key in (8, 16) else 1
+            tree, _, _ = tree.insert(self.make_item(key, f"v{key}"), rank)
+
+        leaves = list(tree.iter_leaf_nodes())
+        self.assertGreater(len(leaves), 1, "premise: leaf chain has multiple nodes")
+        mid_chain_sentinel_openers = [leaf for leaf in leaves[1:] if next(iter(leaf.set)).item.key < 0]
+        self.assertTrue(mid_chain_sentinel_openers, "premise: a mid-chain leaf set opens with a sentinel")
+
+        got, presence_ok, all_have_values, order_ok = check_leaf_keys_and_values(tree, keys)
+        self.assertEqual(got, keys)
+        self.assertTrue(presence_ok)
+        self.assertTrue(all_have_values)
+        self.assertTrue(order_ok)
