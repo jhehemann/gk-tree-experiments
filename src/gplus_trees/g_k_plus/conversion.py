@@ -4,8 +4,11 @@ Provides :class:`GKPlusConversionMixin`, a mixin class that adds
 ``_convert_node_set`` and ``_check_and_convert_set`` to
 :class:`GKPlusTreeBase`.
 
-Conversions are triggered when a KList exceeds ``k · l_factor`` items
-(expand) or a GKPlusTree shrinks below that threshold (collapse).
+Conversions are triggered when a KList exceeds ``k · l_factor``
+threshold-counting items (expand) or a GKPlusTree falls to or below
+that threshold (collapse).  Only real items and the owning tree's own
+dummy count toward the threshold; dummies carried in from other
+dimensions do not (see ``bulk_create._threshold_item_count``).
 These conversions are what create recursive dimensional nesting:
 an expanded KList becomes a GK+-tree of the next dimension.
 
@@ -45,7 +48,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from gplus_trees.base import AbstractSetDataStructure
-from gplus_trees.g_k_plus.bulk_create import _klist_to_tree, _tree_to_klist
+from gplus_trees.g_k_plus.bulk_create import _klist_to_tree, _threshold_item_count, _tree_to_klist
 from gplus_trees.klist_base import KListBase
 
 if TYPE_CHECKING:
@@ -100,7 +103,13 @@ class GKPlusConversionMixin:
         # Check if the item count exceeds l_factor * CAPACITY
         k = klist.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
-        if klist.item_count() > threshold:
+        if klist.item_count() <= threshold:
+            return klist
+
+        # The raw count exceeds the threshold, but only entries of this
+        # tree's own dimension weigh against it (see _threshold_item_count:
+        # counting carried dummies would make the threshold unsatisfiable).
+        if _threshold_item_count(klist, self.dummy_item.key) > threshold:
             # Convert to GKPlusTree with increased dimension
             new_dim = type(self).DIM + 1
             new_tree = _klist_to_tree(klist, k, new_dim, self.l_factor)
@@ -119,20 +128,19 @@ class GKPlusConversionMixin:
             Either the original tree or a new KList based on the threshold
 
         Implementation note:
-            An early-exit loop counts real items (key ≥ 0) and aborts as
-            soon as the count exceeds the collapse threshold.  This is
-            O(threshold) = O(k) instead of O(n), because we stop after
-            seeing threshold + 1 real items.
-
-            When the count stays ≤ threshold the tree is small enough to
-            speculatively convert via ``_tree_to_klist`` and verify the
-            actual KList size (which may be slightly larger due to
-            lower-dimension dummies that are preserved).
+            An early-exit loop counts the entries that weigh against the
+            threshold — real items (key ≥ 0) and the receiver's own
+            dummy — and aborts as soon as the count exceeds the collapse
+            threshold.  This is O(threshold) = O(k) instead of O(n),
+            because we stop after seeing threshold + 1 counting entries.
+            Dummies carried in from other dimensions are excluded, using
+            the same counting rule as the expansion check — the shared
+            rule is what keeps the conversion hysteresis-free (ADR-0002).
 
             Empty GKPlusTree sets (artifacts of unzip splits) are
             converted to empty KLists unconditionally, since an empty
             GKPlusTree would violate the ``set_thresholds_met`` invariant
-            (every GKPlusTree inner set must have item_count > threshold).
+            (every GKPlusTree inner set must exceed the threshold).
         """
         k = self.KListClass.KListNodeClass.CAPACITY
         threshold = int(k * self.l_factor)
@@ -144,29 +152,21 @@ class GKPlusConversionMixin:
         if tree.is_empty():
             # Convert to an empty KList rather than keeping an empty
             # GKPlusTree, which would violate the set_thresholds_met
-            # invariant (a GKPlusTree set must have item_count > threshold).
+            # invariant (a GKPlusTree set must exceed the threshold).
             return _tree_to_klist(tree)
 
-        # Early-exit real-item count: iterate the tree's entries and
-        # count items with key >= 0, stopping as soon as the count
-        # exceeds the collapse threshold.  This is O(threshold) instead
-        # of O(n) because we abort after seeing threshold+1 real items.
-        real_count = 0
+        # Early-exit counting: iterate the tree's entries and stop as
+        # soon as the count exceeds the collapse threshold.  Iterating
+        # *tree* also yields dummies of dimensions above the receiver's
+        # (the inner tree's own sentinel and deeper ones); the equality
+        # check excludes those alongside the carried lower-dimension ones.
+        own_dummy_key = self.dummy_item.key
+        counted = 0
         for entry in tree:
-            if entry.item.key >= 0:
-                real_count += 1
-                if real_count > threshold:
+            key = entry.item.key
+            if key >= 0 or key == own_dummy_key:
+                counted += 1
+                if counted > threshold:
                     return tree
 
-        # The tree has few enough real items that it may fit in a KList.
-        # Convert and verify the resulting size (which also includes
-        # lower-dimension dummies that _tree_to_klist preserves).
-        new_klist = _tree_to_klist(tree)
-        klist_size = new_klist.item_count()
-
-        if klist_size <= threshold:
-            return new_klist
-
-        # Resulting KList exceeds the threshold (due to preserved
-        # lower-dimension dummies).  Keep the tree structure.
-        return tree
+        return _tree_to_klist(tree)

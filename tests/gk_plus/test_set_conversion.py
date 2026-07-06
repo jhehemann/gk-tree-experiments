@@ -152,11 +152,15 @@ class TestKListToTree(TestSetConversion):
         self.assertIsInstance(tree.node.set.node.set, KListBase)
 
     def test_expansion_rank_1_dim_gt_1(self):
+        # Four real keys: the expansion decision counts only real items
+        # and the tree's own dummy (carried dummies like the -2
+        # representative below are exempt), so k+1 real keys are needed
+        # to push the DIM-3 leaf over the threshold.
         rank_lists = [
-            [1, 1, 1],  # Dimension 1
-            [1, 1, 1],  # Dimension 2
-            [1, 1, 1],  # Dimension 3 (conversion)
-            [2, 1, 1],  # Dimension 4 (expansion and stopping)
+            [1, 1, 1, 1],  # Dimension 1
+            [1, 1, 1, 1],  # Dimension 2
+            [1, 1, 1, 1],  # Dimension 3 (conversion)
+            [2, 1, 1, 1],  # Dimension 4 (expansion and stopping)
         ]
         keys = self.find_keys_for_rank_lists(rank_lists, self.k)
         entries = self.create_entries(keys)
@@ -893,6 +897,33 @@ class TestCheckConvertSameSetsInvalidation(TestSetConversion):
 
         self.assertIsInstance(other.node.set, GKPlusTreeBase)
         self.assertIsNone(other.item_cnt, "other was mutated and must be invalidated")
+
+
+class TestCarriedDummyThreshold(TestSetConversion):
+    """Regression tests: conversion-threshold counting must ignore dummies
+    carried in from other dimensions.
+
+    Counting carried dummies makes the threshold unsatisfiable once enough
+    of them share a node: each expansion level keeps the lower dimensions'
+    dummies in the node's entry list and adds its own, so with K=2 and
+    l_factor=1.0 a node holding two dummies plus one real key stays above
+    the threshold forever and bulk creation recurses through dimensions
+    without bound (RecursionError).
+    """
+
+    def test_insert_keys_sharing_low_dim_ranks_terminates(self):
+        """Keys 2 and 3 have rank 1 in dimension 1 and rank 2 in dimension 2;
+        they only separate in dimension 3.  Inserting both must terminate
+        with a finite nesting depth and all invariants intact."""
+        tree = create_gkplus_tree(K=2, dimension=1, l_factor=1.0)
+        for key in (2, 3):
+            tree, _, _ = tree.insert_entry(Entry(self.make_item(key, f"val_{key}"), None), 1)
+
+        real_keys = [e.item.key for e in tree if e.item.key >= 0]
+        self.assertEqual(real_keys, [2, 3])
+        # validate_tree checks all invariants including set_thresholds_met,
+        # which uses the same carried-dummy-exempt counting rule.
+        self.validate_tree(tree)
 
 
 if __name__ == "__main__":
