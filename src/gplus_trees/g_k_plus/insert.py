@@ -285,7 +285,6 @@ class GKPlusInsertMixin:
                     x_key,
                     replica,
                     is_leaf,
-                    check_and_convert_set,
                     capacity,
                     GKPlusTreeBase,
                 )
@@ -329,7 +328,6 @@ class GKPlusInsertMixin:
         x_key,
         replica,
         is_leaf,
-        check_and_convert_set,
         capacity,
         GKPlusTreeBase,
     ):
@@ -347,7 +345,7 @@ class GKPlusInsertMixin:
             node.set, inserted, next_entry = res[0], res[1], res[2]
             if not inserted:
                 return self.update(cur, x_entry)
-            node.set = check_and_convert_set(node.set)  # only KLists can be extended
+            cur.convert_node_set(node)  # only KLists can be extended
         else:
             digest = x_item.get_digest_for_dim(self.DIM + 1)
             new_rank = calc_rank_from_digest_k(digest, capacity)

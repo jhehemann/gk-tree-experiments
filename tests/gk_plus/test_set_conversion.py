@@ -695,11 +695,11 @@ class TestTreeToKList(TestSetConversion):
         self.assert_entries_present_same_instance(entries, list(new_tree))
 
 
-# ─── check_and_collapse_tree unit tests ────────────────────────────
+# ─── _check_and_collapse_tree unit tests ────────────────────────────
 
 
 class TestCheckAndCollapseTree(TestSetConversion):
-    """Direct unit tests for ``check_and_collapse_tree``.
+    """Direct unit tests for ``_check_and_collapse_tree``.
 
     The method is called indirectly during insert/unzip, but these tests
     verify the two edge cases that previously caused a
@@ -723,7 +723,7 @@ class TestCheckAndCollapseTree(TestSetConversion):
         return tree
 
     def _make_caller(self):
-        """Create a DIM-1 GKPlusTree instance to call check_and_collapse_tree on."""
+        """Create a DIM-1 GKPlusTree instance to call _check_and_collapse_tree on."""
         return create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
 
     def test_empty_tree_collapses_to_klist(self):
@@ -731,7 +731,7 @@ class TestCheckAndCollapseTree(TestSetConversion):
         caller = self._make_caller()
         empty_tree = create_gkplus_tree(K=self.k, dimension=2, l_factor=1.0)
 
-        result = caller.check_and_collapse_tree(empty_tree)
+        result = caller._check_and_collapse_tree(empty_tree)
 
         self.assertIsInstance(result, KListBase, "Empty GKPlusTree should be collapsed to a KList")
         self.assertTrue(result.is_empty())
@@ -741,7 +741,7 @@ class TestCheckAndCollapseTree(TestSetConversion):
         caller = self._make_caller()
         dim1_tree = create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
 
-        result = caller.check_and_collapse_tree(dim1_tree)
+        result = caller._check_and_collapse_tree(dim1_tree)
 
         self.assertIsInstance(result, GKPlusTreeBase, "DIM-1 tree should never be collapsed")
 
@@ -755,7 +755,7 @@ class TestCheckAndCollapseTree(TestSetConversion):
         self.assertIsInstance(tree, GKPlusTreeBase)
         self.assertLessEqual(tree.item_count(), threshold, "Precondition: tree must have ≤ threshold items")
 
-        result = caller.check_and_collapse_tree(tree)
+        result = caller._check_and_collapse_tree(tree)
 
         self.assertIsInstance(result, KListBase, "Small tree should be collapsed to a KList")
         # All real items should be present
@@ -772,9 +772,128 @@ class TestCheckAndCollapseTree(TestSetConversion):
         ranks = [1] * len(keys)
         tree = self._make_dim2_tree(keys, ranks)
 
-        result = caller.check_and_collapse_tree(tree)
+        result = caller._check_and_collapse_tree(tree)
 
         self.assertIsInstance(result, GKPlusTreeBase, "Large tree should remain a GKPlusTree")
+
+
+# ─── convert_node_set contract tests ───────────────────────────────
+
+
+class TestConvertNodeSet(TestSetConversion):
+    """Contract tests for ``convert_node_set``: it replaces ``node.set``
+    AND invalidates the owning tree's cached counts, so callers carry no
+    follow-up contract (previously TODO(#1) in conversion.py)."""
+
+    def setUp(self):
+        self.k = 4
+
+    def _make_leaf_tree(self, key: int = 100):
+        """DIM-1 tree with a single rank-1 leaf: node.set is a KList
+        holding the dummy and one real item."""
+        tree = create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
+        tree, _, _ = tree.insert_entry(Entry(self.make_item(key, f"val_{key}"), None), 1)
+        return tree
+
+    def _fill_klist_to(self, tree, target_count: int):
+        """Insert entries directly into the node's KList (bypassing tree
+        insertion, so no conversion is triggered) until it holds
+        *target_count* items."""
+        key = 200
+        while tree.node.set.item_count() < target_count:
+            tree.node.set, _, _ = tree.node.set.insert_entry(Entry(self.make_item(key, f"val_{key}"), None))
+            key += 1
+        return tree
+
+    def test_expansion_invalidates_cache(self):
+        """Expansion: node.set becomes a deeper-dimension tree and the
+        cached counts are recomputed (a stale count would miss the new
+        dimension's dummy)."""
+        tree = self._make_leaf_tree()
+        threshold = int(self.k * tree.l_factor)
+        self._fill_klist_to(tree, threshold + 1)
+
+        old_count = tree.item_count()
+        self.assertEqual(tree.item_cnt, old_count, "cache should be populated before conversion")
+
+        tree.convert_node_set(tree.node)
+
+        self.assertIsInstance(tree.node.set, GKPlusTreeBase, "over-threshold KList should expand")
+        self.assertEqual(tree.node.set.DIM, 2)
+        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by convert_node_set")
+        self.assertIsNone(tree.size, "size must be invalidated by convert_node_set")
+        self.assertIsNone(tree.expanded_cnt, "expanded_cnt must be invalidated by convert_node_set")
+        # The recomputed count sees the new dimension's dummy; a stale
+        # cache would still report old_count.
+        self.assertEqual(tree.item_count(), old_count + 1)
+
+    def test_collapse_invalidates_cache(self):
+        """Collapse: an undersized inner tree becomes a KList again and
+        the cached counts are invalidated."""
+        tree = self._make_leaf_tree()
+        tree.node.set = _klist_to_tree(tree.node.set, self.k, DIM=2, l_factor=tree.l_factor)
+        old_count = tree.item_count()
+        self.assertEqual(tree.item_cnt, old_count, "cache should be populated before conversion")
+
+        tree.convert_node_set(tree.node)
+
+        self.assertIsInstance(tree.node.set, KListBase, "undersized inner tree should collapse")
+        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated by convert_node_set")
+        self.assertEqual(tree.item_count(), tree.node.set.item_count(), "recount must match the converted set")
+
+    def test_no_op_still_invalidates(self):
+        """No conversion needed: the set stays, the caches are still
+        invalidated (callsites reach convert_node_set only after mutating
+        the node, so the caches are stale either way)."""
+        tree = self._make_leaf_tree()
+        klist = tree.node.set
+        tree.item_count()
+        self.assertIsNotNone(tree.item_cnt)
+
+        tree.convert_node_set(tree.node)
+
+        self.assertIs(tree.node.set, klist, "under-threshold KList must stay untouched")
+        self.assertIsNone(tree.item_cnt, "item_cnt must be invalidated even without conversion")
+
+
+class TestCheckConvertSameSetsInvalidation(TestSetConversion):
+    """``check_convert_same_sets`` replaces a node set outside the
+    threshold logic (type normalization before zipping); it must
+    invalidate the tree it mutated."""
+
+    def setUp(self):
+        self.k = 4
+
+    def _make_leaf_tree(self, key: int):
+        tree = create_gkplus_tree(K=self.k, dimension=1, l_factor=1.0)
+        tree, _, _ = tree.insert_entry(Entry(self.make_item(key, f"val_{key}"), None), 1)
+        return tree
+
+    def _expand_set(self, tree):
+        tree.node.set = _klist_to_tree(tree.node.set, self.k, DIM=2, l_factor=tree.l_factor)
+        return tree
+
+    def test_left_conversion_invalidates_left(self):
+        left = self._make_leaf_tree(100)
+        other = self._expand_set(self._make_leaf_tree(500))
+        left.item_count()
+        self.assertIsNotNone(left.item_cnt)
+
+        left, other = left.check_convert_same_sets(left, other)
+
+        self.assertIsInstance(left.node.set, GKPlusTreeBase)
+        self.assertIsNone(left.item_cnt, "left was mutated and must be invalidated")
+
+    def test_other_conversion_invalidates_other(self):
+        left = self._expand_set(self._make_leaf_tree(100))
+        other = self._make_leaf_tree(500)
+        other.item_count()
+        self.assertIsNotNone(other.item_cnt)
+
+        left, other = left.check_convert_same_sets(left, other)
+
+        self.assertIsInstance(other.node.set, GKPlusTreeBase)
+        self.assertIsNone(other.item_cnt, "other was mutated and must be invalidated")
 
 
 if __name__ == "__main__":
