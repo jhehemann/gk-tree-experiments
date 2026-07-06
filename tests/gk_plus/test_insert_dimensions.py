@@ -2,6 +2,7 @@ import copy
 import logging
 from typing import ClassVar
 
+from gplus_trees.base import Entry
 from gplus_trees.g_k_plus.factory import create_gkplus_tree
 from gplus_trees.g_k_plus.utils import calc_rank
 from gplus_trees.gplus_tree_base import print_pretty
@@ -183,3 +184,115 @@ class TestInsertMultipleDimensions(TreeTestCase):
                 self._run_insert_case_multi_dim(
                     keys, ranks, insert_pair, exp_keys, case_name, gnode_capacity=4, l_factor=1.0
                 )
+
+
+class TestGrowthAcrossConversionThreshold(TreeTestCase):
+    """Interface-level coverage for the bulk build of deeper dimensions.
+
+    Growing a tree past the conversion threshold (k · l_factor) through
+    ``insert_entry`` drives the entire internal growth path: KList
+    expansion, conversion, and the bottom-up bulk build of the
+    dimension-d+1 tree.  These tests assert only observable behaviour
+    (max dimension, expanded-leaf count, item counts, iteration order,
+    retrievability), so they exercise the conversion / bulk-create
+    internals without importing them and survive internal refactors.
+    """
+
+    def _insert_all(self, tree, keys, ranks):
+        for key, rank in zip(keys, ranks, strict=True):
+            entry = Entry(self.make_item(key, f"val_{key}"), None)
+            tree, inserted, _ = tree.insert_entry(entry, rank)
+            self.assertTrue(inserted, f"Failed to insert key {key}")
+        return tree
+
+    def _assert_all_retrievable(self, tree, keys):
+        for key in keys:
+            entry, _ = tree.retrieve(key)
+            self.assertIsNotNone(entry, f"Key {key} must be retrievable after growth")
+            self.assertEqual(entry.item.key, key)
+            self.assertEqual(entry.item.value, f"val_{key}", f"Value of key {key} must survive expansion")
+
+    def _assert_sorted_real_keys(self, tree, keys):
+        actual = [e.item.key for e in tree.iter_real_entries()]
+        self.assertEqual(sorted(keys), actual, "Real entries must iterate in sorted key order")
+
+    def test_growth_across_threshold_expands_leaf(self):
+        """Crossing k · l_factor in a leaf set must expand it into a
+        dimension-2 tree (built via the internal bulk path); staying at
+        the threshold must not."""
+        k = 4  # threshold = k * l_factor = 4 (leaf set holds the dummy too)
+        keys = self.find_keys_for_rank_lists([[1, 1, 1, 1]], k=k)
+
+        # Below/at threshold: dummy + 3 keys == 4 items -> no expansion.
+        tree = create_gkplus_tree(K=k, dimension=1, l_factor=1.0)
+        tree = self._insert_all(tree, keys[:3], [1] * 3)
+        self.assertEqual(tree.get_max_dim(), 1, "At the threshold no deeper dimension may exist")
+        self.assertEqual(tree.get_expanded_leaf_count(), 0)
+
+        # One more same-rank key pushes the leaf set past the threshold.
+        tree = self._insert_all(tree, keys[3:], [1])
+        self.assertGreaterEqual(tree.get_max_dim(), 2, "Crossing the threshold must create dimension >= 2")
+        self.assertGreaterEqual(tree.get_expanded_leaf_count(), 1)
+
+        exp_keys = sorted(self.get_dummies(tree) + keys)
+        self.validate_tree(tree, exp_keys)
+        self._assert_all_retrievable(tree, keys)
+        self._assert_sorted_real_keys(tree, keys)
+        self.assertEqual(tree.real_item_count(), len(keys))
+
+    def test_growth_threshold_scales_with_l_factor(self):
+        """With l_factor=2.0 the same capacity tolerates twice the items
+        before expanding: dummy + 7 == 8 items stay flat, the 8th key
+        triggers the dimension-2 bulk build."""
+        k = 4  # threshold = k * l_factor = 8
+        keys = self.find_keys_for_rank_lists([[1] * 8], k=k)
+
+        tree = create_gkplus_tree(K=k, dimension=1, l_factor=2.0)
+        tree = self._insert_all(tree, keys[:7], [1] * 7)
+        self.assertEqual(tree.get_max_dim(), 1, "l_factor=2.0 must defer expansion until 8 items")
+        self.assertEqual(tree.get_expanded_leaf_count(), 0)
+
+        tree = self._insert_all(tree, keys[7:], [1])
+        self.assertGreaterEqual(tree.get_max_dim(), 2)
+        self.assertGreaterEqual(tree.get_expanded_leaf_count(), 1)
+
+        exp_keys = sorted(self.get_dummies(tree) + keys)
+        self.validate_tree(tree, exp_keys)
+        self._assert_all_retrievable(tree, keys)
+
+    def test_growth_into_nested_dimensions(self):
+        """Keys colliding at rank 1 in dimensions 1 AND 2 force the bulk
+        build to recurse: the expanded dimension-2 set itself exceeds the
+        threshold and expands further."""
+        k = 4
+        keys = self.find_keys_for_rank_lists([[1] * 5, [1] * 5], k=k)
+
+        tree = create_gkplus_tree(K=k, dimension=1, l_factor=1.0)
+        tree = self._insert_all(tree, keys, [1] * len(keys))
+
+        self.assertGreaterEqual(tree.get_max_dim(), 3, "Double rank collision must nest beyond dimension 2")
+        exp_keys = sorted(self.get_dummies(tree) + keys)
+        self.validate_tree(tree, exp_keys)
+        self._assert_all_retrievable(tree, keys)
+        self._assert_sorted_real_keys(tree, keys)
+
+    def test_growth_sequential_keys_natural_ranks(self):
+        """Sequential keys with their natural (digest-derived) ranks grow
+        past the threshold in many leaves; structure, counts, ordering
+        and retrievability must hold throughout."""
+        k = 4
+        keys = list(range(1, 301))
+        ranks = [calc_rank(key=key, k=k, dim=1) for key in keys]
+
+        tree = create_gkplus_tree(K=k, dimension=1, l_factor=1.0)
+        tree = self._insert_all(tree, keys, ranks)
+
+        self.assertGreaterEqual(tree.get_max_dim(), 2, "300 keys at K=4 must expand at least one leaf")
+        self.assertGreaterEqual(tree.get_expanded_leaf_count(), 1)
+        self.assertEqual(tree.real_item_count(), len(keys))
+
+        exp_keys = sorted(self.get_dummies(tree) + keys)
+        self.validate_tree(tree, exp_keys)
+        self._assert_sorted_real_keys(tree, keys)
+        self._assert_all_retrievable(tree, keys)
+        self.assertTrue(self.verify_subtree_sizes(tree))
