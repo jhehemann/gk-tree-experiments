@@ -276,6 +276,16 @@ class TestGetDummy(unittest.TestCase):
         b = get_dummy(dim=3)
         self.assertIs(a, b, "lru_cache should return the identical object")
 
+    def test_positional_and_keyword_calls_share_cache(self):
+        # Regression: functools.cache keys positional and keyword calls
+        # separately; a direct @functools.cache on get_dummy handed out two
+        # distinct sentinels per dimension, breaking `item is dummy` checks.
+        self.assertIs(
+            get_dummy(1),
+            get_dummy(dim=1),
+            "get_dummy must return the identical sentinel regardless of call style",
+        )
+
     def test_different_dims_return_different_objects(self):
         a = get_dummy(dim=1)
         b = get_dummy(dim=2)
