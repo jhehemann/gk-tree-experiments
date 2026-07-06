@@ -518,7 +518,7 @@ class TestStatsSetThresholdsMetViolation(unittest.TestCase):
 
 class TestSetThresholdsMetRandomTreeRegression(unittest.TestCase):
     """Regression tests for ``set_thresholds_met`` invariant violations
-    that appeared when ``check_and_collapse_tree`` failed to collapse
+    that appeared when ``_check_and_collapse_tree`` failed to collapse
     undersized GKPlusTree inner sets back to KLists after unzip splits.
 
     Two root causes were identified:

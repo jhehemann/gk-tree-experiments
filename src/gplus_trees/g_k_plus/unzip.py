@@ -79,6 +79,9 @@ class GKPlusUnzipMixin:
         # below the collapse threshold.  Re-check both so that undersized
         # GKPlusTrees are converted back to KLists.  For KList splits this
         # is a no-op (a KList never needs expansion right after a split).
+        # Free-standing conversion (not convert_node_set) is safe here:
+        # self's caches were invalidated at the top of unzip, and
+        # right_set ends up in a freshly constructed tree.
         left_set = self.check_and_convert_set(left_set)
         right_set = self.check_and_convert_set(right_set)
 
