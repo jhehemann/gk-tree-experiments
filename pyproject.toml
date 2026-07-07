@@ -11,7 +11,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.11,<3.12"
 numpy = "^2.2.5"
 tqdm = "^4.67.1"
 
@@ -31,7 +31,7 @@ build-backend = "poetry.core.masonry.api"
 
 # ── Ruff (linter + formatter) ──────────────────────────────────────
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 src = ["src", "tests", "stats", "scripts"]
 
@@ -59,7 +59,7 @@ known-first-party = ["gplus_trees", "tests"]
 # The mixin-based architecture causes widespread attr-defined / union-attr
 # false positives. Re-enable in CI after adding Protocol stubs.
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
