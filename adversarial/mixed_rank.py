@@ -301,3 +301,87 @@ def parallel_blocks(k: int, depth: int, n_blocks: int, block_size: int, *, separ
 
     params = {"n_blocks": n_blocks, "block_size": block_size, "separator_rank": separator_rank}
     return _build("blocks", f"blocks_b{n_blocks}", k, depth, params, entries)
+
+
+def _bushy_leaf_profiles(depth: int, branching: int, leaf_size: int) -> list[Profile]:
+    """Full per-dimension profiles in ascending ≤_U order for a bushy tree.
+
+    Recursion (one dimension per level): at dimension ``j`` a pile splits
+    into ``branching`` sub-piles carrying dimension-j ranks ``branching`` …
+    ``1`` (descending). Sub-pile 1 (highest rank) is emitted first and is
+    therefore the outer tie set; the lower-rank sub-piles follow, landing in
+    its right subtree — so on the outer skeleton they form a rank-descending
+    ancestor→descendant chain, not siblings. Each sub-pile recurses one
+    dimension deeper. A leaf path ``(i_1,…,i_depth)`` holds ``leaf_size``
+    keys, all with profile ``(branching-i_1+1, ..., branching-i_depth+1)``;
+    there are ``branching**depth`` leaf paths, ``branching**depth·leaf_size``
+    keys total.
+    """
+
+    def emit(dim: int, prefix: tuple[int, ...]) -> list[Profile]:
+        if dim > depth:
+            return [prefix] * leaf_size
+        out: list[Profile] = []
+        for i in range(branching):
+            rank = branching - i  # i=0 -> highest rank ``branching``; i=branching-1 -> rank 1
+            out.extend(emit(dim + 1, (*prefix, rank)))
+        return out
+
+    return emit(1, ())
+
+
+def bushy_pile_tree(
+    k: int,
+    depth: int,
+    branching: int,
+    leaf_size: int,
+    *,
+    family: str = "bushy",
+    label: str | None = None,
+) -> MixedRankKeySet:
+    """Recursive bushy pile-tree: χ ≥ ``branching`` converted nodes per instance.
+
+    Generalizes L08 Part 4's χ=2 counterexample (a lower-rank pile planted in
+    a key-gap of a higher-rank pile, so both converted nodes sit on one
+    skeleton path and both inner heights count) to ``branching`` nested piles
+    at descending ranks on one path, applied recursively at every dimension
+    down to ``depth``. Each of the ``branching`` piles at dimension ``j``
+    converts into its own dimension-(j+1) inner tree, which is again a
+    (``depth``-j)-deep bushy structure -- so if the nesting survives the
+    single global ≤_U order, the nesting-aware height satisfies
+    ``H_d ≈ branching·H_{d-1} + branching ≈ branching**depth`` while
+    ``n = branching**depth · leaf_size`` (height linear in n).
+
+    This is the candidate T11 refutation of L15: run it, measure max χ (the
+    guard against the construction degenerating into side-by-side sibling
+    piles — those give χ=1) and height vs. n, and decide whether the branching
+    self-limits (χ→1, height ≈ log·log) or sustains (χ=branching, height
+    polynomial in n).
+
+    Keys are found by scanning forward from the previous key, so the emit
+    order becomes the strictly ascending key order; every key's full profile
+    is re-verified against ``calc_ranks_multi_dims`` before return.
+    """
+    if branching < 2:
+        raise ValueError(f"branching must be ≥ 2 (a bushy path needs ≥ 2 nested piles), got {branching}")
+    if depth < 1:
+        raise ValueError(f"depth must be ≥ 1, got {depth}")
+    if leaf_size < 1:
+        raise ValueError(f"leaf_size must be ≥ 1, got {leaf_size}")
+    if label is None:
+        label = f"bushy_B{branching}_d{depth}"
+
+    profiles = _bushy_leaf_profiles(depth, branching, leaf_size)
+    entries: list[tuple[int, Profile]] = []
+    start = KEY_BASE
+    for profile in profiles:
+        key = find_key_with_profile(profile, k, start_key=start, max_candidates=2_000_000_000)
+        entries.append((key, profile))
+        start = key + 1
+
+    params = {
+        "branching": branching,
+        "leaf_size": leaf_size,
+        "n_leaf_piles": branching**depth,
+    }
+    return _build(family, label, k, depth, params, entries)
