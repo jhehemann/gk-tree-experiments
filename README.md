@@ -108,6 +108,7 @@ python tests/test_runner.py --log-level INFO  # custom runner with logging
 
 ## Project layout
 - [src/gplus_trees/](src/gplus_trees/): core implementations and factories for G+ and GK+ trees.
+- [adversarial/](adversarial/): mixed-rank adversarial key-set generator (per-dimension rank profiles, verified against the rank calculation) for worst-case structure probes.
 - [benchmarks/](benchmarks/): isolated ASV-based performance measurements (see [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md)).
 - [stats/](stats/): scripts for measuring structure statistics across parameters.
 - [scripts/](scripts/): adversarial-key discovery and analysis tools.
