@@ -35,7 +35,13 @@ def make_merkle_gk_plustree_classes(K: int) -> tuple[type[MerkleGKPlusTreeBase],
     MerkleGKPlusTreeK = type(
         f"MerkleGKPlusTree_K{K}",
         (MerkleGKPlusTreeBase,),
-        {"SetClass": KListK, "NodeClass": MerkleGKPlusNodeK, "__slots__": MerkleGKPlusTreeBase.__slots__},
+        {
+            "SetClass": KListK,
+            "NodeClass": MerkleGKPlusNodeK,
+            "KListClass": KListK,
+            "DIM": 1,
+            "__slots__": MerkleGKPlusTreeBase.__slots__,
+        },
     )
 
     # Set the TreeClass on the node
