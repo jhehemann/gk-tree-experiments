@@ -32,6 +32,8 @@ Agent entrypoint: invariants and pointers only. Human documentation lives in
 - Decisions + rationale: `docs/adr/`. Experiment findings are kept machine-local under
   `.scratch/` (not tracked in git).
 - Fixture provenance: `benchmarks/adversarial_keys/PROVENANCE.md`.
+- Experiment runners record per-row code provenance: `code_sha` (short git HEAD) and
+  `code_src` (runtime `gplus_trees.__file__`).
 
 ## Agent scaffolding
 
