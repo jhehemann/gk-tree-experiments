@@ -33,7 +33,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 target-version = "py311"
 line-length = 120
-src = ["src", "tests", "stats", "scripts"]
+src = ["src", "tests", "stats", "scripts", "adversarial"]
 
 [tool.ruff.lint]
 select = [
@@ -52,7 +52,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["gplus_trees", "tests"]
+known-first-party = ["gplus_trees", "tests", "adversarial"]
 
 # ── Mypy (type checker) ────────────────────────────────────────────
 # NOTE: mypy is available locally but not enforced in CI.
