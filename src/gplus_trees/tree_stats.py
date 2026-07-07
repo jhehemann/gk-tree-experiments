@@ -42,12 +42,23 @@ def gtree_stats_(
     t: GPlusTreeBase,
     rank_hist: dict[int, int] | None = None,
     _is_root: bool = True,
+    _expect_leaf_values: bool | None = None,
 ) -> Stats:
     """
     Returns aggregated statistics for a G⁺-tree in **O(n)** time.
 
     The caller can supply an existing Counter / dict for ``rank_hist``;
     otherwise a fresh Counter is used.
+
+    ``_expect_leaf_values`` is internal recursion state: it is False for
+    inner (higher-dimension) trees that represent an *internal* node's
+    set.  Their rank-1 nodes legitimately hold value-less replicas
+    (routing structure, not data), so ``all_leaf_values_present`` stays
+    vacuously True for them instead of misreporting a violation.  The
+    default (``None``) resolves via the ``DIM`` class attribute (same
+    detection as ``check_leaf_keys_and_values``): values are expected
+    for dimension-1 Gᵏ⁺-trees and plain G⁺-trees, while an inner tree
+    validated directly on its own is exempt.
     """
     # Lazy import to break circular dependency
     from gplus_trees.klist_base import KListBase
@@ -77,6 +88,9 @@ def gtree_stats_(
             leaf_keys_in_order=True,
             inner_stats=None,
         )
+
+    if _expect_leaf_values is None:
+        _expect_leaf_values = getattr(t, "DIM", 1) == 1
 
     K = t.SetClass.KListNodeClass.CAPACITY
     threshold = t.set_conversion_threshold
@@ -115,15 +129,23 @@ def gtree_stats_(
     inner_set_stats = None
     inner_set_tree = t.inner_tree_of(node_set)
     if inner_set_tree is not None and not inner_set_tree.is_empty():
-        inner_set_stats = gtree_stats_(inner_set_tree, rank_hist=None, _is_root=True)
+        # The expanded set of an internal node (right subtree present)
+        # holds replicas, so no leaf values are expected in that inner
+        # tree; a leaf node's expanded set holds the actual data items.
+        inner_set_stats = gtree_stats_(
+            inner_set_tree,
+            rank_hist=None,
+            _is_root=True,
+            _expect_leaf_values=_expect_leaf_values and node_right_subtree is None,
+        )
 
     # ---------- recurse on children only if rank > 1 ------------------------------------
-    right_stats = gtree_stats_(node_right_subtree, rank_hist, False)
+    right_stats = gtree_stats_(node_right_subtree, rank_hist, False, _expect_leaf_values)
 
     # Only recurse on child nodes if we are at a non-leaf node indicated by the
     # presence of a right subtree
     if node_right_subtree is not None:
-        child_stats = [gtree_stats_(e.left_subtree, rank_hist, False) for e in node_set]
+        child_stats = [gtree_stats_(e.left_subtree, rank_hist, False, _expect_leaf_values) for e in node_set]
     else:
         child_stats = []
 
@@ -260,14 +282,17 @@ def gtree_stats_(
     all_inner = []
 
     if inner_set_stats is not None:
-        # Merge boolean flags from the inner tree
+        # Merge boolean flags from the inner tree.
+        # all_leaf_values_present is deliberately NOT merged: it is derived
+        # from the authoritative root-level leaf walk below, which iterates
+        # expanded leaf sets transparently.  Merging it would let inner
+        # trees of internal nodes (value-less replicas) poison the flag.
         stats.is_heap &= inner_set_stats.is_heap
         stats.is_search_tree &= inner_set_stats.is_search_tree
         stats.internal_has_replicas &= inner_set_stats.internal_has_replicas
         stats.internal_packed &= inner_set_stats.internal_packed
         stats.set_thresholds_met &= inner_set_stats.set_thresholds_met
         stats.linked_leaf_nodes &= inner_set_stats.linked_leaf_nodes
-        stats.all_leaf_values_present &= inner_set_stats.all_leaf_values_present
         stats.leaf_keys_in_order &= inner_set_stats.leaf_keys_in_order
         all_inner.append(inner_set_stats)
         # Recursively collect any deeper inner stats
@@ -296,17 +321,10 @@ def gtree_stats_(
 
     # ---------- leaf walk ONCE at the root -----------------------------
     if node_rank == 1:  # leaf node: base values
-        true_count = 0
-        all_values_present = True
-
-        for entry in node_set:
-            item = entry.item
-            if item.key >= 0:  # Skip dummy items
-                true_count += 1
-                if item.value is None:
-                    all_values_present = False
-
-        stats.all_leaf_values_present = all_values_present
+        # No per-node value check here: rank-1 nodes of inner trees under
+        # internal nodes hold value-less replicas.  Value completeness is
+        # checked by the root-level leaf walk below.
+        true_count = sum(1 for entry in node_set if entry.item.key >= 0)
         stats.real_item_count = true_count
         stats.leaf_count = 1
 
@@ -316,6 +334,7 @@ def gtree_stats_(
         leaf_count, item_count = 0, 0
         last_leaf, prev_key = None, None
         keys_in_order = True
+        all_values_present = True
         for leaf in t.iter_leaf_nodes():
             last_leaf = leaf
             leaf_count += 1
@@ -333,11 +352,16 @@ def gtree_stats_(
                     keys_in_order = False
                 prev_key = key
 
+                if item.value is None:
+                    all_values_present = False
+
                 leaf_keys.append(key)
                 leaf_values.append(item.value)
 
         # Set values from leaf traversal
         stats.leaf_keys_in_order = keys_in_order
+        if _expect_leaf_values:
+            stats.all_leaf_values_present = all_values_present
 
         # Check leaf_count and real_item_count consistency
         if leaf_count != stats.leaf_count or item_count != stats.real_item_count:
