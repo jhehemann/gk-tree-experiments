@@ -631,7 +631,10 @@ class TestGKPlusTreeZip(TreeTestCase):
         """
         k = 4
         keys1 = [157, 338, 356]
-        ranks1 = [3, 2, 1]
+        # Natural (digest-derived) ranks so tree1 matches the control tree built in
+        # _validate_tree_after_zip; under domain separation (ADR-002) hardcoded ranks
+        # would no longer equal the keys' actual ranks.
+        ranks1 = calc_ranks(keys1, k, DIM=1)
         keys2 = [578, 789, 799]
         ranks2 = [3, 1, 1]
 
@@ -675,7 +678,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         """
         k = 4
         keys1 = [157, 443]
-        ranks1 = [3, 1]
+        # Natural (digest-derived) ranks (ADR-002 domain separation); see case_a.
+        ranks1 = calc_ranks(keys1, k, DIM=1)
         keys2 = [663, 701, 888]
         ranks2 = [1, 2, 4]
 
@@ -721,7 +725,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         """
         k = 4
         keys1 = [337]
-        ranks1 = [1]
+        # Natural (digest-derived) ranks (ADR-002 domain separation); see case_a.
+        ranks1 = calc_ranks(keys1, k, DIM=1)
         keys2 = [535, 572, 705]
         ranks2 = [2, 2, 3]
 
@@ -767,7 +772,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         """
         k = 4
         keys1 = [51, 92, 121, 238, 266, 279, 299, 333, 473]
-        ranks1 = [1, 1, 1, 1, 1, 2, 1, 1, 1]
+        # Natural (digest-derived) ranks (ADR-002 domain separation); see case_a.
+        ranks1 = calc_ranks(keys1, k, DIM=1)
         keys2 = [687, 694, 711, 786, 816, 830, 892]
         ranks2 = [1, 1, 1, 1, 1, 1, 2]
 
@@ -813,7 +819,8 @@ class TestGKPlusTreeZip(TreeTestCase):
         """
         k = 4
         keys1 = [114, 150, 162, 182, 217, 258, 287, 383, 437]
-        ranks1 = [1, 1, 1, 1, 2, 1, 1, 1, 1]
+        # Natural (digest-derived) ranks (ADR-002 domain separation); see case_a.
+        ranks1 = calc_ranks(keys1, k, DIM=1)
         keys2 = [554, 588, 590, 668, 713, 752, 952]
         ranks2 = [1, 1, 1, 1, 1, 1, 1]
 

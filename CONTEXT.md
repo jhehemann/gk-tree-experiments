@@ -72,8 +72,9 @@ _Avoid_: rank (unqualified — that is the item rank), level
 
 **Dimension**:
 The nesting depth of a Gᵏ⁺-tree: dimension 1 is the outermost tree, a higher
-dimension is nested deeper (inside a G-node's set). Ranks for dimension d+1 are
-derived by hashing the dimension-d digest.
+dimension is nested deeper (inside a G-node's set). Each dimension's rank is an
+independent oracle: dimension j hashes ⟨j⟩ ‖ key directly (domain separation,
+ADR-0004 / paper ADR-002), so distinct dimensions do not share entropy.
 _Avoid_: level (collides with tree height)
 
 **Layer**:
@@ -139,9 +140,11 @@ _Avoid_: contraction, shrink
 ### Hashing
 
 **Digest**:
-The per-dimension hash of an item's key: dimension 1 hashes the key itself,
-dimension d+1 hashes the dimension-d digest. Its trailing zero bits yield the
-item's rank.
+The per-dimension hash of an item's key: dimension j is H(⟨j⟩ ‖ key), a
+fixed-length dimension tag prepended to the key (domain separation, ADR-0004 /
+paper ADR-002) — each dimension is computed directly from the key, not chained
+off the previous dimension's digest. Its trailing zero bits yield the item's
+rank.
 _Avoid_: hash (unqualified)
 
 **Merkle hash**:

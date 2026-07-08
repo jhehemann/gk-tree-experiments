@@ -53,11 +53,14 @@ def find_key_with_profile(
     """Smallest key ≥ ``start_key`` whose per-dimension ranks match ``profile``.
 
     ``profile[i]`` is the required rank in dimension i+1; None leaves that
-    dimension unconstrained. The digest chain mirrors the authoritative
-    ``gplus_trees.utils.get_digest``: dimension 1 hashes the key, dimension
-    d+1 hashes the dimension-d digest. Expected search cost is dominated by
-    the profile's largest rank r (≈ k^(r-1) candidates) and its rank-1
-    prefix length j (≈ (k/(k-1))^j survival factor).
+    dimension unconstrained. Each dimension's digest is computed
+    independently by domain separation, mirroring the authoritative
+    ``gplus_trees.utils.get_digest``: dimension d hashes ⟨d⟩ ‖ key, a
+    32-byte big-endian dimension tag prepended to the key (ADR-0004 / paper
+    ADR-002). Dimensions are not chained, so an unconstrained dimension is
+    skipped outright. Expected search cost is dominated by the profile's
+    largest rank r (≈ k^(r-1) candidates) and its rank-1 prefix length j
+    (≈ (k/(k-1))^j survival factor).
 
     Raises LookupError when ``end_key`` or ``max_candidates`` is exhausted.
     """
@@ -77,13 +80,14 @@ def find_key_with_profile(
     for _ in range(max_candidates):
         if end_key is not None and key >= end_key:
             break
-        digest = sha(key.to_bytes(32, "big") + dim_bytes[0]).digest()
+        key_bytes = abs(key).to_bytes(32, "big")
         matched = True
         for i, want in enumerate(profile):
-            if i:
-                digest = sha(digest + dim_bytes[i]).digest()
             if want is None:
                 continue
+            # Domain separation: dimension i+1's digest is H(⟨i+1⟩ ‖ key),
+            # independent of every other dimension (ADR-0004 / paper ADR-002).
+            digest = sha(dim_bytes[i] + key_bytes).digest()
             if want == 1 and low_mask:
                 if digest[-1] & low_mask:
                     continue
