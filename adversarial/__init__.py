@@ -9,9 +9,11 @@ it out. The uniform rank-1 reference search stays in
 shape families used by the height-bound probes.
 """
 
+from adversarial.measure import analyze_chi, analyze_structure
 from adversarial.mixed_rank import (
     MixedRankKeySet,
     ProfileMismatch,
+    bushy_pile_tree,
     collide_then_diversify,
     find_key_with_profile,
     front_loaded_spine,
@@ -23,6 +25,9 @@ from adversarial.mixed_rank import (
 __all__ = [
     "MixedRankKeySet",
     "ProfileMismatch",
+    "analyze_chi",
+    "analyze_structure",
+    "bushy_pile_tree",
     "collide_then_diversify",
     "find_key_with_profile",
     "front_loaded_spine",
