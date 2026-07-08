@@ -107,13 +107,9 @@ class TestRankHashConsistency(unittest.TestCase):
                     # Get digest using InternalItem method
                     digest1 = internal_item.get_digest_for_dim(dim)
 
-                    # Calculate digest manually using the same pattern as get_digest_for_dim
-                    # Start with dimension 1: hash(abs(key) + 1)
-                    digest2 = hashlib.sha256(abs(key).to_bytes(32, "big") + (1).to_bytes(32, "big")).digest()
-
-                    # For subsequent dimensions, hash(prev_digest + target_dim)
-                    for target_dim in range(2, dim + 1):
-                        digest2 = hashlib.sha256(digest2 + target_dim.to_bytes(32, "big")).digest()
+                    # Domain separation (model.md §5, ADR-002): dimension `dim` is
+                    # derived directly from the key as H(⟨dim⟩ ‖ key), not chained.
+                    digest2 = hashlib.sha256(dim.to_bytes(32, "big") + abs(key).to_bytes(32, "big")).digest()
 
                     self.assertEqual(digest1, digest2, f"Digest calculation inconsistency for key={key}, dim={dim}")
 
@@ -132,9 +128,10 @@ class TestRankHashConsistency(unittest.TestCase):
         self.assertEqual(digest1, digest2)
         self.assertIn(3, internal_item.dim_hashes)
 
-        # Lower dimensions should also be cached
-        self.assertIn(1, internal_item.dim_hashes)
-        self.assertIn(2, internal_item.dim_hashes)
+        # Domain separation (model.md §5, ADR-002): dimensions are independent, so
+        # computing dim 3 does NOT populate lower dimensions (no chaining).
+        self.assertNotIn(1, internal_item.dim_hashes)
+        self.assertNotIn(2, internal_item.dim_hashes)
 
     def test_calc_ranks_multi_dims_consistency(self):
         """Test consistency of calc_ranks_multi_dims with individual calculations."""

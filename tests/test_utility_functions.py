@@ -189,10 +189,11 @@ class TestUtilityFunctions(unittest.TestCase):
         self.assertEqual(digest2, digest2_again)
         self.assertEqual(digest3, digest3_again)
 
-        # Request higher dimension - should build from existing cache
+        # Request a higher dimension - it caches only itself; the skipped dim 4 is
+        # NOT computed (dimensions are independent, not built from a chain).
         internal_item.get_digest_for_dim(5)
-        self.assertIn(4, internal_item.dim_hashes)
         self.assertIn(5, internal_item.dim_hashes)
+        self.assertNotIn(4, internal_item.dim_hashes)
 
     def test_internal_item_with_different_key_types(self):
         """Test InternalItem with different key types."""

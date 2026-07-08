@@ -5,28 +5,29 @@ Utility functions for GPlusTree operations, including key discovery based on has
 import hashlib
 
 
-def get_digest(hash_input: int | bytes, dim: int) -> bytes:
+def get_digest(key: int, dim: int) -> bytes:
     """
-    Generates a SHA-256 digest from an input value and a dimension integer.
+    Domain-separated per-dimension digest of a key: H(⟨dim⟩ ‖ ⟨key⟩).
+
+    Realizes the settled rank construction rho_j(x) = rank(H(⟨j⟩ ‖ x))
+    (paper ``model.md`` §5, ADR-002, accepted 2026-07-07): every dimension is an
+    *independent* uniform oracle keyed by the pair (dim, key), rather than an
+    iterate of the previous dimension's digest. ⟨dim⟩ and ⟨key⟩ are fixed-length
+    32-byte big-endian encodings, so distinct (dim, key) pairs never alias and the
+    per-dimension rank vector is i.i.d. geometric for a fresh key — no chain-merge
+    or cycle pathology.
+
+    ``abs(key)`` keeps a dummy item's negative key aliased to its positive
+    counterpart, unchanged from the pre-domain-separation construction.
 
     Args:
-        hash_input (Union[int, bytes]): The input value to hash
-        dim (int): The dimension level to incorporate into the digest.
+        key (int): The item key to derive the digest for.
+        dim (int): The 1-based dimension level.
 
     Returns:
-        bytes: The resulting SHA-256 digest of the input value and the dimension.
-
-    Raises:
-        TypeError: If hash_input is not of type int or bytes.
+        bytes: The SHA-256 digest H(⟨dim⟩ ‖ ⟨key⟩).
     """
-    if isinstance(hash_input, bytes):
-        digest = hashlib.sha256(hash_input + int(dim).to_bytes(32, "big")).digest()
-    elif isinstance(hash_input, int):
-        digest = hashlib.sha256(abs(hash_input).to_bytes(32, "big") + int(dim).to_bytes(32, "big")).digest()
-    else:
-        raise TypeError("key_or_digest must be int or bytes")
-
-    return digest
+    return hashlib.sha256(int(dim).to_bytes(32, "big") + abs(int(key)).to_bytes(32, "big")).digest()
 
 
 def count_trailing_zero_bits(digest: bytes) -> int:
@@ -75,9 +76,16 @@ def calc_rank_from_digest_k(digest: bytes, k: int) -> int:
 
 
 def find_keys_for_rank_lists(rank_lists: list[list[int]], k: int, spacing: bool = False) -> list[int]:
-    """Find keys whose repeated hashes match the rank lists at their positions."""
+    """Find keys whose domain-separated per-dimension digests match the rank lists.
+
+    Inverts rho_j(x) = rank(H(⟨j⟩ ‖ x)) (model.md §5, ADR-002): dimension j's rank
+    is derived directly from the key via :func:`get_digest`, independently of the
+    other dimensions (no iterated chaining).
+    """
     group_size = get_group_size(k)
     key_count = len(rank_lists[0])
+    # Fixed-length ⟨dim⟩ prefixes, precomputed once (key varies in the hot loop).
+    dim_prefixes = [d.to_bytes(32, "big") for d in range(1, len(rank_lists) + 1)]
     result_keys: list[int] = []
     next_candidate_key = 1  # Start from 1 to reserve 0 as non-existing split key option
     MAX_SEARCH_LIMIT = 10_000_000_000
@@ -88,20 +96,16 @@ def find_keys_for_rank_lists(rank_lists: list[list[int]], k: int, spacing: bool 
         found_between_key = False
 
         while key < search_limit:
-            digest = hashlib.sha256(abs(key).to_bytes(32, "big") + (1).to_bytes(32, "big")).digest()
+            key_bytes = abs(key).to_bytes(32, "big")
             match = True
 
             for dim_index, rank_list in enumerate(rank_lists):
                 desired_rank = rank_list[key_idx]
+                digest = hashlib.sha256(dim_prefixes[dim_index] + key_bytes).digest()
                 calculated_rank = calc_rank_from_digest(digest, group_size)
                 if calculated_rank != desired_rank:
                     match = False
                     break
-
-                # Move to next dimension - hash with dimension number (2, 3, 4, ...)
-                if dim_index < len(rank_lists) - 1:
-                    dim = dim_index + 2  # dimension 2, 3, 4, ...
-                    digest = hashlib.sha256(digest + dim.to_bytes(32, "big")).digest()
 
             if match:
                 if not spacing or found_between_key:

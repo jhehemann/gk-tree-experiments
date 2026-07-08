@@ -1,6 +1,5 @@
 """Unified test base classes for all tree types."""
 
-import hashlib
 import logging
 import unittest
 from dataclasses import asdict
@@ -13,7 +12,7 @@ from gplus_trees.g_k_plus.utils import get_group_size
 from gplus_trees.gplus_tree_base import gtree_stats_, print_pretty
 from gplus_trees.invariants import check_leaf_keys_and_values
 from gplus_trees.klist_base import KListBase
-from gplus_trees.utils import calc_rank_from_digest, count_trailing_zero_bits
+from gplus_trees.utils import calc_rank_from_digest, count_trailing_zero_bits, get_digest
 from tests.utils import assert_tree_invariants_tc
 
 logger = logging.getLogger(__name__)
@@ -398,21 +397,21 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
             num_levels (int): How many times to re-hash.
         """
         group_size = get_group_size(k)
-        current_hash = hashlib.sha256(key.to_bytes(32, "big")).digest()
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Key: {key}")
             logger.debug(f"Group Size: {group_size}")
+        # Domain separation: level i's digest is H(⟨i⟩ ‖ key), independent per level.
         for level in range(num_levels):
+            current_hash = get_digest(key, level + 1)
             binary_hash = bin(int.from_bytes(current_hash, "big"))[2:].zfill(256)
             trailing_zeros = count_trailing_zero_bits(current_hash)
             rank = calc_rank_from_digest(current_hash, group_size)
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Level {level + 1}:")
+                logger.debug(f"Level {level + 1} (dimension {level + 1}):")
                 logger.debug(f"  Binary Hash   : {binary_hash}")
                 logger.debug(f"  Trailing Zeros: {trailing_zeros}")
                 logger.debug(f"  Rank          : {rank}")
-            current_hash = hashlib.sha256(current_hash).digest()
 
     def find_keys_for_rank_lists(self, rank_lists, k, spacing=False):
         """Delegate to the library utility for finding keys matching rank lists."""
@@ -421,19 +420,23 @@ class GKPlusTreeTestCase(BaseTreeTestCase):
         return util_find(rank_lists, k, spacing)
 
     def validate_key_ranks(self, keys, rank_lists, k):
-        """Validate that keys match expected rank lists, using dimension in hash calculation."""
+        """Validate that keys match expected rank lists under domain separation.
+
+        Each dimension's rank is derived directly from the key via the library
+        primitive ``get_digest`` (rho_j(x) = rank(H(⟨j⟩ ‖ x)), model.md §5, ADR-002),
+        keeping this check consistent with tree construction and key generation.
+        """
         group_size = get_group_size(k)
         for key_idx, key in enumerate(keys):
-            current_hash = hashlib.sha256(key.to_bytes(32, "big") + (1).to_bytes(32, "big")).digest()
             for dim_idx, rank_list in enumerate(rank_lists):
                 expected_rank = rank_list[key_idx]
-                actual_rank = calc_rank_from_digest(current_hash, group_size)
+                digest = get_digest(key, dim_idx + 1)
+                actual_rank = calc_rank_from_digest(digest, group_size)
                 self.assertEqual(
                     actual_rank,
                     expected_rank,
                     f"Key {key} in dimension {dim_idx + 1}: expected rank {expected_rank}, got {actual_rank}",
                 )
-                current_hash = hashlib.sha256(current_hash + (dim_idx + 2).to_bytes(32, "big")).digest()
 
     # Extended assertion methods for GK+ trees
     def _assert_internal_node_properties(self, node, items: list[InternalItem], rank: int) -> Entry | None:
