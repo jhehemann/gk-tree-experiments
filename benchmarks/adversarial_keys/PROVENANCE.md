@@ -1,9 +1,13 @@
 # Provenance — adversarial key fixtures
 
 23 frozen `.pkl` fixtures with adversarial rank-1 keys, deliberately tracked so benchmark
-runs are reproducible. Each file is a pickled `list[int]` of keys whose iterated SHA-256
-digests all have rank 1 across the file's dimension count (see
-`find_rank_keys()` in `scripts/find_adversarial_keys.py:16`).
+runs are reproducible. Each file is a pickled `list[int]` of keys whose domain-separated
+per-dimension digests `H(⟨j⟩ ‖ key)` all have rank 1 across the file's dimension count
+(see `find_rank_keys()` in `scripts/find_adversarial_keys.py:16`).
+
+Regenerated 2026-07-07 under the domain-separation rank construction (ADR-0004 / paper
+ADR-002); the previous set was produced under iterated hashing `H^j(key)`. The dimension
+matrix and naming are unchanged — only the key values differ.
 
 ## Naming scheme
 

@@ -15,20 +15,17 @@ def calc_rank_from_group_size(key: int, group_size: int, dim: int = 1) -> int:
     Returns:
         The calculated rank
     """
-    # Use keys' absolute value to hash to account for dummy keys (in testing)
-    # Start with dimension 1: hash(abs(key) + 1)
-    digest = get_digest(key, 1)
-
-    # For subsequent dimensions, hash(prev_digest + dim)
-    for d in range(2, dim + 1):
-        digest = get_digest(digest, d)
-
+    # Domain separation (model.md §5, ADR-002): dimension `dim` is derived
+    # directly from the key via H(⟨dim⟩ ‖ key), independently of other dimensions.
+    digest = get_digest(key, dim)
     return calc_rank_from_digest(digest, group_size)
 
 
 def calc_rank(key: int, k: int, dim: int) -> int:
     """
-    Calculate the rank for a key for a specific dimension based on repeated hashing.
+    Calculate the rank for a key at a specific dimension via domain separation.
+
+    The rank is rho_dim(key) = rank(H(⟨dim⟩ ‖ key)) (model.md §5, ADR-002).
 
     Args:
         key (int): The key to calculate rank for.
@@ -44,7 +41,9 @@ def calc_rank(key: int, k: int, dim: int) -> int:
 
 def calc_ranks(keys: list[int], k: int, DIM: int = 1) -> list[int]:
     """
-    Calculate ranks for a list of keys for a specific dimension based on repeated hashing.
+    Calculate ranks for a list of keys at a specific dimension via domain separation.
+
+    Each rank is rho_DIM(key) = rank(H(⟨DIM⟩ ‖ key)) (model.md §5, ADR-002).
 
     Args:
         keys (List[int]): List of integer keys to calculate ranks for.
@@ -64,12 +63,15 @@ def calc_ranks(keys: list[int], k: int, DIM: int = 1) -> list[int]:
 
 def calc_ranks_multi_dims(keys: list[int], k: int, dimensions: int = 1) -> list[list[int]]:
     """
-    Calculate ranks for a list of keys based on repeated hashing.
+    Calculate per-dimension ranks for a list of keys via domain separation.
+
+    Entry [dim-1][key_idx] is rho_dim(key) = rank(H(⟨dim⟩ ‖ key)) (model.md §5,
+    ADR-002); the dimensions are independent, not iterated.
 
     Args:
         keys (List[int]): List of integer keys to calculate ranks for.
         k (int): The K-list node capacity parameter (must be a power of 2 to derive group size).
-        dimensions (int): Number of hashing levels to apply.
+        dimensions (int): Number of dimensions to compute ranks for.
 
     Returns:
         List[List[int]]: Ranks for each dimension, where each inner list contains ranks for all keys at that dimension.
@@ -78,11 +80,11 @@ def calc_ranks_multi_dims(keys: list[int], k: int, dimensions: int = 1) -> list[
     num_keys = len(keys)
     rank_lists = [[0] * num_keys for _ in range(dimensions)]  # Initialize rank_lists[dim][key_idx]
 
+    # Domain separation (model.md §5, ADR-002): each dimension's rank comes from an
+    # independent digest H(⟨dim⟩ ‖ key); dimensions are not chained.
     for key_idx, key in enumerate(keys):
-        current_hash = get_digest(key, 1)
-        rank_lists[0][key_idx] = calc_rank_from_digest(current_hash, group_size)
-        for dim in range(1, dimensions):
-            current_hash = get_digest(current_hash, dim + 1)
-            rank_lists[dim][key_idx] = calc_rank_from_digest(current_hash, group_size)
+        for dim in range(1, dimensions + 1):
+            digest = get_digest(key, dim)
+            rank_lists[dim - 1][key_idx] = calc_rank_from_digest(digest, group_size)
 
     return rank_lists

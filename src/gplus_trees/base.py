@@ -45,41 +45,28 @@ class InternalItem:
         """Check equality of two InternalItem instances based on their keys."""
         return self.key == other.key
 
-    def get_digest_for_dim(self, dim: int) -> int:
+    def get_digest_for_dim(self, dim: int) -> bytes:
         """
-        Get the hash digest for the specified dimension.
+        Get the domain-separated hash digest for the specified dimension.
+
+        Under domain separation (model.md §5, ADR-002) each dimension's digest is
+        derived directly from the key as H(⟨dim⟩ ‖ key), independently of every
+        other dimension — there is no iterated chaining, so a cache miss computes
+        exactly one hash and touches no other dimension's entry.
 
         Args:
-            dim: The dimension level to get the rank for.
+            dim: The dimension level to get the digest for.
 
         Returns:
-            The rank for the specified dimension.
+            The digest H(⟨dim⟩ ‖ key) for the specified dimension.
         """
-        # TODO: include the dimension when hashing to differentiate between dimensions
-        # TODO: use strings to avoid collisions with negative keys
+        # TODO: use strings to avoid collisions with negative keys (abs aliases -key ↔ key)
         digest = self._item.dim_hash_map.get(dim)
         if digest is not None:
             return digest
 
-        key = self.key
-        dim_hash_map = self._item.dim_hash_map
-
-        # Ensure dim 1 is always present
-        if 1 not in dim_hash_map:
-            dim_hash_map[1] = get_digest(key, 1)
-
-        # Find the next lower existing dim hash
-        # Find the closest lower dimension
-        lower_dims = [d for d in dim_hash_map if d < dim]
-        next_lower_dim = max(lower_dims) if lower_dims else 1
-        digest = dim_hash_map[next_lower_dim]
-
-        # Only hash for missing dimensions
-        # For dimension d, hash the previous dimension's digest with d itself
-        for target_dim in range(next_lower_dim + 1, dim + 1):
-            digest = get_digest(digest, target_dim)
-            dim_hash_map[target_dim] = digest
-
+        digest = get_digest(self.key, dim)
+        self._item.dim_hash_map[dim] = digest
         return digest
 
     def short_key(self) -> str:

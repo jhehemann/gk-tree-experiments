@@ -823,7 +823,10 @@ class TestStatsInnerTreeViolationPropagation(unittest.TestCase):
     def test_inner_heap_violation_propagates(self):
         """Break the heap property in the inner tree and verify it
         propagates to the outer stats."""
-        tree = self._build_expanded_tree()
+        # n_items=9 gives the inner (dim-2) tree a root rank > 1 under domain
+        # separation (ADR-002), so the heap can actually be violated; the default
+        # of 5 yields an all-rank-1 inner tree under the new construction.
+        tree = self._build_expanded_tree(n_items=9)
         inner_tree = tree.node.set
         self.assertIsInstance(inner_tree, GKPlusTreeBase)
 

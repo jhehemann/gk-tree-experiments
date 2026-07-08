@@ -591,7 +591,10 @@ class TestGKPlusLeafDummyIdentity(GKPlusTreeTestCase):
         # Dimension expansion creates dummies for dims > 1; each must be the
         # cached sentinel of its dimension, no matter which call style the
         # constructing code path used.
-        keys = [5, 2, 9, 1, 7, 3, 8, 4, 6, 10, 15, 12, 20]
+        # Under domain separation (ADR-002) these dim-1 ranks produce an expanded
+        # (non-first) leaf whose stream opens with the tree's own dummy. The former
+        # hand-picked keys no longer expand under the new construction.
+        keys = list(range(1, 17))
         ranks = calc_ranks_multi_dims(keys, 4, dimensions=1)[0]
         tree = create_gkplus_tree(K=4)
         for key, rank in zip(keys, ranks, strict=True):
@@ -628,7 +631,10 @@ class TestCheckLeafKeysExpansionAware(GKPlusTreeTestCase):
     """
 
     def _build_expanded_tree(self):
-        keys = [5, 2, 9, 1, 7, 3, 8, 4, 6, 10, 15, 12, 20]
+        # Under domain separation (ADR-002) these dim-1 ranks produce an expanded
+        # (non-first) leaf whose stream opens with the tree's own dummy. The former
+        # hand-picked keys no longer expand under the new construction.
+        keys = list(range(1, 17))
         ranks = calc_ranks_multi_dims(keys, 4, dimensions=1)[0]
         tree = create_gkplus_tree(K=4)
         for key, rank in zip(keys, ranks, strict=True):
